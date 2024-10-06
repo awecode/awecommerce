@@ -1,4 +1,5 @@
 import { productService } from './service'
+import { client } from '../core/db'
 
 export const seedProduct = async () => {
   console.log('Seeding product...')
@@ -10,4 +11,9 @@ export const seedProduct = async () => {
   console.log('Product seeded:', product)
 }
 
-seedProduct()
+const main = async () => {
+  await seedProduct()
+  await client.end()
+}
+
+main()

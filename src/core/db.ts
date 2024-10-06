@@ -3,8 +3,9 @@ import { Client } from 'pg'
 
 console.log(process.env.POSTGRES_URL)
 
-const client = new Client({
+export const client = new Client({
   connectionString: process.env.POSTGRES_URL,
 })
 
+client.connect()
 export const db = drizzle(client)
