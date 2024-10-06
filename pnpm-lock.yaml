@@ -10,10 +10,13 @@ importers:
     dependencies:
       drizzle-orm:
         specifier: ^0.33.0
-        version: 0.33.0(@types/pg@8.11.10)(pg@8.13.0)
+        version: 0.33.0(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4)
       pg:
         specifier: ^8.13.0
         version: 8.13.0
+      postgres:
+        specifier: ^3.4.4
+        version: 3.4.4
     devDependencies:
       '@types/pg':
         specifier: ^8.11.10
@@ -988,6 +991,10 @@ packages:
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
+  postgres@3.4.4:
+    resolution: {integrity: sha512-IbyN+9KslkqcXa8AO9fxpk97PA4pzewvpi2B3Dwy9u4zpV32QicaEdgmF3eSQUzdRk7ttDHQejNgAEr4XoeH4A==}
+    engines: {node: '>=12'}
+
   resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
 
@@ -1544,10 +1551,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.33.0(@types/pg@8.11.10)(pg@8.13.0):
+  drizzle-orm@0.33.0(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4):
     optionalDependencies:
       '@types/pg': 8.11.10
       pg: 8.13.0
+      postgres: 3.4.4
 
   esbuild-register@3.6.0(esbuild@0.19.12):
     dependencies:
@@ -1767,6 +1775,8 @@ snapshots:
   postgres-interval@3.0.0: {}
 
   postgres-range@1.1.4: {}
+
+  postgres@3.4.4: {}
 
   resolve-pkg-maps@1.0.0: {}
 
