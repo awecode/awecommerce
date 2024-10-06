@@ -16,7 +16,7 @@ import {
 
 export const productService = {
   createProduct: async (product: NewProduct) => {
-    console.log('Creating product...', product)
-    return await db.insert(products).values(product).returning()
+    const result = await db.insert(products).values(product).returning()
+    return result[0]
   },
 }
