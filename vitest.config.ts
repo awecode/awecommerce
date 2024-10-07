@@ -5,6 +5,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     env: loadEnv('', process.cwd(), ''),
-    setupFiles: ['./tests/pg/setup.ts'],
+    setupFiles: ['./tests/setup.ts'],
   },
 })
