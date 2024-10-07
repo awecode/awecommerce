@@ -4,7 +4,9 @@
   "description": "Awecommerce",
   "main": "index.ts",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest",
+    "migrate": "tsx --env-file=./.env src/core/migrate.ts",
+    "seed:product": "tsx --env-file=./.env src/product/seed.ts"
   },
   "keywords": [],
   "author": "",
