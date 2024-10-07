@@ -6,24 +6,23 @@ import {
 } from 'drizzle-orm/pglite'
 import { Client } from 'pg'
 
-let db:
-  | NodePgDatabase<Record<string, never>>
-  | PgliteDatabase<Record<string, never>>
-let client: Client | PGlite
+type Database = NodePgDatabase<Record<string, never>> | PgliteDatabase<Record<string, never>>
+type DatabaseClient = Client | PGlite
+
+let db: Database
+let client: DatabaseClient
 
 if (process.env.NODE_ENV === 'test') {
   client = new PGlite()
   db = drizzlePglite(client)
 } else {
-  console.log(process.env.POSTGRES_URL)
-
-  client = new Client({
-    connectionString: process.env.POSTGRES_URL,
-  })
-
-  client.connect()
+  const postgresUrl = process.env.POSTGRES_URL
+  if (!postgresUrl) {
+    throw new Error('POSTGRES_URL is not set')
+  }
+  client = new Client({ connectionString: postgresUrl })
+  void client.connect()
   db = drizzle(client)
 }
 
 export { client, db }
-
