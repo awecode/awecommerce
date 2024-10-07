@@ -10,7 +10,7 @@ importers:
     dependencies:
       drizzle-orm:
         specifier: ^0.33.0
-        version: 0.33.0(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4)
+        version: 0.33.0(@electric-sql/pglite@0.2.10)(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4)
       pg:
         specifier: ^8.13.0
         version: 8.13.0
@@ -18,6 +18,9 @@ importers:
         specifier: ^3.4.4
         version: 3.4.4
     devDependencies:
+      '@electric-sql/pglite':
+        specifier: ^0.2.10
+        version: 0.2.10
       '@faker-js/faker':
         specifier: ^9.0.3
         version: 9.0.3
@@ -44,6 +47,9 @@ packages:
 
   '@drizzle-team/brocli@0.10.1':
     resolution: {integrity: sha512-AHy0vjc+n/4w/8Mif+w86qpppHuF3AyXbcWW+R/W7GNA3F5/p2nuhlkCJaTXSLZheB4l1rtHzOfr9A7NwoR/Zg==}
+
+  '@electric-sql/pglite@0.2.10':
+    resolution: {integrity: sha512-0TJF/1ouBweCtyZC4oHwx+dHGn/lP16KfEO/3q22RDuZUsV2saTuYAwb6eK3gBLzVdXG4dj4xZilvmBYEM/WQg==}
 
   '@esbuild-kit/core-utils@3.3.2':
     resolution: {integrity: sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ==}
@@ -1142,6 +1148,8 @@ snapshots:
 
   '@drizzle-team/brocli@0.10.1': {}
 
+  '@electric-sql/pglite@0.2.10': {}
+
   '@esbuild-kit/core-utils@3.3.2':
     dependencies:
       esbuild: 0.18.20
@@ -1563,8 +1571,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.33.0(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4):
+  drizzle-orm@0.33.0(@electric-sql/pglite@0.2.10)(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4):
     optionalDependencies:
+      '@electric-sql/pglite': 0.2.10
       '@types/pg': 8.11.10
       pg: 8.13.0
       postgres: 3.4.4

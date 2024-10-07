@@ -11,6 +11,7 @@
   "license": "ISC",
   "packageManager": "pnpm@9.4.0+sha1.9217c800d4ab947a7aee520242a7b70d64fc7638",
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.10",
     "@faker-js/faker": "^9.0.3",
     "@types/pg": "^8.11.10",
     "drizzle-kit": "^0.24.2",
