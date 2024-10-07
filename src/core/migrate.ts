@@ -9,7 +9,7 @@ const url = `${process.env.POSTGRES_URL}`
 const db = drizzle(postgres(url))
 
 migrate(db, {
-  migrationsFolder: './drizzle',
+  migrationsFolder: './migrations',
 }).then(() =>
   // eslint-disable-next-line no-console
   console.log('🎉 Migration complete'),
