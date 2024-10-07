@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest'
 import { productService } from './service'
 import { faker } from '@faker-js/faker'
+import { db } from '../core/db'
+import { products } from './schema'
+import { eq } from 'drizzle-orm'
 
 it('should create a product', async () => {
   const name = faker.commerce.productName()
@@ -15,4 +18,13 @@ it('should create a product', async () => {
   expect(product.name).toBe(name)
   expect(product.description).toBe(description)
   expect(product.price).toBe(price)
+  const result = await db
+    .select()
+    .from(products)
+    .where(eq(products.id, product.id))
+  expect(result).toHaveLength(1)
+  const productFromDb = result[0]
+  expect(productFromDb.name).toBe(name)
+  expect(productFromDb.description).toBe(description)
+  expect(productFromDb.price).toBe(price)
 })
