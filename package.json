@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "test": "vitest",
-    "migrate": "tsx --env-file=./.env core/pg/migrate.ts",
+    "migrate": "tsx --env-file=./.env core/db/pg/migrate.ts",
     "seed:product": "tsx --env-file=./.env apps/product/seed.ts"
   },
   "keywords": [],

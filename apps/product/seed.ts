@@ -1,5 +1,5 @@
 import { productService } from './service'
-import { client } from '../../core/pg/db'
+import { client } from '../../core/db/pg/db'
 
 export const seedProduct = async () => {
   console.log('Seeding product...')

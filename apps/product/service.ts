@@ -1,4 +1,4 @@
-import { db } from '../../core/pg/db'
+import { db } from '../../core/db/pg/db'
 
 import {
   NewProduct,
