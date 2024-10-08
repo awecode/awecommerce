@@ -10,18 +10,20 @@ import { dialect, type dialectType } from '../config'
 import { type LibSQLDatabase } from 'drizzle-orm/libsql'
 
 const doMigrate = async () => {
+  console.log('Running migrations for ', dialect, ' ...')
   if (dialect === 'pg') {
     const client = getClient()
     const drizzle = drizzlePglite(client)
     await migratePglite(drizzle, {
-      migrationsFolder: path.join(process.cwd(), 'migrations'),
+      migrationsFolder: path.join(process.cwd(), 'migrations/pg'),
     })
   } else {
     const db = initializeDb() as unknown as LibSQLDatabase
     await migrateSqlite(db, {
-      migrationsFolder: path.join(process.cwd(), 'migrations'),
+      migrationsFolder: path.join(process.cwd(), 'migrations/sqlite'),
     })
   }
+  console.log('Migrations for ', dialect, ' completed!')
 }
 
 beforeAll(async () => {
