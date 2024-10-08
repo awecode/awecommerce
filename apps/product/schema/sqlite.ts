@@ -1,44 +1,40 @@
 import {
   integer,
-  pgEnum,
-  pgTable,
-  serial,
+  sqliteTable,
   text,
-  timestamp,
-} from 'drizzle-orm/pg-core'
+} from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm';
 
-export const brands = pgTable('brand', {
-  id: serial().primaryKey(),
+export const brands = sqliteTable('brand', {
+  id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   slug: text().notNull(),
   description: text(),
-  createdAt: timestamp({ mode: 'string' }).defaultNow(),
-  updatedAt: timestamp({ mode: 'string' }).defaultNow(),
+  createdAt: text().default(sql`(current_timestamp)`),
+  updatedAt: text().default(sql`(current_timestamp)`),
 })
 
-export const categories = pgTable('category', {
-  id: serial().primaryKey(),
+export const categories = sqliteTable('category', {
+  id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   slug: text().notNull(),
   parentId: integer().references((): any => categories.id),
   description: text(),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: text().default(sql`(current_timestamp)`),
+  updatedAt: text().default(sql`(current_timestamp)`),
 })
 
-export const productClasses = pgTable('product_class', {
-  id: serial().primaryKey(),
+export const productClasses = sqliteTable('product_class', {
+  id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   slug: text().notNull(),
   description: text(),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: text().default(sql`(current_timestamp)`),
+  updatedAt: text().default(sql`(current_timestamp)`),
 })
 
-export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
-
-export const products = pgTable('product', {
-  id: serial().primaryKey(),
+export const products = sqliteTable('product', {
+  id: integer().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
   description: text().notNull(),
   brandId: integer().references(() => brands.id),
@@ -47,17 +43,17 @@ export const products = pgTable('product', {
   link: text(),
   thumbnail: text(),
   price: integer().notNull(),
-  status: productStatus('status').default('Draft'),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  status: text({ enum: ['Draft', 'Published'] }).default('Draft'),
+  createdAt: text().default(sql`(current_timestamp)`),
+  updatedAt: text().default(sql`(current_timestamp)`),
 })
 
-export const productImages = pgTable('product_image', {
-  id: serial().primaryKey(),
+export const productImages = sqliteTable('product_image', {
+  id: integer().primaryKey({ autoIncrement: true }),
   productId: integer().references(() => products.id),
   imageUrl: text().notNull(),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: text().default(sql`(current_timestamp)`),
+  updatedAt: text().default(sql`(current_timestamp)`),
 })
 
 export type NewProduct = typeof products.$inferInsert
