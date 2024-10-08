@@ -10,3 +10,5 @@ const client = createClient({
   url: sqliteUrl,
 })
 const db = drizzle(client)
+
+export { db }

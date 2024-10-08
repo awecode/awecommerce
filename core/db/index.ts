@@ -1,16 +1,17 @@
-// import { config } from '../../config'
-// import { client as clientPg, db as dbPg } from './pg/db'
-// import { client as clientSqlite, db as dbSqlite } from './pg/db'
+import { dialect, type dialectType } from '../../config'
+import { client as clientPg, db as dbPg } from './pg/db'
+import { db as dbSqlite } from './sqlite/db'
 
-// let client: typeof clientPg | typeof clientSqlite
-// let db: typeof dbPg | typeof dbSqlite
+let client
+let theDb
 
-// if (config.dbDialect === 'pg') {
-//   client = clientPg
-//   db = dbPg
-// } else {
-//   client = clientSqlite
-//   db = dbSqlite
-// }
+if (dialect === 'pg') {
+  client = clientPg
+  theDb = dbPg
+} else {
+  theDb = dbSqlite
+}
 
-// export { client, db }
+const db = theDb as dialectType
+
+export { client, db }

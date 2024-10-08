@@ -8,12 +8,12 @@ import {
   type PgliteDatabase,
 } from 'drizzle-orm/pglite'
 
-type Database =
+export type PgDatabase =
   | NodePgDatabase<Record<string, never>>
   | PgliteDatabase<Record<string, never>>
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
-let db: Database
+let db: PgDatabase
 let client: PGliteWithEnd
 
 if (process.env.NODE_ENV === 'test') {
