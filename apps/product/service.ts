@@ -12,7 +12,7 @@ import {
   NewBrand,
   Brand,
   products,
-} from './schema'
+} from './schema/pg'
 
 export const productService = {
   createProduct: async (product: NewProduct) => {

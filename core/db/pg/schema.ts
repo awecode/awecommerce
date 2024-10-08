@@ -1,1 +1,1 @@
-export * from '../../../apps/product/schema'
+export * from '../../../apps/product/schema/pg'

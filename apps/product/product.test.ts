@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { expect, test } from 'vitest'
 
 import { db } from '../../core/db/pg/db'
-import { products } from './schema'
+import { products } from './schema/pg'
 import { productService } from './service'
 
 test('should create a product', async () => {
