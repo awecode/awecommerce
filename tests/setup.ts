@@ -2,10 +2,11 @@ import { PGlite } from '@electric-sql/pglite'
 import { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator'
 import path from 'path'
-import { beforeAll } from 'vitest'
-import { client } from '../core/db/pg/db'
+import { afterAll, beforeAll } from 'vitest'
+import { getClient } from '../core/db/pg/db'
 
 const doMigrate = async () => {
+  const client = getClient()
   const drizzle = drizzlePglite(client)
   await migratePglite(drizzle, {
     migrationsFolder: path.join(process.cwd(), 'migrations'),
@@ -14,4 +15,9 @@ const doMigrate = async () => {
 
 beforeAll(async () => {
   await doMigrate()
+})
+
+afterAll(async () => {
+  const client = getClient()
+  await client.end()
 })

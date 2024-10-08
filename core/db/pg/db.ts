@@ -13,10 +13,10 @@ export type PgDatabase =
   | PgliteDatabase<Record<string, never>>
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
-const initializeDb = () => {
-  let db: PgDatabase
-  let client: PGliteWithEnd
+let client: PGliteWithEnd
+let db: PgDatabase
 
+const initializeDb = () => {
   if (process.env.NODE_ENV === 'test') {
     client = new PGlite() as PGliteWithEnd
 
@@ -32,13 +32,17 @@ const initializeDb = () => {
     db = drizzle(pool)
   }
 
-  // if (client instanceof PGlite) {
-  //   (client).end = async () => {
-  //     await (client as PGlite).close()
-  //   }
-  // }
+  if (client instanceof PGlite) {
+    (client).end = async () => {
+      await (client as PGlite).close()
+    }
+  }
 
   return db
 }
 
-export { initializeDb }
+const getClient = () => {
+  return client
+}
+
+export { initializeDb, getClient }
