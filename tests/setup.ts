@@ -3,7 +3,7 @@ import { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator'
 import path from 'path'
 import { beforeAll } from 'vitest'
-import { client } from '../src/core/db'
+import { client } from '../core/db'
 
 const pgliteClient = client as PGlite
 
