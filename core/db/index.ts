@@ -1,17 +1,15 @@
 import { dialect, type dialectType } from '../../config'
-import { client as clientPg, db as dbPg } from './pg/db'
-import { db as dbSqlite } from './sqlite/db'
+import { initializeDb as initializePg } from './pg/db'
+import { initializeDb as initializeSqlite } from './sqlite/db'
 
-let client
 let theDb
 
 if (dialect === 'pg') {
-  client = clientPg
-  theDb = dbPg
+  theDb = initializePg()
 } else {
-  theDb = dbSqlite
+  theDb = initializeSqlite()
 }
 
 const db = theDb as dialectType
 
-export { client, db }
+export { db }

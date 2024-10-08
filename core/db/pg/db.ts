@@ -13,28 +13,32 @@ export type PgDatabase =
   | PgliteDatabase<Record<string, never>>
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
-let db: PgDatabase
-let client: PGliteWithEnd
+const initializeDb = () => {
+  let db: PgDatabase
+  let client: PGliteWithEnd
 
-if (process.env.NODE_ENV === 'test') {
-  client = new PGlite() as PGliteWithEnd
+  if (process.env.NODE_ENV === 'test') {
+    client = new PGlite() as PGliteWithEnd
 
-  db = drizzlePglite(client)
-} else {
-  const postgresUrl = process.env.POSTGRES_URL
-  if (!postgresUrl) {
-    throw new Error('POSTGRES_URL is not set')
+    db = drizzlePglite(client)
+  } else {
+    const postgresUrl = process.env.POSTGRES_URL
+    if (!postgresUrl) {
+      throw new Error('POSTGRES_URL is not set')
+    }
+    const pool = new Pool({
+      connectionString: postgresUrl,
+    })
+    db = drizzle(pool)
   }
-  const pool = new Pool({
-    connectionString: postgresUrl,
-  })
-  db = drizzle(pool)
+
+  // if (client instanceof PGlite) {
+  //   (client).end = async () => {
+  //     await (client as PGlite).close()
+  //   }
+  // }
+
+  return db
 }
 
-// if (client instanceof PGlite) {
-//   (client).end = async () => {
-//     await (client as PGlite).close()
-//   }
-// }
-
-export { db, client }
+export { initializeDb }

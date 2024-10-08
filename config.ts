@@ -1,5 +1,10 @@
 import { type LibSQLDatabase } from 'drizzle-orm/libsql'
-// import { type PgDatabase } from './core/db/pg/db'
+import { type PgDatabase } from './core/db/pg/db'
 
-export const dialect: 'pg' | 'sqlite' = 'sqlite'
-export type dialectType = LibSQLDatabase
+type Dialect = 'pg' | 'sqlite'
+
+// export const dialect: Dialect = 'sqlite'
+// export type dialectType = LibSQLDatabase
+
+export const dialect: Dialect = 'pg'
+export type dialectType = PgDatabase
