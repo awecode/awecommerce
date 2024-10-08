@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker'
 import { eq } from 'drizzle-orm'
 import { expect, test } from 'vitest'
 
-import { db } from '../../core/db'
+import { db } from '../../core/pg/db'
 import { products } from './schema'
 import { productService } from './service'
 
