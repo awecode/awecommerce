@@ -14,9 +14,10 @@ type Database =
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
 let db: Database
+let client: PGliteWithEnd
 
 if (process.env.NODE_ENV === 'test') {
-  const client = new PGlite() as PGliteWithEnd
+  client = new PGlite() as PGliteWithEnd
 
   db = drizzlePglite(client)
 } else {
@@ -36,4 +37,4 @@ if (process.env.NODE_ENV === 'test') {
 //   }
 // }
 
-export { db }
+export { db, client }
