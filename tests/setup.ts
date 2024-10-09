@@ -1,10 +1,10 @@
+import { db } from 'core/db'
+import { migrate as migrateSqlite } from 'drizzle-orm/libsql/migrator'
 import { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator'
-import { migrate as migrateSqlite } from 'drizzle-orm/libsql/migrator'
 import path from 'path'
 import { afterAll, beforeAll } from 'vitest'
-import { getClient } from 'core/db/pg/db'
-import { db } from 'core/db'
+import { getClient } from '../core/db/pg/db'
 
 import { dialect } from 'config'
 import { type LibSQLDatabase } from 'drizzle-orm/libsql'
