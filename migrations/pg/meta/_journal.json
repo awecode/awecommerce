@@ -8,6 +8,13 @@
       "when": 1728147765492,
       "tag": "0000_spooky_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1728475371475,
+      "tag": "0001_giant_champions",
+      "breakpoints": true
     }
   ]
 }

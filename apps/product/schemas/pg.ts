@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgEnum,
   pgTable,
@@ -31,6 +32,7 @@ export const productClasses = pgTable('product_class', {
   name: text().notNull(),
   slug: text().notNull(),
   description: text(),
+  trackStock: boolean().default(true),
   createdAt: timestamp().defaultNow(),
   updatedAt: timestamp().defaultNow(),
 })
@@ -40,7 +42,8 @@ export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
 export const products = pgTable('product', {
   id: serial().primaryKey(),
   name: text().notNull(),
-  description: text().notNull(),
+  description: text(),
+  specification: text(),
   brandId: integer().references(() => brands.id),
   categoryId: integer().references(() => categories.id),
   productClassId: integer().references(() => productClasses.id),
@@ -48,6 +51,10 @@ export const products = pgTable('product', {
   thumbnail: text(),
   price: integer().notNull(),
   status: productStatus('status').default('Draft'),
+  stockQuantity: integer().default(0),
+  isFeatured: boolean().default(false),
+  isBestSeller: boolean().default(false),
+  relatedProducts: integer().references((): any => products.id),
   createdAt: timestamp().defaultNow(),
   updatedAt: timestamp().defaultNow(),
 })
