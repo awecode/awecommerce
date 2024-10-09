@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -49,7 +50,9 @@ export const products = pgTable('product', {
   productClassId: integer().references(() => productClasses.id),
   link: text(),
   thumbnail: text(),
-  price: integer().notNull(),
+  price: numeric({ precision: 100 }),
+  discountedPrice: numeric({ precision: 100 }),
+  inventoryCost: numeric({ precision: 100 }),
   status: productStatus('status').default('Draft'),
   stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),

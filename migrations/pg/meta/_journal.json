@@ -15,6 +15,13 @@
       "when": 1728475371475,
       "tag": "0001_giant_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1728479331940,
+      "tag": "0002_fat_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }

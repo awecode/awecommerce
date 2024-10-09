@@ -13,7 +13,7 @@ test('should create a product', async () => {
   const product = await productService.create({
     name,
     description,
-    price,
+    price: price.toString(),
   })
   expect(product).toBeDefined()
   expect(product.name).toBe(name)
@@ -71,12 +71,12 @@ test('should update a product', async () => {
   const product = await productService.update(1, {
     name: 'Updated Product',
     description: 'Updated Description',
-    price: 150,
+    price: '150',
   })
   expect(product).toBeDefined()
   expect(product.name).toBe('Updated Product')
   expect(product.description).toBe('Updated Description')
-  expect(product.price).toBe(150)
+  expect(product.price).toBe('150')
 })
 
 test('should delete a product', async () => {
