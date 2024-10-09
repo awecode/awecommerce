@@ -1,14 +1,13 @@
+import { db } from 'core/db'
+import { getClient } from 'core/db/pg/db'
+import { migrate as migrateSqlite } from 'drizzle-orm/libsql/migrator'
 import { drizzle as drizzlePglite } from 'drizzle-orm/pglite'
 import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator'
-import { migrate as migrateSqlite } from 'drizzle-orm/libsql/migrator'
 import path from 'path'
 import { afterAll, beforeAll } from 'vitest'
-import { getClient } from '../core/db/pg/db'
-import { db } from '../core/db'
 
-import { dialect, type dialectType } from '../config'
+import { dialect } from 'config'
 import { type LibSQLDatabase } from 'drizzle-orm/libsql'
-import { sql } from 'drizzle-orm'
 
 const doMigrate = async () => {
   console.log('Running migrations for ', dialect, ' ...')

@@ -1,12 +1,11 @@
 import { productService } from './services/product'
-// import { client } from '../../core/db/pg/db'
 
 export const seedProduct = async () => {
   console.log('Seeding product...')
-  const product = await productService.createProduct({
+  const product = await productService.create({
     name: 'Test Product',
     description: 'Test Description',
-    price: 100,
+    price: '100',
   })
   console.log('Product seeded:', product)
 }
