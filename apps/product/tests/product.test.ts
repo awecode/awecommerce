@@ -36,3 +36,15 @@ test('should filter products', async () => {
   })
   expect(products).toHaveLength(1)
 })
+
+test('should mark a product as featured', async () => {
+  const product = await productService.markAsFeatured(1)
+  expect(product).toBeDefined()
+  expect(product.isFeatured).toBe(true)
+})
+
+test('should unmark a product as featured', async () => {
+  const product = await productService.unmarkAsFeatured(1)
+  expect(product).toBeDefined()
+  expect(product.isFeatured).toBe(false)
+})

@@ -57,4 +57,25 @@ export const productService = {
     const result = await query
     return result
   },
+
+  markAsFeatured: async (productId: number) => {
+    const result = await db.update(products).set({ isFeatured: true }).where(eq(products.id, productId)).returning()
+    return result[0]
+  },
+
+  unmarkAsFeatured: async (productId: number) => {
+    const result = await db.update(products).set({ isFeatured: false }).where(eq(products.id, productId)).returning()
+    return result[0]
+  },
+
+  markAsBestSeller: async (productId: number) => {
+    const result = await db.update(products).set({ isBestSeller: true }).where(eq(products.id, productId)).returning()
+    return result[0]
+  },
+
+  unmarkAsBestSeller: async (productId: number) => {
+    const result = await db.update(products).set({ isBestSeller: false }).where(eq(products.id, productId)).returning()
+    return result[0]
+  },
 }
+
