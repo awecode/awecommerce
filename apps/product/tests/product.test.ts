@@ -29,3 +29,10 @@ test('should create a product', async () => {
   expect(productFromDb.description).toBe(description)
   expect(productFromDb.price).toBe(price)
 })
+
+test('should filter products', async () => {
+  const products = await productService.filterProducts({
+    status: 'Draft',
+  })
+  expect(products).toHaveLength(1)
+})
