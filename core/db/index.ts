@@ -4,10 +4,13 @@ import { initializeDb as initializeSqlite } from './sqlite/db'
 
 let theDb
 
-if (dialect === 'pg') {
-  theDb = initializePg()
+if (!theDb) {
+  console.log('Initializing database...') 
+  if (dialect === 'pg') {
+    theDb = initializePg()
 } else {
-  theDb = initializeSqlite()
+    theDb = initializeSqlite()
+  }
 }
 
 const db = theDb as dialectType

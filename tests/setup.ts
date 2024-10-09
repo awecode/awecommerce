@@ -4,10 +4,11 @@ import { migrate as migrateSqlite } from 'drizzle-orm/libsql/migrator'
 import path from 'path'
 import { afterAll, beforeAll } from 'vitest'
 import { getClient } from '../core/db/pg/db'
-import { initializeDb } from '../core/db/sqlite/db'
+import { db } from '../core/db'
 
 import { dialect, type dialectType } from '../config'
 import { type LibSQLDatabase } from 'drizzle-orm/libsql'
+import { sql } from 'drizzle-orm'
 
 const doMigrate = async () => {
   console.log('Running migrations for ', dialect, ' ...')
@@ -18,7 +19,6 @@ const doMigrate = async () => {
       migrationsFolder: path.join(process.cwd(), 'migrations/pg'),
     })
   } else {
-    const db = initializeDb() as unknown as LibSQLDatabase
     await migrateSqlite(db, {
       migrationsFolder: path.join(process.cwd(), 'migrations/sqlite'),
     })
