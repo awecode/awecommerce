@@ -1,5 +1,5 @@
 import { products } from 'apps/product/schemas'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import {
   integer,
   numeric,
@@ -7,11 +7,13 @@ import {
   serial,
   text,
   timestamp,
+  uuid,
 } from 'drizzle-orm/pg-core'
 
 export const carts = pgTable('cart', {
   id: serial().primaryKey(),
   userId: text(),
+  sessionId: uuid().notNull().default(sql`uuid_generate_v4()`).unique(),
   createdAt: timestamp().defaultNow(),
   updatedAt: timestamp().defaultNow(),
 })
