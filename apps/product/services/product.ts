@@ -14,12 +14,27 @@ interface ProductFilter {
 }
 
 export const productService = {
-  createProduct: async (product: NewProduct) => {
+  create: async (product: NewProduct) => {
     const result = await db.insert(products).values(product).returning()
     return result[0]
   },
 
-  filterProducts: async (filter: ProductFilter) => {
+  get: async (productId: number) => {
+    const result = await db.select().from(products).where(eq(products.id, productId))
+    return result[0]
+  },
+
+  update: async (productId: number, product: Partial<Product>) => {
+    const result = await db.update(products).set(product).where(eq(products.id, productId)).returning()
+    return result[0]
+  },
+
+  delete: async (productId: number) => {
+    const result = await db.delete(products).where(eq(products.id, productId)).returning()
+    return result[0]
+  },
+
+  filter: async (filter: ProductFilter) => {
     const where: SQL[] = []
 
     if (filter.brandId) {
