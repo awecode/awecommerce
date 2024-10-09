@@ -9,11 +9,11 @@ import { productService } from '../services/product'
 test('should create a product', async () => {
   const name = faker.commerce.productName()
   const description = faker.commerce.productDescription()
-  const price = faker.number.int({ min: 10, max: 100 })
+  const price = faker.number.int({ min: 10, max: 100 }).toString()
   const product = await productService.create({
     name,
     description,
-    price: price.toString(),
+    price: price,
   })
   expect(product).toBeDefined()
   expect(product.name).toBe(name)
