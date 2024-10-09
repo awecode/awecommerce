@@ -20,17 +20,38 @@ export const productService = {
   },
 
   get: async (productId: number) => {
-    const result = await db.select().from(products).where(eq(products.id, productId))
+    const result = await db
+      .select()
+      .from(products)
+      .where(eq(products.id, productId))
+    return result[0]
+  },
+
+  getPrices: async (productId: number) => {
+    const result = await db
+      .select({
+        price: products.price,
+        discountedPrice: products.discountedPrice,
+      })
+      .from(products)
+      .where(eq(products.id, productId))
     return result[0]
   },
 
   update: async (productId: number, product: Partial<Product>) => {
-    const result = await db.update(products).set(product).where(eq(products.id, productId)).returning()
+    const result = await db
+      .update(products)
+      .set(product)
+      .where(eq(products.id, productId))
+      .returning()
     return result[0]
   },
 
   delete: async (productId: number) => {
-    const result = await db.delete(products).where(eq(products.id, productId)).returning()
+    const result = await db
+      .delete(products)
+      .where(eq(products.id, productId))
+      .returning()
     return result[0]
   },
 
@@ -74,23 +95,38 @@ export const productService = {
   },
 
   markAsFeatured: async (productId: number) => {
-    const result = await db.update(products).set({ isFeatured: true }).where(eq(products.id, productId)).returning()
+    const result = await db
+      .update(products)
+      .set({ isFeatured: true })
+      .where(eq(products.id, productId))
+      .returning()
     return result[0]
   },
 
   unmarkAsFeatured: async (productId: number) => {
-    const result = await db.update(products).set({ isFeatured: false }).where(eq(products.id, productId)).returning()
+    const result = await db
+      .update(products)
+      .set({ isFeatured: false })
+      .where(eq(products.id, productId))
+      .returning()
     return result[0]
   },
 
   markAsBestSeller: async (productId: number) => {
-    const result = await db.update(products).set({ isBestSeller: true }).where(eq(products.id, productId)).returning()
+    const result = await db
+      .update(products)
+      .set({ isBestSeller: true })
+      .where(eq(products.id, productId))
+      .returning()
     return result[0]
   },
 
   unmarkAsBestSeller: async (productId: number) => {
-    const result = await db.update(products).set({ isBestSeller: false }).where(eq(products.id, productId)).returning()
+    const result = await db
+      .update(products)
+      .set({ isBestSeller: false })
+      .where(eq(products.id, productId))
+      .returning()
     return result[0]
   },
 }
-
