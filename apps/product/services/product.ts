@@ -1,4 +1,4 @@
-import { db } from '../../core/db'
+import { db } from '../../../core/db'
 
 import {
   NewProduct,
@@ -12,7 +12,7 @@ import {
   NewBrand,
   Brand,
   products,
-} from './schema'
+} from '../schemas'
 
 export const productService = {
   createProduct: async (product: NewProduct) => {

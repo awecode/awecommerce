@@ -1,1 +1,1 @@
-export * from '../../../apps/product/schema/sqlite'
+export * from '../../../apps/product/schemas/sqlite'

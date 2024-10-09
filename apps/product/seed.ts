@@ -1,4 +1,4 @@
-import { productService } from './service'
+import { productService } from './services/product'
 // import { client } from '../../core/db/pg/db'
 
 export const seedProduct = async () => {
