@@ -7,7 +7,7 @@ interface ProductFilter {
   brandId?: number
   categoryId?: number
   productClassId?: number
-  status?: 'Draft' | 'Published'
+  status?: Product['status']
   search?: string // searches id or name
   isFeatured?: boolean
   isBestSeller?: boolean
