@@ -12,10 +12,18 @@ export const cartService = {
   addToCart: async (sessionId: string, productId: number, quantity: number) => {
     const { price, discountedPrice } = await productService.getPrices(productId)
 
-    const cartId = (await db
-      .select({ id: carts.id })
-      .from(carts)
-      .where(eq(carts.sessionId, sessionId)))[0].id
+    if (!price) {
+      throw new Error('Product price not found')
+    }
+
+    const cartPrice = discountedPrice || price
+
+    const cartId = (
+      await db
+        .select({ id: carts.id })
+        .from(carts)
+        .where(eq(carts.sessionId, sessionId))
+    )[0].id
 
     const result = await db
       .insert(cartLines)
@@ -23,7 +31,7 @@ export const cartService = {
         cartId,
         productId,
         quantity,
-        price: discountedPrice,
+        price: cartPrice,
         originalPrice: price,
       })
       .returning()
@@ -35,19 +43,27 @@ export const cartService = {
     if (quantity < 1) {
       throw new Error('Quantity must be at least 1')
     }
-    const result = await db.update(cartLines).set({ quantity }).where(eq(cartLines.id, cartLineId)).returning()
+    const result = await db
+      .update(cartLines)
+      .set({ quantity })
+      .where(eq(cartLines.id, cartLineId))
+      .returning()
     return result[0]
   },
 
   removeFromCart: async (cartLineId: number) => {
-    const result = await db.delete(cartLines).where(eq(cartLines.id, cartLineId)).returning()
+    const result = await db
+      .delete(cartLines)
+      .where(eq(cartLines.id, cartLineId))
+      .returning()
     return result[0]
   },
-
 
   clearCart: async (cartId: number) => {
-    const result = await db.delete(cartLines).where(eq(cartLines.cartId, cartId)).returning()
+    const result = await db
+      .delete(cartLines)
+      .where(eq(cartLines.cartId, cartId))
+      .returning()
     return result[0]
   },
-
 }

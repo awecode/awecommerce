@@ -10,7 +10,7 @@ test('should create a cart', async () => {
   const cart = await cartService.create()
   expect(cart).toBeDefined()
   expect(cart.id).toBeDefined()
-  expect(cart.userId).toBeUndefined()
+  expect(cart.userId).toBeNull()
   expect(cart.sessionId).toBeDefined()
 })
 
@@ -26,6 +26,6 @@ test('should add a product to the cart', async () => {
   expect(cartLine).toBeDefined()
   expect(cartLine.cartId).toBe(cart.id)
   expect(cartLine.productId).toBe(product.id)
-  expect(cartLine.price).toBe(discountedPrice)
+  expect(cartLine.price).toBe(discountedPrice || price)
   expect(cartLine.originalPrice).toBe(price)
 })
