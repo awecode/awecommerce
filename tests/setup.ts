@@ -19,7 +19,8 @@ const doMigrate = async () => {
       migrationsFolder: path.join(process.cwd(), 'migrations/pg'),
     })
   } else {
-    await migrateSqlite(db, {
+    const dbToMigrate = db as unknown as LibSQLDatabase
+    await migrateSqlite(dbToMigrate, {
       migrationsFolder: path.join(process.cwd(), 'migrations/sqlite'),
     })
   }
