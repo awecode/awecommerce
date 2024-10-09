@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
+import { uuid_ossp } from '@electric-sql/pglite/contrib/uuid_ossp'
 
 import {
   drizzle as drizzlePglite,
@@ -18,7 +19,9 @@ let db: PgDatabase
 
 const initializeDb = () => {
   if (process.env.NODE_ENV === 'test') {
-    client = new PGlite() as PGliteWithEnd
+    client = new PGlite({
+      extensions: { uuid_ossp }
+    }) as PGliteWithEnd
 
     db = drizzlePglite(client)
   } else {
