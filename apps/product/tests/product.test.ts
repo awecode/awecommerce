@@ -2,8 +2,8 @@ import { faker } from '@faker-js/faker'
 import { eq, sql } from 'drizzle-orm'
 import { expect, test } from 'vitest'
 
-import { db } from '../../../core/db'
-import { products } from '../schemas'
+import { db } from 'core/db'
+import { products } from '../schemas/pg'
 import { productService } from '../services/product'
 
 test('should create a product', async () => {

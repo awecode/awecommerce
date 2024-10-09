@@ -1,4 +1,4 @@
-import { dialect, type dialectType } from '../../config'
+import { dialect, type dialectType } from 'config'
 import { initializeDb as initializePg } from './pg/db'
 import { initializeDb as initializeSqlite } from './sqlite/db'
 

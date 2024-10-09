@@ -1,5 +1,5 @@
 import { and, eq, like, or, SQL } from 'drizzle-orm'
-import { db } from '../../../core/db'
+import { db } from 'core/db'
 
 import { NewProduct, Product, products } from '../schemas'
 
