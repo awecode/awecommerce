@@ -8,6 +8,7 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
+    "migrate:pglite": "tsx --env-file=./.env core/db/pg/migrate-pglite.ts",
     "migrate:sqlite": "tsx --env-file=./.env core/db/sqlite/migrate.ts",
     "seed:product": "tsx --env-file=./.env apps/product/seed.ts"
   },
