@@ -1,0 +1,1 @@
+ALTER TYPE "cart_status" ADD VALUE 'Merged';

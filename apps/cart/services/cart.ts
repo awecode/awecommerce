@@ -122,6 +122,7 @@ export const cartService = {
       .from(carts)
       .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
+      .groupBy(carts.id)
       .orderBy(desc(carts.updatedAt))
     if (!userCart) {
       // set user id to session cart and return the cart content
@@ -148,6 +149,7 @@ export const cartService = {
       .from(carts)
       .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
       .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
+      .groupBy(carts.id)
       .orderBy(desc(carts.updatedAt))
     if (!sessionCart) {
       return userCart
@@ -194,7 +196,6 @@ export const cartService = {
         set: {
           quantity: sql`excluded.quantity`,
           price: sql`excluded.price`,
-          originalPrice: sql`excluded.originalPrice`,
         },
       })
 
