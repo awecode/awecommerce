@@ -46,3 +46,13 @@ test('should get cart content for session', async () => {
   expect(cartContent.lines[0].price.toString()).toBe(product1.discountedPrice || product1.price)
   expect(cartContent.lines[1].price.toString()).toBe(product2.discountedPrice || product2.price)
 })
+
+test('should merge carts', async () => {
+  const cart1 = await cartService.create('123') //123 is userId
+  const cart2 = await cartService.create()
+  const product1 = await createProduct()
+  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  const product2 = await createProduct()
+  await cartService.addToCart(cart2.sessionId, product2.id, 3)
+  await cartService.mergeCarts(cart1.userId!, cart2.sessionId)
+})

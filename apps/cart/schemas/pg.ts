@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-export const cartStatus = pgEnum('cart_status', ['Open', 'Frozen', 'Cancelled'])
+export const cartStatus = pgEnum('cart_status', ['Open', 'Frozen', 'Cancelled', 'Merged'])
 
 export const carts = pgTable('cart', {
   id: serial().primaryKey(),
