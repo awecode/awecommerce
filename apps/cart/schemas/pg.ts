@@ -50,3 +50,4 @@ export const cartRelations = relations(carts, ({ many }) => ({
 
 export type Cart = typeof carts.$inferSelect
 export type CartLine = typeof cartLines.$inferSelect
+export type NewCartLine = typeof cartLines.$inferInsert

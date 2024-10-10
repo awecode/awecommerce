@@ -1,7 +1,12 @@
 import { db } from 'core/db'
-import { CartLine, cartLines, carts } from '../schemas'
+import { Cart, CartLine, NewCartLine, cartLines, carts } from '../schemas'
 import { eq, desc, and, sql } from 'drizzle-orm'
 import { productService } from 'apps/product/services/product'
+
+interface CartContent {
+  cart: Cart
+  lines: (CartLine | NewCartLine)[]
+}
 
 export const cartService = {
   create: async (userId?: string) => {
@@ -85,7 +90,7 @@ export const cartService = {
     return result[0]
   },
 
-  getCartContentForSession: async (sessionId: string) => {
+  getCartContentForSession: async (sessionId: string): Promise<CartContent> => {
     // returns cart with line items
     const result = await db
       .select({
@@ -110,7 +115,10 @@ export const cartService = {
    * @param userId - The ID of the user whose cart needs to be merged.
    * @param sessionId - The session ID associated with the cart to be merged.
    */
-  mergeCarts: async (userId: string, sessionId: string) => {
+  mergeCarts: async (
+    userId: string,
+    sessionId: string,
+  ): Promise<CartContent> => {
     // This should be a database function instead
     // Transaction
     // Get open cart for user
@@ -152,7 +160,7 @@ export const cartService = {
       .groupBy(carts.id)
       .orderBy(desc(carts.updatedAt))
     if (!sessionCart) {
-      return userCart
+      return userCart[0]
     }
     // Get all cart lines from user cart and add to session cart, set user id to session cart.
     // For cart lines, if product exists in session cart, update quantity, otherwise add new line item.
@@ -170,10 +178,6 @@ export const cartService = {
             price: sessionLine.price,
             originalPrice: sessionLine.originalPrice,
           })
-          // await db
-          //   .update(cartLines)
-          //   .set({ quantity: userLine.quantity + sessionLine.quantity })
-          //   .where(eq(cartLines.id, userLine.id))
         } else {
           lines.push({
             id: undefined,
@@ -204,5 +208,10 @@ export const cartService = {
       .update(carts)
       .set({ status: 'Merged' })
       .where(eq(carts.id, userCart[0].cart.id))
+
+    return {
+      cart: userCart[0].cart,
+      lines,
+    }
   },
 }
