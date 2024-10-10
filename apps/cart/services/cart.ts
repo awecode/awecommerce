@@ -173,7 +173,7 @@ export const cartService = {
       for (const userLine of userCart[0].lines) {
         if (userLine.productId) {
           const sessionLine = sessionCart[0].lines.find(
-            (l) => l.productId === userLine.productId,
+            (l) => l?.productId === userLine.productId,
           )
           if (sessionLine) {
             lines.push({

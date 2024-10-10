@@ -127,8 +127,22 @@ test('should merge carts when session cart is invalid', async () => {
   expect(mergedCart.lines[0].quantity).toBe(2)
 })
 
-test('merge cart should return session cart when user cart is empty', async () => {
+test('should return user cart for merge when session cart is empty', async () => {
   const cart1 = await cartService.create('1234') //1234 is userId
+  const product1 = await createProduct()
+  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  const cart2 = await cartService.create()
+  const mergedCart = await cartService.mergeCarts(
+    cart1.userId!,
+    cart2.sessionId,
+  )
+  expect(mergedCart.cart.userId).toBe(cart1.userId)
+  expect(mergedCart.cart.sessionId).toBe(cart2.sessionId)
+  expect(mergedCart.lines.length).toBe(1)
+})
+
+test('should return session cart for merge when user cart is empty', async () => {
+  const cart1 = await cartService.create('12345') //1234 is userId
   const cart2 = await cartService.create()
   const product2 = await createProduct()
   await cartService.addToCart(cart2.sessionId, product2.id, 2)
@@ -143,11 +157,11 @@ test('merge cart should return session cart when user cart is empty', async () =
   expect(mergedCart.lines[0].quantity).toBe(2)
 })
 
-test('should return empty cart when both user and session cart are empty', async () => {
-  const cart1 = await cartService.create('12345') //12345 is userId
+test('should return empty cart for merge when both user and session cart are empty', async () => {
+  const cart1 = await cartService.create('123456') //12345 is userId
   const cart2 = await cartService.create()
   const mergedCart = await cartService.mergeCarts(
-    cart1.userId!, // dummy uuid
+    cart1.userId!,
     cart2.sessionId,
   )
   expect(mergedCart.cart.userId).toBe(cart1.userId)
