@@ -1,11 +1,11 @@
-import { db } from 'core/db'
-import { Cart, CartLine, NewCartLine, cartLines, carts } from '../schemas'
-import { eq, desc, and, sql } from 'drizzle-orm'
 import { productService } from 'apps/product/services/product'
+import { db } from 'core/db'
+import { and, desc, eq, sql } from 'drizzle-orm'
+import { Cart, CartLine, cartLines, carts } from '../schemas'
 
 interface CartContent {
   cart: Cart
-  lines: (CartLine | NewCartLine)[]
+  lines: CartLine[]
 }
 
 export const cartService = {
@@ -196,7 +196,7 @@ export const cartService = {
       if (
         !userCart[0].lines.find((l) => l.productId === sessionLine.productId)
       ) {
-        // Fix for json_agg not returning createdAt and updatedAt as datetime
+        // TODO Fix for json_agg not returning createdAt and updatedAt as Date?
         // if (is(sessionLine.createdAt, PgTimestampString))
         //   sessionLine.createdAt = new Date(sessionLine.createdAt)
         if (
@@ -216,7 +216,7 @@ export const cartService = {
     }
 
     // insert or update cart lines
-    await db
+    const insertedLines = await db
       .insert(cartLines)
       .values(lines)
       .onConflictDoUpdate({
@@ -226,6 +226,7 @@ export const cartService = {
           price: sql`excluded.price`,
         },
       })
+      .returning()
 
     // Mark user cart as merged
     await db
@@ -240,7 +241,7 @@ export const cartService = {
 
     return {
       cart: sessionCart[0].cart,
-      lines,
+      lines: insertedLines,
     }
   },
 }
