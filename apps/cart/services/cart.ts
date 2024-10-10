@@ -1,6 +1,6 @@
 import { db } from 'core/db'
 import { cartLines, carts } from '../schemas'
-import { eq } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 import { productService } from 'apps/product/services/product'
 
 export const cartService = {
@@ -64,6 +64,24 @@ export const cartService = {
       .delete(cartLines)
       .where(eq(cartLines.cartId, cartId))
       .returning()
+    return result[0]
+  },
+
+  getCartForSession: async (sessionId: string) => {
+    const result = await db
+      .select()
+      .from(carts)
+      .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
+      .orderBy(desc(carts.updatedAt))
+    return result[0]
+  },
+
+  getCartForUser: async (userId: string) => {
+    const result = await db
+      .select()
+      .from(carts)
+      .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
+      .orderBy(desc(carts.updatedAt))
     return result[0]
   },
 }
