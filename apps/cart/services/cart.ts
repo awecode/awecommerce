@@ -154,30 +154,49 @@ export const cartService = {
     }
     // Get all cart lines from user cart and add to session cart, set user id to session cart.
     // For cart lines, if product exists in session cart, update quantity, otherwise add new line item.
-    
+
+    const lines = []
     for (const userLine of userCart[0].lines) {
       if (userLine.productId) {
         const sessionLine = sessionCart[0].lines.find(
           (l) => l.productId === userLine.productId,
         )
         if (sessionLine) {
-          await db
-            .update(cartLines)
-            .set({ quantity: userLine.quantity + sessionLine.quantity })
-            .where(eq(cartLines.id, userLine.id))
+          lines.push({
+            id: sessionLine.id,
+            quantity: userLine.quantity + sessionLine.quantity,
+            price: sessionLine.price,
+            originalPrice: sessionLine.originalPrice,
+          })
+          // await db
+          //   .update(cartLines)
+          //   .set({ quantity: userLine.quantity + sessionLine.quantity })
+          //   .where(eq(cartLines.id, userLine.id))
         } else {
-          await db
-            .insert(cartLines)
-            .values({
-              cartId: sessionCart[0].cart.id,
-              productId: userLine.productId,
-              quantity: userLine.quantity,
-              price: userLine.price,
-              originalPrice: userLine.originalPrice,
-            })
+          lines.push({
+            id: undefined,
+            cartId: sessionCart[0].cart.id,
+            productId: userLine.productId,
+            quantity: userLine.quantity,
+            price: userLine.price,
+            originalPrice: userLine.originalPrice,
+          })
         }
       }
     }
+
+    // insert or update cart lines
+    await db
+      .insert(cartLines)
+      .values(lines)
+      .onConflictDoUpdate({
+        target: cartLines.id,
+        set: {
+          quantity: sql`excluded.quantity`,
+          price: sql`excluded.price`,
+          originalPrice: sql`excluded.originalPrice`,
+        },
+      })
 
     // Mark user cart as merged
     await db
