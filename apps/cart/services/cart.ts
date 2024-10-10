@@ -191,6 +191,30 @@ export const cartService = {
       }
     }
 
+    // Also add lines from session cart that are not in user cart
+    for (const sessionLine of sessionCart[0].lines) {
+      if (
+        !userCart[0].lines.find((l) => l.productId === sessionLine.productId)
+      ) {
+        // Fix for json_agg not returning createdAt and updatedAt as datetime
+        // if (is(sessionLine.createdAt, PgTimestampString))
+        //   sessionLine.createdAt = new Date(sessionLine.createdAt)
+        if (
+          sessionLine.createdAt &&
+          typeof sessionLine.createdAt === 'string'
+        ) {
+          sessionLine.createdAt = new Date(sessionLine.createdAt)
+        }
+        if (
+          sessionLine.updatedAt &&
+          typeof sessionLine.updatedAt === 'string'
+        ) {
+          sessionLine.updatedAt = new Date(sessionLine.updatedAt)
+        }
+        lines.push(sessionLine)
+      }
+    }
+
     // insert or update cart lines
     await db
       .insert(cartLines)
@@ -209,8 +233,13 @@ export const cartService = {
       .set({ status: 'Merged' })
       .where(eq(carts.id, userCart[0].cart.id))
 
+    // set user id to session cart
+    await db.update(carts).set({ userId }).where(eq(carts.sessionId, sessionId))
+
+    sessionCart[0].cart.userId = userId
+
     return {
-      cart: userCart[0].cart,
+      cart: sessionCart[0].cart,
       lines,
     }
   },
