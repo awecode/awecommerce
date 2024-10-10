@@ -15,6 +15,13 @@
       "when": 1728536898262,
       "tag": "0001_dapper_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1728543309373,
+      "tag": "0002_dry_spitfire",
+      "breakpoints": true
     }
   ]
 }

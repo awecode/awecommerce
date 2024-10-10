@@ -3,6 +3,7 @@ import { relations, sql } from 'drizzle-orm'
 import {
   integer,
   numeric,
+  pgEnum,
   pgTable,
   serial,
   text,
@@ -10,10 +11,13 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
+export const cartStatus = pgEnum('cart_status', ['Open', 'Frozen', 'Cancelled'])
+
 export const carts = pgTable('cart', {
   id: serial().primaryKey(),
   userId: text(),
   sessionId: uuid().notNull().default(sql`uuid_generate_v4()`).unique(),
+  status: cartStatus().default('Open'),
   createdAt: timestamp().defaultNow(),
   updatedAt: timestamp().defaultNow(),
 })

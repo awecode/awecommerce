@@ -53,7 +53,7 @@ export const products = pgTable('product', {
   price: numeric({ precision: 100 }),
   discountedPrice: numeric({ precision: 100 }),
   inventoryCost: numeric({ precision: 100 }),
-  status: productStatus('status').default('Draft'),
+  status: productStatus().default('Draft'),
   stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),
   isBestSeller: boolean().default(false),
