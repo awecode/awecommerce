@@ -201,6 +201,7 @@ export const cartService = {
     // Also add lines from session cart that are not in user cart
     for (const sessionLine of sessionCart[0].lines) {
       if (
+        sessionLine &&
         !userCart[0].lines.find((l) => l?.productId === sessionLine.productId)
       ) {
         // TODO Fix for json_agg not returning createdAt and updatedAt as Date?
@@ -222,18 +223,21 @@ export const cartService = {
       }
     }
 
-    // insert or update cart lines
-    const insertedLines = await db
-      .insert(cartLines)
-      .values(lines)
-      .onConflictDoUpdate({
-        target: cartLines.id,
-        set: {
-          quantity: sql`excluded.quantity`,
-          price: sql`excluded.price`,
-        },
-      })
-      .returning()
+    let insertedLines: CartLine[] = []
+    if (lines.length) {
+      // insert or update cart lines
+      insertedLines = await db
+        .insert(cartLines)
+        .values(lines)
+        .onConflictDoUpdate({
+          target: cartLines.id,
+          set: {
+            quantity: sql`excluded.quantity`,
+            price: sql`excluded.price`,
+          },
+        })
+        .returning()
+    }
 
     // Mark user cart as merged
     await db
