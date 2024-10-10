@@ -1,6 +1,6 @@
 import { db } from 'core/db'
-import { cartLines, carts } from '../schemas'
-import { eq, desc, and } from 'drizzle-orm'
+import { CartLine, cartLines, carts } from '../schemas'
+import { eq, desc, and, sql } from 'drizzle-orm'
 import { productService } from 'apps/product/services/product'
 
 export const cartService = {
@@ -82,6 +82,20 @@ export const cartService = {
       .from(carts)
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
       .orderBy(desc(carts.updatedAt))
+    return result[0]
+  },
+
+  getCartContentForSession: async (sessionId: string) => {
+    // returns cart with line items
+    const result = await db
+      .select({
+        cart: carts,
+        lines: sql<CartLine[]>`json_agg(${cartLines})`
+      })
+      .from(carts)
+      .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
+      .where(eq(carts.sessionId, sessionId))
+      .groupBy(carts.id)
     return result[0]
   },
 }
