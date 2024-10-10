@@ -135,14 +135,14 @@ export const cartService = {
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
       .groupBy(carts.id)
       .orderBy(desc(carts.updatedAt))
-    if (!userCart) {
+    if (!userCart.length) {
       // set user id to session cart and return the cart content
       const result = await db
         .update(carts)
         .set({ userId })
         .where(eq(carts.sessionId, sessionId))
         .returning()
-      if (!result) {
+      if (!result.length) {
         // return newCart with empty lines
         return {
           cart: await cartService.create(userId),
@@ -169,29 +169,31 @@ export const cartService = {
     // For cart lines, if product exists in session cart, update quantity, otherwise add new line item.
 
     const lines = []
-    for (const userLine of userCart[0].lines) {
-      if (userLine.productId) {
-        const sessionLine = sessionCart[0].lines.find(
-          (l) => l.productId === userLine.productId,
-        )
-        if (sessionLine) {
-          lines.push({
-            id: sessionLine.id,
-            quantity: sumProductQuantityOnCartMerge
-              ? userLine.quantity + sessionLine.quantity
-              : sessionLine.quantity,
-            price: sessionLine.price,
-            originalPrice: sessionLine.originalPrice,
-          })
-        } else {
-          lines.push({
-            id: undefined,
-            cartId: sessionCart[0].cart.id,
-            productId: userLine.productId,
-            quantity: userLine.quantity,
-            price: userLine.price,
-            originalPrice: userLine.originalPrice,
-          })
+    if (userCart[0].lines?.length && userCart[0].lines[0]) {
+      for (const userLine of userCart[0].lines) {
+        if (userLine.productId) {
+          const sessionLine = sessionCart[0].lines.find(
+            (l) => l.productId === userLine.productId,
+          )
+          if (sessionLine) {
+            lines.push({
+              id: sessionLine.id,
+              quantity: sumProductQuantityOnCartMerge
+                ? userLine.quantity + sessionLine.quantity
+                : sessionLine.quantity,
+              price: sessionLine.price,
+              originalPrice: sessionLine.originalPrice,
+            })
+          } else {
+            lines.push({
+              id: undefined,
+              cartId: sessionCart[0].cart.id,
+              productId: userLine.productId,
+              quantity: userLine.quantity,
+              price: userLine.price,
+              originalPrice: userLine.originalPrice,
+            })
+          }
         }
       }
     }
@@ -199,7 +201,7 @@ export const cartService = {
     // Also add lines from session cart that are not in user cart
     for (const sessionLine of sessionCart[0].lines) {
       if (
-        !userCart[0].lines.find((l) => l.productId === sessionLine.productId)
+        !userCart[0].lines.find((l) => l?.productId === sessionLine.productId)
       ) {
         // TODO Fix for json_agg not returning createdAt and updatedAt as Date?
         // if (is(sessionLine.createdAt, PgTimestampString))
