@@ -81,3 +81,34 @@ test('should merge carts', async () => {
   // Line 2 should be on merged cart with same id
   expect(mergedCart.lines.find((l) => l.id === line2.id)).toBeDefined()
 })
+
+test('should merge carts with same product and sum quantity', async () => {
+  const cart1 = await cartService.create('123') //123 is userId
+  const cart2 = await cartService.create()
+  const product1 = await createProduct()
+  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  await cartService.addToCart(cart2.sessionId, product1.id, 3)
+  const mergedCart = await cartService.mergeCarts(
+    cart1.userId!,
+    cart2.sessionId,
+    true,
+  )
+  expect(mergedCart.lines.length).toBe(1)
+  expect(mergedCart.lines[0].quantity).toBe(5)
+})
+
+test('should merge carts with same product and not sum quantity', async () => {
+  const cart1 = await cartService.create('123') //123 is userId
+  const cart2 = await cartService.create()
+  const product1 = await createProduct()
+  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  const line2 = await cartService.addToCart(cart2.sessionId, product1.id, 3)
+  const mergedCart = await cartService.mergeCarts(
+    cart1.userId!,
+    cart2.sessionId,
+    false,
+  )
+  expect(mergedCart.lines.length).toBe(1)
+  expect(mergedCart.lines[0].quantity).toBe(line2.quantity)
+})
+

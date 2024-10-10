@@ -3,6 +3,8 @@ import { db } from 'core/db'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { Cart, CartLine, cartLines, carts } from '../schemas'
 
+const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
+
 interface CartContent {
   cart: Cart
   lines: CartLine[]
@@ -118,6 +120,7 @@ export const cartService = {
   mergeCarts: async (
     userId: string,
     sessionId: string,
+    sumProductQuantityOnCartMerge: boolean = SUM_PRODUCT_QUANTITY_ON_CART_MERGE,
   ): Promise<CartContent> => {
     // This should be a database function instead
     // Transaction
@@ -174,7 +177,9 @@ export const cartService = {
         if (sessionLine) {
           lines.push({
             id: sessionLine.id,
-            quantity: userLine.quantity + sessionLine.quantity,
+            quantity: sumProductQuantityOnCartMerge
+              ? userLine.quantity + sessionLine.quantity
+              : sessionLine.quantity,
             price: sessionLine.price,
             originalPrice: sessionLine.originalPrice,
           })
