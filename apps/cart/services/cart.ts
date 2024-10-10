@@ -162,7 +162,7 @@ export const cartService = {
       .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
       .groupBy(carts.id)
       .orderBy(desc(carts.updatedAt))
-    if (!sessionCart) {
+    if (!sessionCart.length) {
       return userCart[0]
     }
     // Get all cart lines from user cart and add to session cart, set user id to session cart.

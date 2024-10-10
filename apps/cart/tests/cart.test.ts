@@ -112,3 +112,17 @@ test('should merge carts with same product and not sum quantity', async () => {
   expect(mergedCart.lines[0].quantity).toBe(line2.quantity)
 })
 
+test('should merge carts when session cart is invalid', async () => {
+  const cart1 = await cartService.create('123') //123 is userId
+  const product1 = await createProduct()
+  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  const mergedCart = await cartService.mergeCarts(
+    cart1.userId!,
+    '123e4567-e89b-12d3-a456-426614174000', // dummy uuid
+  )
+  expect(mergedCart.cart.userId).toBe(cart1.userId)
+  expect(mergedCart.cart.sessionId).toBe(cart1.sessionId)
+  expect(mergedCart.lines.length).toBe(1)
+  expect(mergedCart.lines[0].productId).toBe(product1.id)
+  expect(mergedCart.lines[0].quantity).toBe(2)
+})
