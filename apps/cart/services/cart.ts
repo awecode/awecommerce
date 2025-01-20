@@ -1,7 +1,8 @@
-import { productService } from 'apps/product/services/product'
-import { db } from 'core/db'
+import { ProductService } from '../../product/services/product'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { Cart, CartLine, cartLines, carts } from '../schemas'
+import { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { PgliteDatabase } from 'drizzle-orm/pglite'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -10,29 +11,38 @@ interface CartContent {
   lines: CartLine[]
 }
 
-export const cartService = {
-  create: async (userId?: string) => {
-    const result = await db.insert(carts).values({ userId }).returning()
-    return result[0]
-  },
+class CartService {
+  private db: NodePgDatabase<Record<string, never>>
+      | PgliteDatabase<Record<string, never>>;
 
-  addToCart: async (sessionId: string, productId: number, quantity: number) => {
-    const { price, discountedPrice } = await productService.getPrices(productId)
+  constructor(dbInstance: NodePgDatabase<Record<string, never>>
+    | PgliteDatabase<Record<string, never>>) {
+    this.db = dbInstance;
+  }
+
+  async create(userId?: string) {
+    const result = await this.db.insert(carts).values({ userId }).returning();
+    return result[0];
+  }
+
+  async addToCart(sessionId: string, productId: number, quantity: number) {
+    const productService = new ProductService(this.db);
+    const { price, discountedPrice } = await productService.getPrices(productId);
 
     if (!price) {
-      throw new Error('Product price not found')
+      throw new Error('Product price not found');
     }
 
-    const cartPrice = discountedPrice || price
+    const cartPrice = discountedPrice || price;
 
     const cartId = (
-      await db
+      await this.db
         .select({ id: carts.id })
         .from(carts)
         .where(eq(carts.sessionId, sessionId))
-    )[0].id
+    )[0].id;
 
-    const result = await db
+    const result = await this.db
       .insert(cartLines)
       .values({
         cartId,
@@ -41,60 +51,59 @@ export const cartService = {
         price: cartPrice,
         originalPrice: price,
       })
-      .returning()
+      .returning();
 
-    return result[0]
-  },
+    return result[0];
+  }
 
-  updateQuantity: async (cartLineId: number, quantity: number) => {
+  async updateQuantity(cartLineId: number, quantity: number) {
     if (quantity < 1) {
-      throw new Error('Quantity must be at least 1')
+      throw new Error('Quantity must be at least 1');
     }
-    const result = await db
+    const result = await this.db
       .update(cartLines)
       .set({ quantity })
       .where(eq(cartLines.id, cartLineId))
-      .returning()
-    return result[0]
-  },
+      .returning();
+    return result[0];
+  }
 
-  removeFromCart: async (cartLineId: number) => {
-    const result = await db
+  async removeFromCart(cartLineId: number) {
+    const result = await this.db
       .delete(cartLines)
       .where(eq(cartLines.id, cartLineId))
-      .returning()
-    return result[0]
-  },
+      .returning();
+    return result[0];
+  }
 
-  clearCart: async (cartId: number) => {
-    const result = await db
+  async clearCart(cartId: number) {
+    const result = await this.db
       .delete(cartLines)
       .where(eq(cartLines.cartId, cartId))
-      .returning()
-    return result[0]
-  },
+      .returning();
+    return result[0];
+  }
 
-  getCartForSession: async (sessionId: string) => {
-    const result = await db
+  async getCartForSession(sessionId: string) {
+    const result = await this.db
       .select()
       .from(carts)
       .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
-      .orderBy(desc(carts.updatedAt))
-    return result[0]
-  },
+      .orderBy(desc(carts.updatedAt));
+    return result[0];
+  }
 
-  getCartForUser: async (userId: string) => {
-    const result = await db
+  async getCartForUser(userId: string) {
+    const result = await this.db
       .select()
       .from(carts)
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
-      .orderBy(desc(carts.updatedAt))
-    return result[0]
-  },
+      .orderBy(desc(carts.updatedAt));
+    return result[0];
+  }
 
-  getCartContentForSession: async (sessionId: string): Promise<CartContent> => {
-    // returns cart with line items
-    const result = await db
+  async getCartContentForSession(sessionId: string): Promise<CartContent> {
+    const result = await this.db
       .select({
         cart: carts,
         lines: sql<CartLine[]>`json_agg(${cartLines})`,
@@ -102,30 +111,16 @@ export const cartService = {
       .from(carts)
       .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
       .where(eq(carts.sessionId, sessionId))
-      .groupBy(carts.id)
-    return result[0]
-  },
+      .groupBy(carts.id);
+    return result[0];
+  }
 
-  /**
-   * Merges carts for a user and a session.
-   *
-   * 1. Gets the latest open cart for the user.
-   * 2. Gets the latest open cart for the session.
-   * 3. Merges the items from both carts.
-   * 4. It's possible that neither cart exists.
-   *
-   * @param userId - The ID of the user whose cart needs to be merged.
-   * @param sessionId - The session ID associated with the cart to be merged.
-   */
-  mergeCarts: async (
+  async mergeCarts(
     userId: string,
     sessionId: string,
     sumProductQuantityOnCartMerge: boolean = SUM_PRODUCT_QUANTITY_ON_CART_MERGE,
-  ): Promise<CartContent> => {
-    // This should be a database function instead
-    // Transaction
-    // Get open cart for user
-    const userCart = await db
+  ): Promise<CartContent> {
+    const userCart = await this.db
       .select({
         cart: carts,
         lines: sql<CartLine[]>`json_agg(${cartLines})`,
@@ -134,25 +129,22 @@ export const cartService = {
       .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
       .groupBy(carts.id)
-      .orderBy(desc(carts.updatedAt))
+      .orderBy(desc(carts.updatedAt));
     if (!userCart.length) {
-      // set user id to session cart and return the cart content
-      const result = await db
+      const result = await this.db
         .update(carts)
         .set({ userId })
         .where(eq(carts.sessionId, sessionId))
-        .returning()
+        .returning();
       if (!result.length) {
-        // return newCart with empty lines
         return {
-          cart: await cartService.create(userId),
+          cart: await this.create(userId),
           lines: [],
-        }
+        };
       }
-      return await cartService.getCartContentForSession(result[0].sessionId)
+      return await this.getCartContentForSession(result[0].sessionId);
     }
-    // Get open cart for session
-    const sessionCart = await db
+    const sessionCart = await this.db
       .select({
         cart: carts,
         lines: sql<CartLine[]>`json_agg(${cartLines})`,
@@ -161,20 +153,18 @@ export const cartService = {
       .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
       .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
       .groupBy(carts.id)
-      .orderBy(desc(carts.updatedAt))
+      .orderBy(desc(carts.updatedAt));
     if (!sessionCart.length) {
-      return userCart[0]
+      return userCart[0];
     }
-    // Get all cart lines from user cart and add to session cart, set user id to session cart.
-    // For cart lines, if product exists in session cart, update quantity, otherwise add new line item.
 
-    const lines = []
+    const lines = [];
     if (userCart[0].lines?.length && userCart[0].lines[0]) {
       for (const userLine of userCart[0].lines) {
         if (userLine.productId) {
           const sessionLine = sessionCart[0].lines.find(
             (l) => l?.productId === userLine.productId,
-          )
+          );
           if (sessionLine) {
             lines.push({
               id: sessionLine.id,
@@ -183,7 +173,7 @@ export const cartService = {
                 : sessionLine.quantity,
               price: sessionLine.price,
               originalPrice: sessionLine.originalPrice,
-            })
+            });
           } else {
             lines.push({
               id: undefined,
@@ -192,41 +182,36 @@ export const cartService = {
               quantity: userLine.quantity,
               price: userLine.price,
               originalPrice: userLine.originalPrice,
-            })
+            });
           }
         }
       }
     }
 
-    // Also add lines from session cart that are not in user cart
     for (const sessionLine of sessionCart[0].lines) {
       if (
         sessionLine &&
         !userCart[0].lines.find((l) => l?.productId === sessionLine.productId)
       ) {
-        // TODO Fix for json_agg not returning createdAt and updatedAt as Date?
-        // if (is(sessionLine.createdAt, PgTimestampString))
-        //   sessionLine.createdAt = new Date(sessionLine.createdAt)
         if (
           sessionLine.createdAt &&
           typeof sessionLine.createdAt === 'string'
         ) {
-          sessionLine.createdAt = new Date(sessionLine.createdAt)
+          sessionLine.createdAt = new Date(sessionLine.createdAt);
         }
         if (
           sessionLine.updatedAt &&
           typeof sessionLine.updatedAt === 'string'
         ) {
-          sessionLine.updatedAt = new Date(sessionLine.updatedAt)
+          sessionLine.updatedAt = new Date(sessionLine.updatedAt);
         }
-        lines.push(sessionLine)
+        lines.push(sessionLine);
       }
     }
 
-    let insertedLines: CartLine[] = []
+    let insertedLines: CartLine[] = [];
     if (lines.length) {
-      // insert or update cart lines
-      insertedLines = await db
+      insertedLines = await this.db
         .insert(cartLines)
         .values(lines)
         .onConflictDoUpdate({
@@ -236,23 +221,23 @@ export const cartService = {
             price: sql`excluded.price`,
           },
         })
-        .returning()
+        .returning();
     }
 
-    // Mark user cart as merged
-    await db
+    await this.db
       .update(carts)
       .set({ status: 'Merged' })
-      .where(eq(carts.id, userCart[0].cart.id))
+      .where(eq(carts.id, userCart[0].cart.id));
 
-    // set user id to session cart
-    await db.update(carts).set({ userId }).where(eq(carts.sessionId, sessionId))
+    await this.db.update(carts).set({ userId }).where(eq(carts.sessionId, sessionId));
 
-    sessionCart[0].cart.userId = userId
+    sessionCart[0].cart.userId = userId;
 
     return {
       cart: sessionCart[0].cart,
       lines: insertedLines,
-    }
-  },
+    };
+  }
 }
+
+export { CartService }

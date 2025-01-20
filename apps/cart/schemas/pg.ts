@@ -1,4 +1,4 @@
-import { products } from 'apps/product/schemas'
+import { products } from '../../product/schemas'
 import { relations, sql } from 'drizzle-orm'
 import {
   integer,

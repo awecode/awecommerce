@@ -1,8 +1,14 @@
 import { faker } from '@faker-js/faker'
 import { expect, test } from 'vitest'
 
-import { productService } from 'apps/product/services/product'
-import { cartService } from '../services/cart'
+import {db} from 'core/db'
+import { CartService } from 'apps/cart/services/cart'
+import { ProductService } from 'apps/product/services/product'
+
+
+const cartService = new CartService(db)
+const productService = new ProductService(db)
+
 
 const createProduct = async () => {
   return await productService.create({

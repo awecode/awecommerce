@@ -1,7 +1,8 @@
 import { and, eq, like, or, SQL } from 'drizzle-orm'
-import { db } from 'core/db'
 
 import { NewProduct, Product, products } from '../schemas'
+import { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { PgliteDatabase } from 'drizzle-orm/pglite'
 
 interface ProductFilter {
   brandId?: number
@@ -13,22 +14,30 @@ interface ProductFilter {
   isBestSeller?: boolean
 }
 
-export const productService = {
-  create: async (product: NewProduct) => {
-    const result = await db.insert(products).values(product).returning()
-    return result[0]
-  },
+class ProductService {
+  private db:  NodePgDatabase<Record<string, never>>
+    | PgliteDatabase<Record<string, never>>
 
-  get: async (productId: number) => {
-    const result = await db
+  constructor(dbInstance:  NodePgDatabase<Record<string, never>>
+    | PgliteDatabase<Record<string, never>>) {
+    this.db = dbInstance
+  }
+
+  async create(product: NewProduct) {
+    const result = await this.db.insert(products).values(product).returning()
+    return result[0]
+  }
+
+  async get(productId: number) {
+    const result = await this.db
       .select()
       .from(products)
       .where(eq(products.id, productId))
     return result[0]
-  },
+  }
 
-  getPrices: async (productId: number) => {
-    const result = await db
+  async getPrices(productId: number) {
+    const result = await this.db
       .select({
         price: products.price,
         discountedPrice: products.discountedPrice,
@@ -36,26 +45,26 @@ export const productService = {
       .from(products)
       .where(eq(products.id, productId))
     return result[0]
-  },
+  }
 
-  update: async (productId: number, product: Partial<Product>) => {
-    const result = await db
+  async update(productId: number, product: Partial<Product>) {
+    const result = await this.db
       .update(products)
       .set(product)
       .where(eq(products.id, productId))
       .returning()
     return result[0]
-  },
+  }
 
-  delete: async (productId: number) => {
-    const result = await db
+  async delete(productId: number) {
+    const result = await this.db
       .delete(products)
       .where(eq(products.id, productId))
       .returning()
     return result[0]
-  },
+  }
 
-  filter: async (filter: ProductFilter) => {
+  async filter(filter: ProductFilter) {
     const where: SQL[] = []
 
     if (filter.brandId) {
@@ -85,48 +94,50 @@ export const productService = {
       )
     }
 
-    const query = db
+    const query = this.db
       .select()
       .from(products)
       .where(and(...where))
 
     const result = await query
     return result
-  },
+  }
 
-  markAsFeatured: async (productId: number) => {
-    const result = await db
+  async markAsFeatured(productId: number) {
+    const result = await this.db
       .update(products)
       .set({ isFeatured: true })
       .where(eq(products.id, productId))
       .returning()
     return result[0]
-  },
+  }
 
-  unmarkAsFeatured: async (productId: number) => {
-    const result = await db
+  async unmarkAsFeatured(productId: number) {
+    const result = await this.db
       .update(products)
       .set({ isFeatured: false })
       .where(eq(products.id, productId))
       .returning()
     return result[0]
-  },
+  }
 
-  markAsBestSeller: async (productId: number) => {
-    const result = await db
+  async markAsBestSeller(productId: number) {
+    const result = await this.db
       .update(products)
       .set({ isBestSeller: true })
       .where(eq(products.id, productId))
       .returning()
     return result[0]
-  },
+  }
 
-  unmarkAsBestSeller: async (productId: number) => {
-    const result = await db
+  async unmarkAsBestSeller(productId: number) {
+    const result = await this.db
       .update(products)
       .set({ isBestSeller: false })
       .where(eq(products.id, productId))
       .returning()
     return result[0]
-  },
+  }
 }
+
+export { ProductService }

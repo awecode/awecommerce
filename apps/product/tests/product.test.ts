@@ -1,10 +1,13 @@
 import { faker } from '@faker-js/faker'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { expect, test } from 'vitest'
 
 import { db } from 'core/db'
 import { products } from '../schemas/pg'
-import { productService } from '../services/product'
+
+import { ProductService } from 'apps/product/services/product'
+
+const productService = new ProductService(db)
 
 test('should create a product', async () => {
   const name = faker.commerce.productName()
