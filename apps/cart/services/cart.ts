@@ -1,8 +1,6 @@
-import { ProductService } from '../../product/services/product'
 import { and, desc, eq, sql } from 'drizzle-orm'
+import { ProductService } from '../../product/services/product'
 import { Cart, CartLine, cartLines, carts } from '../schemas'
-import { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { PgliteDatabase } from 'drizzle-orm/pglite'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -12,11 +10,9 @@ interface CartContent {
 }
 
 class CartService {
-  private db: NodePgDatabase<Record<string, never>>
-      | PgliteDatabase<Record<string, never>>;
+  private db: any 
 
-  constructor(dbInstance: NodePgDatabase<Record<string, never>>
-    | PgliteDatabase<Record<string, never>>) {
+  constructor(dbInstance: any) {
     this.db = dbInstance;
   }
 

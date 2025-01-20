@@ -1,8 +1,6 @@
 import { and, eq, like, or, SQL } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, products } from '../schemas'
-import { NodePgDatabase } from 'drizzle-orm/node-postgres'
-import { PgliteDatabase } from 'drizzle-orm/pglite'
 
 type PaginationArgs = {
   page: number
@@ -20,12 +18,11 @@ interface ProductFilter {
   pagination?: PaginationArgs 
 }
 
-type Database = NodePgDatabase<Record<string, never>> | PgliteDatabase<Record<string, never>>
 
 class ProductService {
-  private db:Database
+  private db:any
 
-  constructor(dbInstance: Database) {
+  constructor(dbInstance: any) {
     this.db = dbInstance
   }
 
@@ -417,4 +414,5 @@ class ProductImageService {
   }
 }
 
-export { BrandService, ProductService, ProductClassService, CategoryService, ProductImageService }
+export { BrandService, CategoryService, ProductClassService, ProductImageService, ProductService }
+
