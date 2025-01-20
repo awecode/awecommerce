@@ -18,7 +18,6 @@ interface ProductFilter {
   pagination?: PaginationArgs 
 }
 
-
 class ProductService {
   private db:any
 
@@ -44,6 +43,14 @@ class ProductService {
       .select()
       .from(products)
       .where(eq(products.id, productId))
+    return result[0]
+  }
+
+  async getBySlug(slug: string) {
+    const result = await this.db
+      .select()
+      .from(products)
+      .where(eq(products.slug, slug))
     return result[0]
   }
 
@@ -202,6 +209,14 @@ class BrandService {
     return result[0]
   }
 
+  async getBySlug(slug: string) {
+    const result = await this.db
+      .select()
+      .from(brands)
+      .where(eq(brands.slug, slug))
+    return result[0]
+  }
+
   async update(brandId: number, brand: Partial<NewBrand>) {
     const result = await this.db
       .update(brands)
@@ -278,6 +293,14 @@ class ProductClassService {
     return result[0]
   }
 
+  async getBySlug(slug: string) {
+    const result = await this.db
+      .select()
+      .from(productClasses)
+      .where(eq(productClasses.slug, slug))
+    return result[0]
+  }
+
   async update(productClassId: number, productClass: Partial<NewProductClass>) {
     const result = await this.db
       .update(productClasses)
@@ -329,7 +352,6 @@ class ProductClassService {
   }
 }
 
-
 interface CategoryFilter {
   q?: string
   pagination?: PaginationArgs
@@ -352,6 +374,14 @@ class CategoryService {
       .select()
       .from(categories)
       .where(eq(categories.id, categoryId))
+    return result[0]
+  }
+
+  async getBySlug(slug: string) {
+    const result = await this.db
+      .select()
+      .from(categories)
+      .where(eq(categories.slug, slug))
     return result[0]
   }
 
@@ -444,4 +474,3 @@ class RelatedProductService {
 }
 
 export { BrandService, CategoryService, ProductClassService, ProductImageService, ProductService, RelatedProductService }
-
