@@ -5,15 +5,16 @@ import {
   pgEnum,
   pgTable,
   serial,
-  text,
+  varchar,
   timestamp,
+  text,
   primaryKey,
 } from 'drizzle-orm/pg-core'
 
 export const brands = pgTable('brand', {
   id: serial().primaryKey(),
-  name: text().notNull(),
-  slug: text().notNull(),
+  name: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull(),
   description: text(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -21,8 +22,8 @@ export const brands = pgTable('brand', {
 
 export const categories = pgTable('category', {
   id: serial().primaryKey(),
-  name: text().notNull(),
-  slug: text().notNull(),
+  name: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull(),
   parentId: integer().references((): any => categories.id),
   description: text(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -31,8 +32,8 @@ export const categories = pgTable('category', {
 
 export const productClasses = pgTable('product_class', {
   id: serial().primaryKey(),
-  name: text().notNull(),
-  slug: text().notNull(),
+  name: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull(),
   description: text(),
   trackStock: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -43,14 +44,14 @@ export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
 
 export const products = pgTable('product', {
   id: serial().primaryKey(),
-  name: text().notNull(),
+  name: varchar({ length: 100 }).notNull(),
   description: text(),
   specification: text(),
   brandId: integer().references(() => brands.id),
   categoryId: integer().references(() => categories.id),
   productClassId: integer().references(() => productClasses.id),
-  link: text(),
-  thumbnail: text(),
+  link: varchar({ length: 256 }),
+  thumbnail: varchar({ length: 256 }),
   price: numeric({ precision: 100 }),
   discountedPrice: numeric({ precision: 100 }),
   inventoryCost: numeric({ precision: 100 }),
@@ -72,7 +73,7 @@ export const productRelatedProducts = pgTable('product_related_products', {
 export const productImages = pgTable('product_image', {
   id: serial().primaryKey(),
   productId: integer().references(() => products.id),
-  imageUrl: text().notNull(),
+  imageUrl: varchar({ length: 256 }).notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
