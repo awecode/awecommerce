@@ -15,6 +15,8 @@ test('should create a product', async () => {
   const price = faker.number.int({ min: 10, max: 100 }).toString()
   const product = await productService.create({
     name,
+    slug: name,
+    sku: name,
     description,
     price: price,
   })

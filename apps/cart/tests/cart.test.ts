@@ -13,6 +13,8 @@ const productService = new ProductService(db)
 const createProduct = async () => {
   return await productService.create({
     name: faker.commerce.productName(),
+    slug: faker.commerce.productName(),
+    sku: faker.commerce.productName(),
     description: faker.commerce.productDescription(),
     price: faker.number.int({ min: 10, max: 100 }).toString(),
   })

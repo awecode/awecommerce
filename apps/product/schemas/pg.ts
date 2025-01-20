@@ -14,7 +14,7 @@ import {
 export const brands = pgTable('brand', {
   id: serial().primaryKey(),
   name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull().unique(),
   description: text(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -23,7 +23,7 @@ export const brands = pgTable('brand', {
 export const categories = pgTable('category', {
   id: serial().primaryKey(),
   name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull().unique(),
   parentId: integer().references((): any => categories.id),
   description: text(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -33,7 +33,7 @@ export const categories = pgTable('category', {
 export const productClasses = pgTable('product_class', {
   id: serial().primaryKey(),
   name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull().unique(),
   description: text(),
   trackStock: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -45,6 +45,8 @@ export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
 export const products = pgTable('product', {
   id: serial().primaryKey(),
   name: varchar({ length: 100 }).notNull(),
+  slug: varchar({ length: 100 }).notNull().unique(),
+  sku: varchar({ length: 100 }).notNull().unique(),
   description: text(),
   specification: text(),
   brandId: integer().references(() => brands.id),
