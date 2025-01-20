@@ -70,17 +70,29 @@ export const productImages = pgTable('product_image', {
   updatedAt: timestamp().defaultNow(),
 })
 
-export type NewProduct = typeof products.$inferInsert
+
+type BaseEntity = {
+  id: number
+  createdAt: string
+  updatedAt: string
+}
+
 export type Product = typeof products.$inferSelect
+export type NewProduct = Omit<typeof products.$inferInsert, keyof BaseEntity>
+export type UpdateProduct = Partial<NewProduct>
 
-export type NewProductImage = typeof productImages.$inferInsert
+export type NewProductImage = Omit<typeof productImages.$inferInsert, keyof BaseEntity>
 export type ProductImage = typeof productImages.$inferSelect
+export type UpdateProductImage = Partial<NewProductImage>
 
-export type NewProductClass = typeof productClasses.$inferInsert
+export type NewProductClass = Omit<typeof productClasses.$inferInsert, keyof BaseEntity>
 export type ProductClass = typeof productClasses.$inferSelect
+export type UpdateProductClass = Partial<NewProductClass>
 
-export type NewCategory = typeof categories.$inferInsert
+export type NewCategory = Omit<typeof categories.$inferInsert, keyof BaseEntity>
 export type Category = typeof categories.$inferSelect
+export type UpdateCategory = Partial<NewCategory>
 
-export type NewBrand = typeof brands.$inferInsert
+export type NewBrand = Omit<typeof brands.$inferInsert, keyof BaseEntity>
 export type Brand = typeof brands.$inferSelect
+export type UpdateBrand = Partial<NewBrand>
