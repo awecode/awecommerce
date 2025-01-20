@@ -28,6 +28,14 @@ class ProductService {
 
   async create(product: NewProduct) {
     const result = await this.db.insert(products).values(product).returning()
+    if(product.images){
+      const productImageService = new ProductImageService(this.db)
+      await productImageService.setImages(result[0].id, product.images)
+    }
+    if(product.relatedProducts){
+      const relatedProductService = new RelatedProductService(this.db)
+      await relatedProductService.setRelatedProducts(result[0].id, product.relatedProducts)
+    }
     return result[0]
   }
 
@@ -50,7 +58,7 @@ class ProductService {
     return result[0]
   }
 
-  async update(productId: number, product: Partial<Product>) {
+  async update(productId: number, product: Partial<NewProduct>) {
     const result = await this.db
       .update(products)
       .set({
@@ -59,6 +67,14 @@ class ProductService {
       })
       .where(eq(products.id, productId))
       .returning()
+    if(product.images){
+      const productImageService = new ProductImageService(this.db)
+      await productImageService.setImages(productId, product.images)
+    }
+    if(product.relatedProducts){
+      const relatedProductService = new RelatedProductService(this.db)
+      await relatedProductService.setRelatedProducts(productId, product.relatedProducts)
+    }
     return result[0]
   }
 
@@ -167,9 +183,9 @@ interface BrandFilter {
 }
 
 class BrandService {
-  private db:Database
+  private db:any
 
-  constructor(dbInstance:Database) {
+  constructor(dbInstance:any) {
     this.db = dbInstance
   }
 
@@ -243,9 +259,9 @@ interface ProductClassFilter {
 }
 
 class ProductClassService {
-  private db: Database
+  private db: any
 
-  constructor(dbInstance: Database) {
+  constructor(dbInstance: any) {
     this.db = dbInstance
   }
 
@@ -320,9 +336,9 @@ interface CategoryFilter {
 }
 
 class CategoryService {
-  private db: Database
+  private db: any
 
-  constructor(dbInstance: Database) {
+  constructor(dbInstance: any) {
     this.db = dbInstance
   }
 
@@ -391,9 +407,9 @@ class CategoryService {
 }
 
 class ProductImageService {
-  private db: Database
+  private db: any
 
-  constructor(dbInstance: Database) {
+  constructor(dbInstance: any) {
     this.db = dbInstance
   }
 
@@ -414,5 +430,18 @@ class ProductImageService {
   }
 }
 
-export { BrandService, CategoryService, ProductClassService, ProductImageService, ProductService }
+class RelatedProductService {
+  private db: any
+
+  constructor(dbInstance: any) {
+    this.db = dbInstance
+  }
+  
+  async setRelatedProducts(productId: number, relatedProductIds: number[]) {
+    await this.db.delete(products).where(eq(products.id, productId))
+    await this.db.insert(products).values(relatedProductIds.map((relatedProductId) => ({ productId, relatedProductId })))
+  }
+}
+
+export { BrandService, CategoryService, ProductClassService, ProductImageService, ProductService, RelatedProductService }
 

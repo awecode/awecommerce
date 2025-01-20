@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  primaryKey,
 } from 'drizzle-orm/pg-core'
 
 export const brands = pgTable('brand', {
@@ -57,10 +58,16 @@ export const products = pgTable('product', {
   stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),
   isBestSeller: boolean().default(false),
-  relatedProducts: integer().references((): any => products.id),
   createdAt: timestamp().defaultNow(),
   updatedAt: timestamp().defaultNow(),
 })
+
+export const productRelatedProducts = pgTable('product_related_products', {
+  productId: integer().references(() => products.id),
+  relatedProductId: integer().references(() => products.id),
+}, (t)=>({
+  pk: primaryKey(t.productId, t.relatedProductId)
+}))
 
 export const productImages = pgTable('product_image', {
   id: serial().primaryKey(),
@@ -78,7 +85,10 @@ type BaseEntity = {
 }
 
 export type Product = typeof products.$inferSelect
-export type NewProduct = Omit<typeof products.$inferInsert, keyof BaseEntity>
+export type NewProduct = Omit<typeof products.$inferInsert, keyof BaseEntity> & {
+  images?: string[]
+  relatedProducts?: number[]
+}
 export type UpdateProduct = Partial<NewProduct>
 
 export type NewProductImage = Omit<typeof productImages.$inferInsert, keyof BaseEntity>
