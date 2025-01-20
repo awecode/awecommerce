@@ -8,11 +8,11 @@ type PaginationArgs = {
 }
 
 interface ProductFilter {
-  brandId?: number
-  categoryId?: number
-  productClassId?: number
+  brand?: number
+  category?: number
+  productClass?: number
   status?: Product['status']
-  search?: string // searches id or name
+  q?: string 
   isFeatured?: boolean
   isBestSeller?: boolean
   pagination?: PaginationArgs 
@@ -89,14 +89,14 @@ class ProductService {
   async list(filter: ProductFilter) {
     const where: SQL[] = []
 
-    if (filter.brandId) {
-      where.push(eq(products.brandId, filter.brandId))
+    if (filter.brand) {
+      where.push(eq(products.brandId, filter.brand))
     }
-    if (filter.categoryId) {
-      where.push(eq(products.categoryId, filter.categoryId))
+    if (filter.category) {
+      where.push(eq(products.categoryId, filter.category))
     }
-    if (filter.productClassId) {
-      where.push(eq(products.productClassId, filter.productClassId))
+    if (filter.productClass) {
+      where.push(eq(products.productClassId, filter.productClass))
     }
     if (filter.status) {
       where.push(eq(products.status, filter.status))
@@ -107,11 +107,11 @@ class ProductService {
     if (filter.isBestSeller !== undefined) {
       where.push(eq(products.isBestSeller, filter.isBestSeller))
     }
-    if (filter.search) {
+    if (filter.q) {
       where.push(
         or(
-          like(products.id, `%${filter.search}%`),
-          like(products.name, `%${filter.search}%`),
+          like(products.id, `%${filter.q}%`),
+          like(products.name, `%${filter.q}%`),
         )!,
       )
     }
@@ -178,7 +178,7 @@ class ProductService {
 }
 
 interface BrandFilter {
-  search?: string
+  q?: string
   pagination?: PaginationArgs
 }
 
@@ -225,8 +225,8 @@ class BrandService {
   async list(filter: BrandFilter) {
     const where: SQL[] = []
 
-    if (filter.search) {
-      where.push(like(brands.name, `%${filter.search}%`))
+    if (filter.q) {
+      where.push(like(brands.name, `%${filter.q}%`))
     }
 
     const query = this.db
@@ -254,7 +254,7 @@ class BrandService {
 }
 
 interface ProductClassFilter {
-  search?: string
+  q?: string
   pagination?: PaginationArgs
 }
 
@@ -301,8 +301,8 @@ class ProductClassService {
   async list(filter?: ProductClassFilter) {
     const where: SQL[] = []
 
-    if (filter?.search) {
-      where.push(like(productClasses.name, `%${filter.search}%`))
+    if (filter?.q) {
+      where.push(like(productClasses.name, `%${filter.q}%`))
     }
 
     const query = this.db
@@ -331,7 +331,7 @@ class ProductClassService {
 
 
 interface CategoryFilter {
-  search?: string
+  q?: string
   pagination?: PaginationArgs
 }
 
@@ -378,8 +378,8 @@ class CategoryService {
   async list(filter?: CategoryFilter) {
     const where: SQL[] = []
 
-    if (filter?.search) {
-      where.push(like(categories.name, `%${filter.search}%`))
+    if (filter?.q) {
+      where.push(like(categories.name, `%${filter.q}%`))
     }
 
     const query = this.db
