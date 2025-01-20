@@ -63,7 +63,7 @@ class ProductService {
       .update(products)
       .set({
         ...product,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(products.id, productId))
       .returning()
@@ -283,7 +283,7 @@ class ProductClassService {
       .update(productClasses)
       .set({
         ...productClass,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(productClasses.id, productClassId))
       .returning()
@@ -360,7 +360,7 @@ class CategoryService {
       .update(categories)
       .set({
         ...category,
-        updatedAt: new Date(),
+        updatedAt: new Date().toISOString(),
       })
       .where(eq(categories.id, categoryId))
       .returning()
