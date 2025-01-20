@@ -15,8 +15,8 @@ export const brands = pgTable('brand', {
   name: text().notNull(),
   slug: text().notNull(),
   description: text(),
-  createdAt: timestamp({ mode: 'string' }).defaultNow(),
-  updatedAt: timestamp({ mode: 'string' }).defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 export const categories = pgTable('category', {
@@ -25,8 +25,8 @@ export const categories = pgTable('category', {
   slug: text().notNull(),
   parentId: integer().references((): any => categories.id),
   description: text(),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 export const productClasses = pgTable('product_class', {
@@ -35,8 +35,8 @@ export const productClasses = pgTable('product_class', {
   slug: text().notNull(),
   description: text(),
   trackStock: boolean().default(true),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
@@ -58,8 +58,8 @@ export const products = pgTable('product', {
   stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),
   isBestSeller: boolean().default(false),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 export const productRelatedProducts = pgTable('product_related_products', {
@@ -73,8 +73,8 @@ export const productImages = pgTable('product_image', {
   id: serial().primaryKey(),
   productId: integer().references(() => products.id),
   imageUrl: text().notNull(),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 
