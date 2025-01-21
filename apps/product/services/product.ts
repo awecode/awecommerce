@@ -221,6 +221,42 @@ class ProductService {
       .returning()
     return result[0]
   }
+
+  async markAsTodaysDeal(productId: number) {
+    const result = await this.db
+      .update(products)
+      .set({ isTodaysDeal: true })
+      .where(eq(products.id, productId))
+      .returning()
+    return result[0]
+  }
+
+  async unmarkAsTodaysDeal(productId: number) {
+    const result = await this.db
+      .update(products)
+      .set({ isTodaysDeal: false })
+      .where(eq(products.id, productId))
+      .returning()
+    return result[0]
+  }
+
+  async markAsActive(productId: number) {
+    const result = await this.db
+      .update(products)
+      .set({ isActive: true })
+      .where(eq(products.id, productId))
+      .returning()
+    return result[0]
+  }
+
+  async markAsInactive(productId: number) {
+    const result = await this.db
+      .update(products)
+      .set({ isActive: false })
+      .where(eq(products.id, productId))
+      .returning()
+    return result[0]
+  }
 }
 
 interface BrandFilter {
@@ -308,6 +344,24 @@ class BrandService {
         pages: Math.ceil(total / size),
       }
     }
+  }
+
+  async markAsActive(brandId: number) {
+    const result = await this.db
+      .update(brands)
+      .set({ isActive: true })
+      .where(eq(brands.id, brandId))
+      .returning()
+    return result[0]
+  }
+
+  async markAsInactive(brandId: number) {
+    const result = await this.db
+      .update(brands)
+      .set({ isActive: false })
+      .where(eq(brands.id, brandId))
+      .returning()
+    return result[0]
   }
 }
 
@@ -398,6 +452,24 @@ class ProductClassService {
       }
     }
   }
+
+  async markAsActive(productClassId: number) {
+    const result = await this.db
+      .update(productClasses)
+      .set({ isActive: true })
+      .where(eq(productClasses.id, productClassId))
+      .returning()
+    return result[0]
+  }
+
+  async markAsInactive(productClassId: number) {
+    const result = await this.db
+      .update(productClasses)
+      .set({ isActive: false })
+      .where(eq(productClasses.id, productClassId))
+      .returning()
+    return result[0]
+  }
 }
 
 interface CategoryFilter {
@@ -486,6 +558,24 @@ class CategoryService {
         pages: Math.ceil(total / size),
       }
     }
+  }
+
+  async markAsActive(categoryId: number) {
+    const result = await this.db
+      .update(categories)
+      .set({ isActive: true })
+      .where(eq(categories.id, categoryId))
+      .returning()
+    return result[0]
+  }
+
+  async markAsInactive(categoryId: number) {
+    const result = await this.db
+      .update(categories)
+      .set({ isActive: false })
+      .where(eq(categories.id, categoryId))
+      .returning()
+    return result[0]
   }
 }
 
