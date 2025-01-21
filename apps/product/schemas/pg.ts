@@ -16,6 +16,7 @@ export const brands = pgTable('brand', {
   name: varchar({ length: 100 }).notNull(),
   slug: varchar({ length: 100 }).notNull().unique(),
   description: text(),
+  isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
@@ -26,6 +27,7 @@ export const categories = pgTable('category', {
   slug: varchar({ length: 100 }).notNull().unique(),
   parentId: integer().references((): any => categories.id),
   description: text(),
+  isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
@@ -36,6 +38,7 @@ export const productClasses = pgTable('product_class', {
   slug: varchar({ length: 100 }).notNull().unique(),
   description: text(),
   trackStock: boolean().default(true),
+  isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
@@ -61,6 +64,8 @@ export const products = pgTable('product', {
   stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),
   isBestSeller: boolean().default(false),
+  isTodaysDeal: boolean().default(false),
+  isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
