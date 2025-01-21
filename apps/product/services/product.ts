@@ -16,6 +16,10 @@ interface ProductFilter {
   isFeatured?: boolean
   isBestSeller?: boolean
   pagination?: PaginationArgs 
+  isActive?: boolean
+  // onlyActiveBrands?: boolean
+  // onlyActiveCategories?: boolean
+  // onlyActiveProductClasses?: boolean
 }
 
 class ProductService {
@@ -123,9 +127,33 @@ class ProductService {
       )
     }
 
-    const query = this.db
-      .select()
+    if(filter.isActive !== undefined){
+      where.push(eq(products.isActive, filter.isActive))
+    }
+
+    // if(filter.onlyActiveBrands){
+    //   where.push(eq(brands.isActive, true))
+    // }
+
+    // if(filter.onlyActiveCategories){
+    //   where.push(eq(categories.isActive, true))
+    // }
+
+    // if(filter.onlyActiveProductClasses){
+    //   where.push(eq(productClasses.isActive, true))
+    // }
+
+    let query = this.db
+      .select({
+        ...products,
+        brand: brands,
+        category: categories,
+        productClass: productClasses
+      })
       .from(products)
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
       .where(and(...where))
 
     if (!filter.pagination) {
@@ -188,7 +216,6 @@ interface BrandFilter {
   q?: string
   pagination?: PaginationArgs
 }
-
 class BrandService {
   private db:any
 
