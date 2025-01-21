@@ -71,6 +71,13 @@
       "when": 1737442691114,
       "tag": "0009_tearful_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1737444556670,
+      "tag": "0010_lovely_moon_knight",
+      "breakpoints": true
     }
   ]
 }

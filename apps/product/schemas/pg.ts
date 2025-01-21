@@ -16,6 +16,7 @@ export const brands = pgTable('brand', {
   id: serial().primaryKey(),
   name: varchar({ length: 100 }).notNull(),
   slug: varchar({ length: 100 }).notNull().unique(),
+  logo: varchar({ length: 256 }),
   description: text(),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
