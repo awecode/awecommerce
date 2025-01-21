@@ -52,22 +52,25 @@ class CartService {
     return result[0];
   }
 
-  async updateQuantity(cartLineId: number, quantity: number) {
+  async updateQuantity(cartId: number, cartLineId: number, quantity: number) {
     if (quantity < 1) {
       throw new Error('Quantity must be at least 1');
     }
     const result = await this.db
       .update(cartLines)
       .set({ quantity })
-      .where(eq(cartLines.id, cartLineId))
+      .where(and(eq(cartLines.id, cartLineId), eq(cartLines.cartId, cartId)))
       .returning();
     return result[0];
   }
 
-  async removeFromCart(cartLineId: number) {
+  async removeFromCart(cartId: number, cartLineId: number) {
     const result = await this.db
       .delete(cartLines)
-      .where(eq(cartLines.id, cartLineId))
+      .where(and(
+        eq(cartLines.id, cartLineId),
+        eq(cartLines.cartId, cartId)
+      ))
       .returning();
     return result[0];
   }
@@ -101,8 +104,8 @@ class CartService {
   async getCartContentForSession(sessionId: string): Promise<CartContent> {
     const result = await this.db
       .select({
-        cart: carts,
-        lines: sql<CartLine[]>`json_agg(${cartLines})`,
+      cart: carts,
+      lines: sql<CartLine[]>`COALESCE(jsonb_agg(${cartLines}.*) FILTER (WHERE ${cartLines}.id IS NOT NULL), '[]'::jsonb)`,
       })
       .from(carts)
       .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
