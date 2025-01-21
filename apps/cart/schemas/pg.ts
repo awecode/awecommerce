@@ -6,7 +6,7 @@ import {
   pgEnum,
   pgTable,
   serial,
-  text,
+  varchar,
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core'
@@ -15,11 +15,11 @@ export const cartStatus = pgEnum('cart_status', ['Open', 'Frozen', 'Cancelled', 
 
 export const carts = pgTable('cart', {
   id: serial().primaryKey(),
-  userId: text(),
+  userId: varchar({ length: 255 }),
   sessionId: uuid().notNull().default(sql`uuid_generate_v4()`).unique(),
   status: cartStatus().default('Open'),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 export const cartLines = pgTable('cart_line', {
@@ -29,8 +29,8 @@ export const cartLines = pgTable('cart_line', {
   price: numeric().notNull(),
   originalPrice: numeric().notNull(),
   quantity: integer().notNull(),
-  createdAt: timestamp().defaultNow(),
-  updatedAt: timestamp().defaultNow(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
 export const cartLineRelations = relations(cartLines, ({ one }) => ({
