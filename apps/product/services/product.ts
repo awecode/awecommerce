@@ -1,4 +1,4 @@
-import { and, eq, ilike, or, SQL } from 'drizzle-orm'
+import { and, eq, ilike, or, SQL, sql, isNull } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, products } from '../schemas'
 
@@ -15,11 +15,12 @@ interface ProductFilter {
   q?: string 
   isFeatured?: boolean
   isBestSeller?: boolean
+  isTodaysDeal?: boolean
   pagination?: PaginationArgs 
   isActive?: boolean
-  // onlyActiveBrands?: boolean
-  // onlyActiveCategories?: boolean
-  // onlyActiveProductClasses?: boolean
+  onlyActiveBrands?: boolean
+  onlyActiveCategories?: boolean
+  onlyActiveProductClasses?: boolean
 }
 
 class ProductService {
@@ -131,17 +132,21 @@ class ProductService {
       where.push(eq(products.isActive, filter.isActive))
     }
 
-    // if(filter.onlyActiveBrands){
-    //   where.push(eq(brands.isActive, true))
-    // }
+    if(filter.isTodaysDeal !== undefined){
+      where.push(eq(products.isTodaysDeal, filter.isTodaysDeal))
+    }
 
-    // if(filter.onlyActiveCategories){
-    //   where.push(eq(categories.isActive, true))
-    // }
+    if(filter.onlyActiveBrands){
+      where.push(or(isNull(products.brandId), eq(brands.isActive, true)))
+    }
 
-    // if(filter.onlyActiveProductClasses){
-    //   where.push(eq(productClasses.isActive, true))
-    // }
+    if(filter.onlyActiveCategories){
+      where.push(or(isNull(products.categoryId), eq(categories.isActive, true)))
+    }
+
+    if(filter.onlyActiveProductClasses){
+      where.push(or(isNull(products.productClassId), eq(productClasses.isActive, true)))
+    }
 
     let query = this.db
       .select({
@@ -162,7 +167,13 @@ class ProductService {
 
     const { page, size} = filter.pagination
     const results = await query.limit(size).offset((page - 1) * size)
-    const total = await this.db.$count(products, and(...where))
+    const total = Number((
+      await this.db.select({ count: sql<number>`count(*)` }).from(products).
+        leftJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+        .where(and(...where))
+      )[0]!.count)
     return {
       results: results,
       pagination:{
@@ -214,6 +225,7 @@ class ProductService {
 
 interface BrandFilter {
   q?: string
+  isActive?: boolean
   pagination?: PaginationArgs
 }
 class BrandService {
@@ -271,6 +283,10 @@ class BrandService {
       where.push(ilike(brands.name, `%${filter.q}%`))
     }
 
+    if(filter.isActive !== undefined){
+      where.push(eq(brands.isActive, filter.isActive))
+    }
+
     const query = this.db
       .select()
       .from(brands)
@@ -297,6 +313,7 @@ class BrandService {
 
 interface ProductClassFilter {
   q?: string
+  isActive?: boolean
   pagination?: PaginationArgs
 }
 
@@ -355,6 +372,10 @@ class ProductClassService {
       where.push(ilike(productClasses.name, `%${filter.q}%`))
     }
 
+    if(filter?.isActive !== undefined){
+      where.push(eq(productClasses.isActive, filter.isActive))
+    }
+
     const query = this.db
       .select()
       .from(productClasses)
@@ -381,6 +402,7 @@ class ProductClassService {
 
 interface CategoryFilter {
   q?: string
+  isActive?: boolean
   pagination?: PaginationArgs
 }
 
@@ -437,6 +459,10 @@ class CategoryService {
 
     if (filter?.q) {
       where.push(ilike(categories.name, `%${filter.q}%`))
+    }
+
+    if(filter?.isActive !== undefined){
+      where.push(eq(categories.isActive, filter.isActive))
     }
 
     const query = this.db
