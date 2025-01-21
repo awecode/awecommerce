@@ -9,6 +9,7 @@ import {
   timestamp,
   text,
   primaryKey,
+  jsonb,
 } from 'drizzle-orm/pg-core'
 
 export const brands = pgTable('brand', {
@@ -66,6 +67,7 @@ export const products = pgTable('product', {
   isBestSeller: boolean().default(false),
   isTodaysDeal: boolean().default(false),
   isActive: boolean().default(true),
+  extraInfo: jsonb().default({}).$type<Record<string, any>>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
