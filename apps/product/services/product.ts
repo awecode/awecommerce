@@ -1,4 +1,4 @@
-import { and, eq, like, or, SQL } from 'drizzle-orm'
+import { and, eq, ilike, or, SQL } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, products } from '../schemas'
 
@@ -117,8 +117,8 @@ class ProductService {
     if (filter.q) {
       where.push(
         or(
-          like(products.id, `%${filter.q}%`),
-          like(products.name, `%${filter.q}%`),
+          Number(filter.q) ? eq(products.id, Number(filter.q)) : undefined,
+          ilike(products.name, `%${filter.q}%`),
         )!,
       )
     }
@@ -241,7 +241,7 @@ class BrandService {
     const where: SQL[] = []
 
     if (filter.q) {
-      where.push(like(brands.name, `%${filter.q}%`))
+      where.push(ilike(brands.name, `%${filter.q}%`))
     }
 
     const query = this.db
@@ -325,7 +325,7 @@ class ProductClassService {
     const where: SQL[] = []
 
     if (filter?.q) {
-      where.push(like(productClasses.name, `%${filter.q}%`))
+      where.push(ilike(productClasses.name, `%${filter.q}%`))
     }
 
     const query = this.db
@@ -409,7 +409,7 @@ class CategoryService {
     const where: SQL[] = []
 
     if (filter?.q) {
-      where.push(like(categories.name, `%${filter.q}%`))
+      where.push(ilike(categories.name, `%${filter.q}%`))
     }
 
     const query = this.db
