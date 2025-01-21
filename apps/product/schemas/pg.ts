@@ -29,6 +29,7 @@ export const categories = pgTable('category', {
   slug: varchar({ length: 100 }).notNull().unique(),
   parentId: integer().references((): any => categories.id),
   description: text(),
+  logo: varchar({ length: 256 }),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
