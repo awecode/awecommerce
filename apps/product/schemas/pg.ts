@@ -67,7 +67,6 @@ export const products = pgTable('product', {
   stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),
   isBestSeller: boolean().default(false),
-  isTodaysDeal: boolean().default(false),
   isActive: boolean().default(true),
   extraInfo: jsonb().default({}).$type<Record<string, any>>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),

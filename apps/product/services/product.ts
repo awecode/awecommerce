@@ -15,7 +15,6 @@ interface ProductFilter {
   q?: string 
   isFeatured?: boolean
   isBestSeller?: boolean
-  isTodaysDeal?: boolean
   pagination?: PaginationArgs 
   isActive?: boolean
   includeInactiveBrands?: boolean
@@ -132,10 +131,6 @@ class ProductService {
       where.push(eq(products.isActive, filter.isActive))
     }
 
-    if(filter.isTodaysDeal !== undefined){
-      where.push(eq(products.isTodaysDeal, filter.isTodaysDeal))
-    }
-
     if(!filter.includeInactiveBrands){
       where.push(or(isNull(products.brandId), eq(brands.isActive, true)))
     }
@@ -217,24 +212,6 @@ class ProductService {
     const result = await this.db
       .update(products)
       .set({ isBestSeller: false })
-      .where(eq(products.id, productId))
-      .returning()
-    return result[0]
-  }
-
-  async markAsTodaysDeal(productId: number) {
-    const result = await this.db
-      .update(products)
-      .set({ isTodaysDeal: true })
-      .where(eq(products.id, productId))
-      .returning()
-    return result[0]
-  }
-
-  async unmarkAsTodaysDeal(productId: number) {
-    const result = await this.db
-      .update(products)
-      .set({ isTodaysDeal: false })
       .where(eq(products.id, productId))
       .returning()
     return result[0]
