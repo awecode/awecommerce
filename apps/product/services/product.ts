@@ -31,11 +31,11 @@ class ProductService {
 
   async create(product: NewProduct) {
     const result = await this.db.insert(products).values(product).returning()
-    if(product.images && product.images.length){
+    if(product.images){
       const productImageService = new ProductImageService(this.db)
       await productImageService.setImages(result[0].id, product.images)
     }
-    if(product.relatedProducts && product.relatedProducts.length){
+    if(product.relatedProducts){
       const relatedProductService = new RelatedProductService(this.db)
       await relatedProductService.setRelatedProducts(result[0].id, product.relatedProducts)
     }
@@ -590,7 +590,9 @@ class ProductImageService {
     const result = await this.db
       .delete(productImages)
       .where(eq(productImages.productId, productId))
-    await this.db.insert(productImages).values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
+    if(imageUrls.length) {
+      await this.db.insert(productImages).values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
+    }   
     return result
   }
 }
@@ -604,7 +606,9 @@ class RelatedProductService {
   
   async setRelatedProducts(productId: number, relatedProductIds: number[]) {
     await this.db.delete(products).where(eq(products.id, productId))
-    await this.db.insert(products).values(relatedProductIds.map((relatedProductId) => ({ productId, relatedProductId })))
+    if(relatedProductIds.length){
+      await this.db.insert(products).values(relatedProductIds.map((relatedProductId) => ({ productId, relatedProductId })))
+    }
   }
 }
 
