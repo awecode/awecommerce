@@ -31,11 +31,11 @@ class ProductService {
 
   async create(product: NewProduct) {
     const result = await this.db.insert(products).values(product).returning()
-    if(product.images){
+    if(product.images && product.images.length){
       const productImageService = new ProductImageService(this.db)
       await productImageService.setImages(result[0].id, product.images)
     }
-    if(product.relatedProducts){
+    if(product.relatedProducts && product.relatedProducts.length){
       const relatedProductService = new RelatedProductService(this.db)
       await relatedProductService.setRelatedProducts(result[0].id, product.relatedProducts)
     }
