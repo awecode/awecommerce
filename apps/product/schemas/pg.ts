@@ -14,9 +14,9 @@ import {
 
 export const brands = pgTable('brand', {
   id: serial().primaryKey(),
-  name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull().unique(),
-  logo: varchar({ length: 256 }),
+  name: text().notNull(),
+  slug: text().notNull().unique(),
+  logo: text(),
   description: text(),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -25,11 +25,11 @@ export const brands = pgTable('brand', {
 
 export const categories = pgTable('category', {
   id: serial().primaryKey(),
-  name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull().unique(),
+  name: text().notNull(),
+  slug: text().notNull().unique(),
   parentId: integer().references((): any => categories.id),
   description: text(),
-  logo: varchar({ length: 256 }),
+  logo: text(),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
@@ -37,8 +37,8 @@ export const categories = pgTable('category', {
 
 export const productClasses = pgTable('product_class', {
   id: serial().primaryKey(),
-  name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull().unique(),
+  name: text().notNull(),
+  slug: text().notNull().unique(),
   description: text(),
   trackStock: boolean().default(true),
   isActive: boolean().default(true),
@@ -50,16 +50,16 @@ export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
 
 export const products = pgTable('product', {
   id: serial().primaryKey(),
-  name: varchar({ length: 100 }).notNull(),
-  slug: varchar({ length: 100 }).notNull().unique(),
-  sku: varchar({ length: 100 }).notNull().unique(),
+  name: text().notNull(),
+  slug: text().notNull().unique(),
+  sku: text().notNull().unique(),
   description: text(),
   specification: text(),
   brandId: integer().references(() => brands.id),
   categoryId: integer().references(() => categories.id),
   productClassId: integer().references(() => productClasses.id),
-  link: varchar({ length: 256 }),
-  thumbnail: varchar({ length: 256 }),
+  link: text(),
+  thumbnail: text(),
   price: numeric({ precision: 100 }),
   discountedPrice: numeric({ precision: 100 }),
   inventoryCost: numeric({ precision: 100 }),
@@ -83,7 +83,7 @@ export const productRelatedProducts = pgTable('product_related_products', {
 export const productImages = pgTable('product_image', {
   id: serial().primaryKey(),
   productId: integer().references(() => products.id),
-  imageUrl: varchar({ length: 256 }).notNull(),
+  imageUrl: text().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
