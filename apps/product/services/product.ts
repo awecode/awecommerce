@@ -316,7 +316,12 @@ class BrandService {
     const where: SQL[] = []
 
     if (filter.q) {
-      where.push(ilike(brands.name, `%${filter.q}%`))
+      where.push(
+        or(
+          Number(filter.q) ? eq(brands.id, Number(filter.q)) : undefined,
+          ilike(brands.name, `%${filter.q}%`),
+        )!,
+      )
     }
 
     if(filter.isActive !== undefined){
@@ -423,7 +428,12 @@ class ProductClassService {
     const where: SQL[] = []
 
     if (filter?.q) {
-      where.push(ilike(productClasses.name, `%${filter.q}%`))
+      where.push(
+        or(
+          Number(filter.q) ? eq(productClasses.id, Number(filter.q)) : undefined,
+          ilike(productClasses.name, `%${filter.q}%`),
+        )!,
+      )
     }
 
     if(filter?.isActive !== undefined){
@@ -530,7 +540,12 @@ class CategoryService {
     const where: SQL[] = []
 
     if (filter?.q) {
-      where.push(ilike(categories.name, `%${filter.q}%`))
+      where.push(
+        or(
+          Number(filter.q) ? eq(categories.id, Number(filter.q)) : undefined,
+          ilike(categories.name, `%${filter.q}%`),
+        )!,
+      )
     }
 
     if(filter?.isActive !== undefined){
