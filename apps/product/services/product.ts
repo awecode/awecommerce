@@ -18,9 +18,9 @@ interface ProductFilter {
   isTodaysDeal?: boolean
   pagination?: PaginationArgs 
   isActive?: boolean
-  onlyActiveBrands?: boolean
-  onlyActiveCategories?: boolean
-  onlyActiveProductClasses?: boolean
+  includeInactiveBrands?: boolean
+  includeInactiveCategories?: boolean
+  includeInactiveProductClasses?: boolean
 }
 
 class ProductService {
@@ -136,15 +136,15 @@ class ProductService {
       where.push(eq(products.isTodaysDeal, filter.isTodaysDeal))
     }
 
-    if(filter.onlyActiveBrands){
+    if(!filter.includeInactiveBrands){
       where.push(or(isNull(products.brandId), eq(brands.isActive, true)))
     }
 
-    if(filter.onlyActiveCategories){
+    if(!filter.includeInactiveCategories){
       where.push(or(isNull(products.categoryId), eq(categories.isActive, true)))
     }
 
-    if(filter.onlyActiveProductClasses){
+    if(!filter.includeInactiveProductClasses){
       where.push(or(isNull(products.productClassId), eq(productClasses.isActive, true)))
     }
 
