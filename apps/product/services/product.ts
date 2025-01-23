@@ -1,6 +1,7 @@
 import { and, eq, ilike, or, SQL, sql, isNull } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products } from '../schemas'
+import { aliasedTable } from 'drizzle-orm'
 
 type PaginationArgs = {
   page: number
@@ -44,10 +45,17 @@ class ProductService {
   }
 
   async get(productId: number) {
+    const related = aliasedTable(products, 'related')
     const result = await this.db
-      .select()
+      .select({
+        ...products,
+        relatedProducts: sql`COALESCE(jsonb_agg(${related}.*) FILTER (WHERE ${related}.id IS NOT NULL), '[]'::jsonb)`
+      })
       .from(products)
       .where(eq(products.id, productId))
+      .leftJoin(productRelatedProducts, eq(products.id, productRelatedProducts.productId))
+      .leftJoin(related, eq(productRelatedProducts.relatedProductId, related.id))
+      .groupBy(products.id)
     return result[0]
   }
 
@@ -71,21 +79,22 @@ class ProductService {
   }
 
   async update(productId: number, product: Partial<NewProduct>) {
+    const { images, relatedProducts, ...productData } = product
     const result = await this.db
       .update(products)
       .set({
-        ...product,
+        ...productData,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(products.id, productId))
       .returning()
-    if(product.images){
+    if(images){
       const productImageService = new ProductImageService(this.db)
-      await productImageService.setImages(productId, product.images)
+      await productImageService.setImages(productId, images)
     }
-    if(product.relatedProducts){
+    if(relatedProducts){
       const relatedProductService = new RelatedProductService(this.db)
-      await relatedProductService.setRelatedProducts(productId, product.relatedProducts)
+      await relatedProductService.setRelatedProducts(productId, relatedProducts)
     }
     return result[0]
   }
