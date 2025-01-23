@@ -49,12 +49,14 @@ class ProductService {
     const result = await this.db
       .select({
         ...products,
-        relatedProducts: sql`COALESCE(jsonb_agg(${related}.*) FILTER (WHERE ${related}.id IS NOT NULL), '[]'::jsonb)`
+        relatedProducts: sql`COALESCE(jsonb_agg(${related}.*) FILTER (WHERE ${related}.id IS NOT NULL), '[]'::jsonb)`,
+        images: sql`jsonb_agg(${productImages.imageUrl}) FILTER (WHERE ${productImages.imageUrl}IS NOT NULL)`,
       })
       .from(products)
       .where(eq(products.id, productId))
       .leftJoin(productRelatedProducts, eq(products.id, productRelatedProducts.productId))
       .leftJoin(related, eq(productRelatedProducts.relatedProductId, related.id))
+      .leftJoin(productImages, eq(products.id, productImages.productId))
       .groupBy(products.id)
     return result[0]
   }
