@@ -1,6 +1,6 @@
 import { and, eq, ilike, or, SQL, sql, isNull } from 'drizzle-orm'
 
-import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, products } from '../schemas'
+import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products } from '../schemas'
 
 type PaginationArgs = {
   page: number
@@ -30,14 +30,15 @@ class ProductService {
   }
 
   async create(product: NewProduct) {
-    const result = await this.db.insert(products).values(product).returning()
-    if(product.images){
+    const { images, relatedProducts, ...productData } = product
+    const result = await this.db.insert(products).values(productData).returning()
+    if(images){
       const productImageService = new ProductImageService(this.db)
-      await productImageService.setImages(result[0].id, product.images)
+      await productImageService.setImages(result[0].id, images)
     }
-    if(product.relatedProducts){
+    if(relatedProducts){
       const relatedProductService = new RelatedProductService(this.db)
-      await relatedProductService.setRelatedProducts(result[0].id, product.relatedProducts)
+      await relatedProductService.setRelatedProducts(result[0].id, relatedProducts)
     }
     return result[0]
   }
@@ -605,9 +606,9 @@ class RelatedProductService {
   }
   
   async setRelatedProducts(productId: number, relatedProductIds: number[]) {
-    await this.db.delete(products).where(eq(products.id, productId))
+    await this.db.delete(productRelatedProducts).where(eq(productRelatedProducts.productId, productId))
     if(relatedProductIds.length){
-      await this.db.insert(products).values(relatedProductIds.map((relatedProductId) => ({ productId, relatedProductId })))
+      await this.db.insert(productRelatedProducts).values(relatedProductIds.map((relatedProductId) => ({ productId, relatedProductId })))
     }
   }
 }
