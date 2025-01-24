@@ -20,7 +20,7 @@ class ShippingMethodService {
         return method;
     }
 
-    async getAll() {
+    async list() {
         return await this.db.select().from(shippingMethods).orderBy(desc(shippingMethods.createdAt));
     }
 
@@ -38,4 +38,6 @@ class ShippingMethodService {
     }
 }
 
-export default ShippingMethodService;
+export  {
+    ShippingMethodService
+};
