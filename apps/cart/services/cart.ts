@@ -162,7 +162,7 @@ class CartService {
       for (const userLine of userCart[0].lines) {
         if (userLine.productId) {
           const sessionLine = sessionCart[0].lines.find(
-            (l) => l?.productId === userLine.productId,
+            (l: CartLine) => l?.productId === userLine.productId,
           );
           if (sessionLine) {
             lines.push({
@@ -190,7 +190,7 @@ class CartService {
     for (const sessionLine of sessionCart[0].lines) {
       if (
         sessionLine &&
-        !userCart[0].lines.find((l) => l?.productId === sessionLine.productId)
+        !userCart[0].lines.find((l: CartLine) => l?.productId === sessionLine.productId)
       ) {
         if (
           sessionLine.createdAt &&

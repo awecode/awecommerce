@@ -60,6 +60,16 @@ class ShippingAddressService {
     return res
   }
 
+  async getDefault(userId: string) {
+    const [res] = await this.db.select().from(shippingAddresses).where(
+      and(
+        eq(shippingAddresses.userId, userId),
+        eq(shippingAddresses.isDefault, true)
+      )
+    )
+    return res
+  }
+
   async markAsDefault(userId: string, id: number) {
     await this.db.update(shippingAddresses).set({
       isDefault: false,
