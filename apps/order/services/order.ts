@@ -1,17 +1,17 @@
-import { and, eq, ne, or, sql, SQL } from "drizzle-orm";
-import { NewOrder, NewPaymentEvent, Order, OrderLine, orderLines, orders, orderStatusChanges, paymentEvents } from "../schemas";
-import { CartLine, cartLines, carts } from "../../cart/schemas";
+import { and, eq, or, sql, SQL } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import { CartLine, carts } from "../../cart/schemas";
+import { NewOrder, NewPaymentEvent, Order, OrderLine, orderLines, orders, orderStatusChanges, paymentEvents } from "../schemas";
 
 type OrderStatus = 'Pending'|'Processing'|'Couriered'|'Shipped'|'Delivered'|'Returned'|'Cancelled'|'Completed'
 type OrderPaymentStatus = 'Pending'|'Paid'|'Refunded'
 
 type OrderListFilter = {
     q?: string;
-    status?: OrderStatus;
+    status?: string;
     userId?: string;
     createdAt?: string;
-    paymentStatus?: OrderPaymentStatus;
+    paymentStatus?: string;
     pagination?: {
         page: number;
         size: number;
@@ -92,10 +92,10 @@ class OrderService {
     }
 
     async createPaymentEvent(paymentEvent: NewPaymentEvent) {
-        await this.db.insert(paymentEvents).values(paymentEvent)[0];
-            await this.changePaymentStatus(paymentEvent.orderId, 
-            paymentEvent.type === 'Paid' ? 'Paid' : 'Refunded'
-            );
+        await this.db.insert(paymentEvents).values(paymentEvent)
+        await this.changePaymentStatus(paymentEvent.orderId, 
+        paymentEvent.type === 'Paid' ? 'Paid' : 'Refunded'
+        );
     }
 
     async cancel(orderId: number, cancelledBy: string, cancellationReason: string) {
@@ -107,14 +107,17 @@ class OrderService {
         }).where(eq(orders.id, orderId))
     }
 
-    async get(orderId: number) {
+    async get(orderId: number, userId?: string) {
         const [order] = await this.db.select({
             ...orders,
             lines: sql`COALESCE(json_agg(${orderLines}), '[]') FILTER (WHERE ${orderLines.id} IS NOT NULL`
         }).from(orders)
             .leftJoin(orderLines, eq(orders.id, orderLines.orderId))
             .where(
-                eq(orders.id, orderId)
+                and(
+                eq(orders.id, orderId),
+                userId ? eq(orders.userId, userId) : undefined
+                )
             )
         if (!order) {
             return null
@@ -149,7 +152,7 @@ class OrderService {
         }
 
         if (filters?.status) {
-            where.push(eq(orders.status, filters.status))
+            where.push(eq(orders.status, filters.status as OrderStatus))
         }
 
         if (filters?.userId) {
@@ -163,7 +166,7 @@ class OrderService {
         }
 
         if (filters?.paymentStatus) {
-            where.push(eq(orders.paymentStatus, filters.paymentStatus))
+            where.push(eq(orders.paymentStatus, filters.paymentStatus as OrderPaymentStatus))
         }
 
         const query = this.db
@@ -192,4 +195,4 @@ class OrderService {
 
 export {
     OrderService
-}
+};
