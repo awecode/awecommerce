@@ -120,17 +120,17 @@ class OrderService {
     }
 
     async get(orderId: number, userId?: string) {
-        const [order] = await this.db.select({
-            ...orders,
-            lines: sql`COALESCE(json_agg(${orderLines}), '[]') FILTER (WHERE ${orderLines.id} IS NOT NULL`
-        }).from(orders)
-            .leftJoin(orderLines, eq(orders.id, orderLines.orderId))
-            .where(
-                and(
-                eq(orders.id, orderId),
-                userId ? eq(orders.userId, userId) : undefined
+        const order = await this.db.query.orders.findFirst(
+            {
+                with:{
+                    lines: true
+                },
+                where: and(
+                    eq(orders.id, orderId),
+                    userId ? eq(orders.userId, userId) : undefined
                 )
-            )
+            }
+        )
         if (!order) {
             return null
         }

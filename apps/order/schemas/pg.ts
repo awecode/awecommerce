@@ -7,6 +7,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { carts } from '../../cart/schemas'
 import { pgEnum } from 'drizzle-orm/pg-core'
+import { relations } from 'drizzle-orm'
 
 export const shippingAddresses = pgTable('shipping_address', {
     id: serial().primaryKey(),
@@ -103,6 +104,41 @@ export const paymentEvents = pgTable('payment_event', {
   reference: text(),
   metadata: jsonb(),
 })
+
+export const orderRelations = relations(orders, ({ many }) => ({
+  lines: many(orderLines),
+  statusChanges: many(orderStatusChanges),
+  transactions: many(transactions),
+  paymentEvents: many(paymentEvents),
+}))
+
+export const orderLineRelations = relations(orderLines, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderLines.orderId],
+    references: [orders.id],
+  }),
+}))
+
+export const orderStatusChangeRelations = relations(orderStatusChanges, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderStatusChanges.orderId],
+    references: [orders.id],
+  }),
+}))
+
+export const transactionRelations = relations(transactions, ({ one }) => ({
+  order: one(orders, {
+    fields: [transactions.orderId],
+    references: [orders.id],
+  }),
+}))
+
+export const paymentEventRelations = relations(paymentEvents, ({ one }) => ({
+  order: one(orders, {
+    fields: [paymentEvents.orderId],
+    references: [orders.id],
+  }),
+}))
 
 
 export type Order = typeof orders.$inferSelect

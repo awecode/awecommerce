@@ -33,6 +33,10 @@ export const cartLines = pgTable('cart_line', {
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
+export const cartRelations = relations(carts, ({ many }) => ({
+  lines: many(cartLines),
+}))
+
 export const cartLineRelations = relations(cartLines, ({ one }) => ({
   cart: one(carts, {
     fields: [cartLines.cartId],
@@ -42,10 +46,6 @@ export const cartLineRelations = relations(cartLines, ({ one }) => ({
     fields: [cartLines.productId],
     references: [products.id],
   }),
-}))
-
-export const cartRelations = relations(carts, ({ many }) => ({
-  cartLines: many(cartLines),
 }))
 
 export type Cart = typeof carts.$inferSelect

@@ -1,3 +1,4 @@
+import { relations } from 'drizzle-orm'
 import {
   boolean,
   integer,
@@ -87,6 +88,60 @@ export const productImages = pgTable('product_image', {
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
+
+export const productRelations = relations(products, (({one, many})=>({
+  brand: one(brands, {
+    fields: [products.brandId],
+    references: [brands.id]
+  }),
+  category: one(categories, {
+    fields: [products.categoryId],
+    references: [categories.id]
+  }),
+  productClass: one(productClasses, {
+    fields: [products.productClassId],
+    references: [productClasses.id]
+  }),
+  images: many(productImages),
+  relatedProducts: many(productRelatedProducts,{
+    relationName: 'relatedProduct'
+  }),
+  relatedTo: many(productRelatedProducts,{
+    relationName: 'relatedTo'
+  })
+})))
+
+export const productImageRelations = relations(productImages, (({one})=>({
+  product: one(products, {
+    fields: [productImages.productId],
+    references: [products.id]
+  })
+})))
+
+export const productClassRelations = relations(productClasses, (({many})=>({
+  products: many(products)
+})))
+
+export const categoryRelations = relations(categories, (({many})=>({
+  products: many(products)
+})))
+
+export const brandRelations = relations(brands, (({many})=>({
+  products: many(products)
+})))
+
+export const productRelatedProductRelations = relations(productRelatedProducts, (({one})=>({
+  product: one(products, {
+    fields: [productRelatedProducts.productId],
+    references: [products.id],
+    relationName: 'relatedTo'
+  }),
+  relatedProduct: one(products, {
+    fields: [productRelatedProducts.relatedProductId],
+    references: [products.id],
+    relationName: 'relatedProduct'
+  })
+})))
 
 
 type BaseEntity = {

@@ -4,10 +4,9 @@ import { Cart, CartLine, cartLines, carts } from '../schemas'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
-interface CartContent {
-  cart: Cart
+type CartContent = Extend<Cart, {
   lines: CartLine[]
-}
+}>
 
 class CartService {
   private db: any 
@@ -102,16 +101,22 @@ class CartService {
   }
 
   async getCartContentForSession(sessionId: string): Promise<CartContent> {
-    const result = await this.db
-      .select({
-      cart: carts,
-      lines: sql<CartLine[]>`COALESCE(jsonb_agg(${cartLines}.*) FILTER (WHERE ${cartLines}.id IS NOT NULL), '[]'::jsonb)`,
-      })
-      .from(carts)
-      .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-      .where(eq(carts.sessionId, sessionId))
-      .groupBy(carts.id);
-    return result[0];
+    // const result = await this.db
+    //   .select({
+    //   cart: carts,
+    //   lines: sql<CartLine[]>`COALESCE(jsonb_agg(${cartLines}.*) FILTER (WHERE ${cartLines}.id IS NOT NULL), '[]'::jsonb)`,
+    //   })
+    //   .from(carts)
+    //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
+    //   .where(eq(carts.sessionId, sessionId))
+    //   .groupBy(carts.id);
+    // return result[0];
+    return await this.db.query.carts.findFirst({
+      with: {
+        lines: true,
+      },
+      where: eq(carts.sessionId, sessionId),
+    })
   }
 
   async mergeCarts(
@@ -119,17 +124,24 @@ class CartService {
     sessionId: string,
     sumProductQuantityOnCartMerge: boolean = SUM_PRODUCT_QUANTITY_ON_CART_MERGE,
   ): Promise<CartContent> {
-    const userCart = await this.db
-      .select({
-        cart: carts,
-        lines: sql<CartLine[]>`json_agg(${cartLines})`,
-      })
-      .from(carts)
-      .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-      .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
-      .groupBy(carts.id)
-      .orderBy(desc(carts.updatedAt));
-    if (!userCart.length) {
+    // const userCart = await this.db
+    //   .select({
+    //     cart: carts,
+    //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
+    //   })
+    //   .from(carts)
+    //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
+    //   .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
+    //   .groupBy(carts.id)
+    //   .orderBy(desc(carts.updatedAt));
+    const userCart = await this.db.query.carts.findFirst({
+      with: {
+        lines: true,
+      },
+      where: eq(carts.userId, userId),
+      orderBy: desc(carts.updatedAt),
+    })
+    if (!userCart) {
       const result = await this.db
         .update(carts)
         .set({ userId })
@@ -137,35 +149,44 @@ class CartService {
         .returning();
       if (!result.length) {
         return {
-          cart: await this.create(userId),
+          ...(await this.create(userId)),
           lines: [],
         };
       }
       return await this.getCartContentForSession(result[0].sessionId);
     }
-    const sessionCart = await this.db
-      .select({
-        cart: carts,
-        lines: sql<CartLine[]>`json_agg(${cartLines})`,
-      })
-      .from(carts)
-      .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-      .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
-      .groupBy(carts.id)
-      .orderBy(desc(carts.updatedAt));
-    if (!sessionCart.length) {
-      return userCart[0];
+    // const sessionCart = await this.db
+    //   .select({
+    //     cart: carts,
+    //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
+    //   })
+    //   .from(carts)
+    //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
+    //   .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
+    //   .groupBy(carts.id)
+    //   .orderBy(desc(carts.updatedAt));
+    const sessionCart = await this.db.query.carts.findFirst({
+      with: {
+        lines: true,
+      },
+      where: eq(carts.sessionId, sessionId),
+      orderBy: desc(carts.updatedAt),
+    })
+    if (!sessionCart) {
+      return userCart
     }
 
     const lines = [];
-    if (userCart[0].lines?.length && userCart[0].lines[0]) {
-      for (const userLine of userCart[0].lines) {
+    if (userCart.lines?.length && userCart.lines[0]) {
+      for (const userLine of userCart.lines) {
         if (userLine.productId) {
-          const sessionLine = sessionCart[0].lines.find(
+          const sessionLine = sessionCart.lines.find(
             (l: CartLine) => l?.productId === userLine.productId,
           );
           if (sessionLine) {
             lines.push({
+              cartId: sessionCart.id,
+              productId: sessionLine.productId,
               id: sessionLine.id,
               quantity: sumProductQuantityOnCartMerge
                 ? userLine.quantity + sessionLine.quantity
@@ -176,7 +197,7 @@ class CartService {
           } else {
             lines.push({
               id: undefined,
-              cartId: sessionCart[0].cart.id,
+              cartId: sessionCart.id,
               productId: userLine.productId,
               quantity: userLine.quantity,
               price: userLine.price,
@@ -187,10 +208,10 @@ class CartService {
       }
     }
 
-    for (const sessionLine of sessionCart[0].lines) {
+    for (const sessionLine of sessionCart.lines) {
       if (
         sessionLine &&
-        !userCart[0].lines.find((l: CartLine) => l?.productId === sessionLine.productId)
+        !userCart.lines.find((l: CartLine) => l?.productId === sessionLine.productId)
       ) {
         if (
           sessionLine.createdAt &&
@@ -226,14 +247,14 @@ class CartService {
     await this.db
       .update(carts)
       .set({ status: 'Merged' })
-      .where(eq(carts.id, userCart[0].cart.id));
+      .where(eq(carts.id, userCart.id));
 
     await this.db.update(carts).set({ userId }).where(eq(carts.sessionId, sessionId));
 
-    sessionCart[0].cart.userId = userId;
+    sessionCart.userId = userId;
 
     return {
-      cart: sessionCart[0].cart,
+      ...sessionCart,
       lines: insertedLines,
     };
   }

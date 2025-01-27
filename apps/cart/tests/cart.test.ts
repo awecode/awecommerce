@@ -48,7 +48,7 @@ test('should get cart content for session', async () => {
   await cartService.addToCart(cart.sessionId, product2.id, 1)
   const cartContent = await cartService.getCartContentForSession(cart.sessionId)
   expect(cartContent).toBeDefined()
-  expect(cartContent.cart).toBeDefined()
+  expect(cartContent).toBeDefined()
   expect(cartContent.lines[0].price.toString()).toBe(product1.discountedPrice || product1.price)
   expect(cartContent.lines[1].price.toString()).toBe(product2.discountedPrice || product2.price)
 })
@@ -64,8 +64,8 @@ test('should merge carts', async () => {
     cart1.userId!,
     cart2.sessionId,
   )
-  expect(mergedCart.cart.userId).toBe(cart1.userId)
-  expect(mergedCart.cart.sessionId).toBe(cart2.sessionId)
+  expect(mergedCart.userId).toBe(cart1.userId)
+  expect(mergedCart.sessionId).toBe(cart2.sessionId)
   expect(mergedCart.lines.length).toBe(2)
   // Line 1 should not be on merged cart
   expect(mergedCart.lines.find((l) => l.id === line1.id)).toBeUndefined()
@@ -128,8 +128,8 @@ test('should merge carts when session cart is invalid', async () => {
     cart1.userId!,
     '123e4567-e89b-12d3-a456-426614174000', // dummy uuid
   )
-  expect(mergedCart.cart.userId).toBe(cart1.userId)
-  expect(mergedCart.cart.sessionId).toBe(cart1.sessionId)
+  expect(mergedCart.userId).toBe(cart1.userId)
+  expect(mergedCart.sessionId).toBe(cart1.sessionId)
   expect(mergedCart.lines.length).toBe(1)
   expect(mergedCart.lines[0].productId).toBe(product1.id)
   expect(mergedCart.lines[0].quantity).toBe(2)
@@ -144,8 +144,8 @@ test('should return user cart for merge when session cart is empty', async () =>
     cart1.userId!,
     cart2.sessionId,
   )
-  expect(mergedCart.cart.userId).toBe(cart1.userId)
-  expect(mergedCart.cart.sessionId).toBe(cart2.sessionId)
+  expect(mergedCart.userId).toBe(cart1.userId)
+  expect(mergedCart.sessionId).toBe(cart2.sessionId)
   expect(mergedCart.lines.length).toBe(1)
 })
 
@@ -158,8 +158,8 @@ test('should return session cart for merge when user cart is empty', async () =>
     cart1.userId!, // dummy uuid
     cart2.sessionId,
   )
-  expect(mergedCart.cart.userId).toBe(cart1.userId)
-  expect(mergedCart.cart.sessionId).toBe(cart2.sessionId)
+  expect(mergedCart.userId).toBe(cart1.userId)
+  expect(mergedCart.sessionId).toBe(cart2.sessionId)
   expect(mergedCart.lines.length).toBe(1)
   expect(mergedCart.lines[0].productId).toBe(product2.id)
   expect(mergedCart.lines[0].quantity).toBe(2)
@@ -172,7 +172,7 @@ test('should return empty cart for merge when both user and session cart are emp
     cart1.userId!,
     cart2.sessionId,
   )
-  expect(mergedCart.cart.userId).toBe(cart1.userId)
-  expect(mergedCart.cart.sessionId).toBe(cart2.sessionId)
+  expect(mergedCart.userId).toBe(cart1.userId)
+  expect(mergedCart.sessionId).toBe(cart2.sessionId)
   expect(mergedCart.lines.length).toBe(0)
 })
