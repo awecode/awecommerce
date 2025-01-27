@@ -5,6 +5,7 @@
   "scripts": {
     "test": "vitest",
     "prepare": "unbuild",
+    "preinstall": "unbuild",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
