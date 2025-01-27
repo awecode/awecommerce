@@ -79,6 +79,20 @@ export const orderLines = pgTable('order_line', {
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
 
+export const transactionStatusEnum = pgEnum('transaction_status', ['Requested', 'Success', 'Failed', 'Cancelled', 'Error', 'Disproved', 'Refunded'])
+
+export const transactions = pgTable('transaction', {
+  id: serial().primaryKey(),
+  orderId: integer().notNull().references(() => orders.id),
+  gateway: text().notNull(),
+  reference: text(),
+  amount: numeric().notNull(),
+  status: transactionStatusEnum().notNull().default('Requested'),
+  metadata: jsonb(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  lastRequestedAt: timestamp({ mode: 'string', withTimezone: true }),
+})
+
 export const paymentEventTypes = pgEnum('payment_event_type', ['Paid', 'Refund'])
 
 export const paymentEvents = pgTable('payment_event', {
@@ -114,3 +128,8 @@ export type UpdateShippingMethod = Partial<NewShippingMethod>
 export type ShippingAddress = typeof shippingAddresses.$inferSelect
 export type NewShippingAddress = Omit<typeof shippingAddresses.$inferInsert, 'id' | 'createdAt' | 'updatedAt'>
 export type UpdateShippingAddress = Partial<NewShippingAddress>
+
+
+export type Transaction = typeof transactions.$inferSelect
+export type NewTransaction = Omit<typeof transactions.$inferInsert, 'id' | 'createdAt'>
+export type UpdateTransaction = Partial<NewTransaction>

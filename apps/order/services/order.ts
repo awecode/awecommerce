@@ -1,7 +1,7 @@
 import { and, eq, notInArray, or, sql, SQL } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { CartLine, carts } from "../../cart/schemas";
-import { NewOrder, NewPaymentEvent, Order, OrderLine, orderLines, orders, orderStatusChanges, paymentEvents } from "../schemas";
+import { NewOrder, NewPaymentEvent, NewTransaction, Order, OrderLine, orderLines, orders, orderStatusChanges, paymentEvents, transactions } from "../schemas";
 
 type OrderStatus = 'Pending'|'Processing'|'Couriered'|'Shipped'|'Delivered'|'Returned'|'Cancelled'|'Completed'
 type OrderPaymentStatus = 'Pending'|'Paid'|'Refunded'
@@ -77,6 +77,13 @@ class OrderService {
             orderId: order.id,
             previousStatus: order.status,
             newStatus
+        })
+    }
+
+    async createTransaction(orderId: number, transaction: NewTransaction) {
+        await this.db.insert(transactions).values({
+            ...transaction,
+            orderId
         })
     }
 
