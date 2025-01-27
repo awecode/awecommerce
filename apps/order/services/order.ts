@@ -43,7 +43,7 @@ class OrderService {
         await this.db.update(carts).set({ status: "Frozen" }).where(eq(
             carts.id, data.cartId
         ))
-        this.db.insert(orders).values(cartLines.map((line: CartLine) => ({
+        await this.db.insert(orderLines).values(cartLines.map((line: CartLine) => ({
             orderId: order.id,
             productId: line.productId,
             price: line.price,

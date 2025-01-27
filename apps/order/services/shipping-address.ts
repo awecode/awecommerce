@@ -51,7 +51,7 @@ class ShippingAddressService {
   }
 
   async get(userId: string, id: number) {
-    const [res] = this.db.select().from(shippingAddresses).where(
+    const [res] = await this.db.select().from(shippingAddresses).where(
       and(
         eq(shippingAddresses.userId, userId),
         eq(shippingAddresses.id, id)
