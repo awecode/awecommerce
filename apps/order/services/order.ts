@@ -110,7 +110,7 @@ class OrderService {
         );
     }
 
-    async cancel(orderId: number, cancelledBy: string, cancellationReason: string, cancellationRemarks: string) {
+    async cancel(orderId: number, cancelledBy: string, cancellationReason: string, cancellationRemarks?: string | null) {
         return await this.db.update(orders).set({
             status: 'Cancelled',
             cancelledBy,
