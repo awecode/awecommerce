@@ -67,7 +67,11 @@ class OrderService {
         return subtotal - discount + tax;
     }
 
-    async changeStatus(order: Pick<Order, 'id'| 'status'>, newStatus: OrderStatus) {
+    async changeStatus(orderId: number, newStatus: OrderStatus) {
+        const [order] = await this.db.select().from(orders).where(eq(orders.id, orderId));
+        if (!order || order.status === newStatus) {
+            return
+        }
         await this.db.update(orders).set({ status: newStatus }).where(eq(orders.id, order.id))
         await this.db.insert(orderStatusChanges).values({
             orderId: order.id,
