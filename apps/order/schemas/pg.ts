@@ -68,6 +68,13 @@ export const orderStatusChanges = pgTable('order_status_change', {
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
 
+export const orderLogs = pgTable('order_log', {
+  id: serial().primaryKey(),
+  orderId: integer().notNull().references(() => orders.id),
+  log: text().notNull(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+})
+
 export const orderLines = pgTable('order_line', {
   id: serial().primaryKey(),
   orderId: integer().notNull().references(() => orders.id),
@@ -111,6 +118,7 @@ export const orderRelations = relations(orders, ({ many }) => ({
   statusChanges: many(orderStatusChanges),
   transactions: many(transactions),
   paymentEvents: many(paymentEvents),
+  logs: many(orderLogs),
 }))
 
 export const orderLineRelations = relations(orderLines, ({ one }) => ({
@@ -137,6 +145,13 @@ export const transactionRelations = relations(transactions, ({ one }) => ({
 export const paymentEventRelations = relations(paymentEvents, ({ one }) => ({
   order: one(orders, {
     fields: [paymentEvents.orderId],
+    references: [orders.id],
+  }),
+}))
+
+export const orderLogRelations = relations(orderLogs, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderLogs.orderId],
     references: [orders.id],
   }),
 }))

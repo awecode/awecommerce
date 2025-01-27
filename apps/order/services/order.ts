@@ -1,9 +1,9 @@
-import { and, eq, notInArray, or, sql, SQL } from "drizzle-orm";
+import { and, desc, eq, notInArray, or, sql, SQL } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { CartLine, carts } from "../../cart/schemas";
-import { NewOrder, NewPaymentEvent, NewTransaction, Order, OrderLine, orderLines, orders, orderStatusChanges, paymentEvents, transactions } from "../schemas";
+import { NewOrder, NewPaymentEvent, NewTransaction, Order, OrderLine, orderLines, orderLogs, orders, orderStatusChanges, paymentEvents, transactions } from "../schemas";
 
-type OrderStatus = 'Pending'|'Processing'|'Couriered'|'Shipped'|'Delivered'|'Returned'|'Cancelled'|'Completed'
+type OrderStatus = 'Pending'|'Confirmed'|'Processing'|'Processed'|'Couriered'|'Shipped'|'Delivered'|'Returned'|'Cancelled'|'Completed'
 type OrderPaymentStatus = 'Pending'|'Paid'|'Refunded'
 
 type OrderListFilter = {
@@ -19,6 +19,18 @@ type OrderListFilter = {
     }
 }
 
+const STATUS_LOG: { [key in OrderStatus]: string } = {
+    Pending: 'Order placed',
+    Confirmed: 'Order confirmed',
+    Processing: 'Order processing',
+    Processed: 'Order processed',
+    Couriered: 'Order couriered',
+    Shipped: 'Order shipped',
+    Delivered: 'Order delivered',
+    Returned: 'Order returned',
+    Cancelled: 'Order cancelled',
+    Completed: 'Order completed'
+}
   
 
 class OrderService {
@@ -50,6 +62,7 @@ class OrderService {
             discount: Number(line.originalPrice) - Number(line.price),
             quantity: line.quantity
         })))
+        await this.createLog(order.id, STATUS_LOG.Pending)
         return {
             ...order,
             hash: this.generateHash(order.id.toString())
@@ -67,6 +80,17 @@ class OrderService {
         return subtotal - discount + tax;
     }
 
+    async createLog(orderId: number, log: string) {
+        await this.db.insert(orderLogs).values({
+            orderId,
+            log
+        })
+    }
+
+    async getLogs(orderId: number) {
+        return await this.db.select().from(orderLogs).where(eq(orderLogs.orderId, orderId)).orderBy(desc(orderLogs.createdAt))
+    }
+
     async changeStatus(orderId: number, newStatus: OrderStatus) {
         const [order] = await this.db.select().from(orders).where(eq(orders.id, orderId));
         if (!order || order.status === newStatus) {
@@ -78,6 +102,7 @@ class OrderService {
             previousStatus: order.status,
             newStatus
         })
+        await this.createLog(order.id, STATUS_LOG[newStatus])
     }
 
     async createTransaction(orderId: number, transaction: NewTransaction) {

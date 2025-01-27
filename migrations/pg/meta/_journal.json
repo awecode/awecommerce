@@ -127,6 +127,13 @@
       "when": 1737974118743,
       "tag": "0017_sweet_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1737977295181,
+      "tag": "0018_gorgeous_iron_patriot",
+      "breakpoints": true
     }
   ]
 }
