@@ -55,6 +55,7 @@ export const orders = pgTable('order', {
   cancelledBy: text(),
   cancelledAt: timestamp({ mode: 'string', withTimezone: true }),
   cancellationReason: text(),
+  cancellationRemarks: text(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
