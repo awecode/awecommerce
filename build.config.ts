@@ -7,7 +7,15 @@ export default defineBuildConfig({
       builder: "mkdist",
       input: ".",
       outDir: "./dist",
+      format: "esm",
     },
+    {
+      builder: "mkdist",
+      input: ".",
+      outDir: "./dist",
+      format: "cjs",
+      ext: "cjs",
+    }
   ],
 
   // Change outDir, default is 'dist'
@@ -15,4 +23,9 @@ export default defineBuildConfig({
 
   // Generates .d.ts declaration file
   declaration: true,
+
+
+  rollup: {
+    emitCJS: true,
+  },
 });

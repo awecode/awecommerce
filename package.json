@@ -5,6 +5,8 @@
   "scripts": {
     "test": "vitest",
     "prepare": "unbuild",
+    "build": "unbuild",
+    "build:stub": "unbuild --stub",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
@@ -22,7 +24,16 @@
     "README.md"
   ],
   "exports": {
-    ".": "./dist"
+    "./*": {
+      "import": {
+        "default": "./dist/*.mjs",
+        "types": "./dist/*.d.ts"
+      },
+      "require": {
+        "default": "./dist/*.cjs",
+        "types": "./dist/*.d.ts"
+      }
+    }
   },
   "dependencies": {
     "drizzle-orm": "^0.38.4",
