@@ -8,6 +8,7 @@ import {
 import { carts } from '../../cart/schemas'
 import { pgEnum } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
+import { products } from '../../product/schemas'
 
 export const shippingAddresses = pgTable('shipping_address', {
     id: serial().primaryKey(),
@@ -78,7 +79,7 @@ export const orderLogs = pgTable('order_log', {
 export const orderLines = pgTable('order_line', {
   id: serial().primaryKey(),
   orderId: integer().notNull().references(() => orders.id),
-  productId: integer().notNull(),
+  productId: integer().notNull().references(() => products.id),
   price: numeric().notNull(),
   discount: numeric().notNull().default('0'),
   tax: numeric().notNull().default('0'),
@@ -125,6 +126,10 @@ export const orderLineRelations = relations(orderLines, ({ one }) => ({
   order: one(orders, {
     fields: [orderLines.orderId],
     references: [orders.id],
+  }),
+  product: one(products, {
+    fields: [orderLines.productId],
+    references: [products.id],
   }),
 }))
 

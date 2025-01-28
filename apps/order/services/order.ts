@@ -206,17 +206,30 @@ class OrderService {
             where.push(eq(orders.paymentStatus, filters.paymentStatus))
         }
 
-        const query = this.db
-            .select()
-            .from(orders)
-            .where(and(...where))
+        const query = {
+            with: {
+                lines: {
+                    with:{
+                        product: true
+                    }
+                }
+            },
+            where: and(...where)
+        }
+
 
         if (!filters?.pagination) {
-            return await query
+            return await this.db.query.orders.findMany(query)
         }
 
         const { page, size } = filters.pagination
-        const results = await query.limit(size).offset((page - 1) * size)
+        const results = await this.db.query.orders.findMany({
+            ...query,
+            orderBy: desc(orders.createdAt),
+            skip: (page - 1) * size,
+            take: size
+        })
+            
         const total = await this.db.$count(orders, and(...where))
         return {
             results: results,
