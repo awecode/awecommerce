@@ -1,4 +1,4 @@
-import { and, desc, eq, notInArray, or, sql, SQL } from "drizzle-orm";
+import { and, desc, eq, or, sql, SQL } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { CartLine, carts } from "../../cart/schemas";
 import { NewOrder, NewPaymentEvent, NewTransaction, Order, OrderLine, orderLines, orderLogs, orders, orderStatusChanges, paymentEvents, transactions } from "../schemas";
@@ -8,8 +8,7 @@ type OrderPaymentStatus = 'Pending'|'Paid'|'Refunded'
 
 type OrderListFilter = {
     q?: string;
-    orderStatus?: 'Active'|'Cancelled'|'Completed';
-    detailedStatus?: OrderStatus;
+    status?: OrderStatus;
     userId?: string;
     createdAt?: string;
     paymentStatus?: OrderPaymentStatus;
@@ -189,16 +188,8 @@ class OrderService {
             )
         }
 
-        if(filters?.orderStatus){
-            if(filters.orderStatus === 'Active'){
-                where.push(notInArray(orders.status, ['Cancelled', 'Completed']))
-            }else{
-                where.push(eq(orders.status, filters.orderStatus))
-            }
-        }
-
-        if (filters?.detailedStatus) {
-            where.push(eq(orders.status, filters.detailedStatus))
+        if (filters?.status) {
+            where.push(eq(orders.status, filters.status))
         }
 
         if (filters?.userId) {
