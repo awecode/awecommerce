@@ -91,18 +91,14 @@ class OrderService {
         return await this.db.select().from(orderLogs).where(eq(orderLogs.orderId, orderId)).orderBy(desc(orderLogs.createdAt))
     }
 
-    async changeStatus(orderId: number, newStatus: OrderStatus) {
-        const [order] = await this.db.select().from(orders).where(eq(orders.id, orderId));
-        if (!order || order.status === newStatus) {
-            return
-        }
+    async changeStatus(orderId: number, previousStatus: OrderStatus, newStatus: OrderStatus) {
         await this.db.update(orders).set({ status: newStatus }).where(eq(orders.id, order.id))
         await this.db.insert(orderStatusChanges).values({
-            orderId: order.id,
-            previousStatus: order.status,
+            orderId: orderId,
+            previousStatus: previousStatus,
             newStatus
         })
-        await this.createLog(order.id, STATUS_LOG[newStatus])
+        await this.createLog(orderId, STATUS_LOG[newStatus])
     }
 
     async createTransaction(orderId: number, transaction: NewTransaction) {
@@ -136,7 +132,7 @@ class OrderService {
     }
 
     async cancel(orderId: number, cancelledBy: string, cancellationReason: string, cancellationRemarks?: string | null) {
-        return await this.db.update(orders).set({
+        await this.db.update(orders).set({
             status: 'Cancelled',
             cancelledBy,
             cancelledAt: new Date(),
