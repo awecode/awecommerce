@@ -38,7 +38,7 @@ export const shippingMethods = pgTable('shipping_method', {
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
 
-export const orderStatusEnum = pgEnum('order_status', ['Pending', 'Processing', 'Couriered', 'Shipped', 'Delivered', 'Returned', 'Cancelled', 'Completed'])
+export const orderStatusEnum = pgEnum('order_status', ['Pending','Confirmed', 'Processing', 'Processed', 'Couriered', 'Shipped', 'Delivered', 'Returned', 'Cancelled', 'Completed'])
 export const paymentStatusEnum = pgEnum('payment_status', ['Pending', 'Paid', 'Refunded'])
 
 export const orders = pgTable('order', {
@@ -63,7 +63,7 @@ export const orders = pgTable('order', {
 
 export const orderStatusChanges = pgTable('order_status_change', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id),
+  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   previousStatus: orderStatusEnum().notNull(),
   newStatus: orderStatusEnum().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
@@ -71,14 +71,14 @@ export const orderStatusChanges = pgTable('order_status_change', {
 
 export const orderLogs = pgTable('order_log', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id),
+  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   log: text().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
 
 export const orderLines = pgTable('order_line', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id),
+  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   productId: integer().notNull().references(() => products.id),
   price: numeric().notNull(),
   discount: numeric().notNull().default('0'),
@@ -93,7 +93,7 @@ export const transactionStatusEnum = pgEnum('transaction_status', ['Requested', 
 
 export const transactions = pgTable('transaction', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id),
+  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   gateway: text().notNull(),
   reference: text(),
   amount: numeric().notNull(),
@@ -107,7 +107,7 @@ export const paymentEventTypes = pgEnum('payment_event_type', ['Paid', 'Refund']
 
 export const paymentEvents = pgTable('payment_event', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id),
+  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   amount: numeric().notNull(),
   type: paymentEventTypes().notNull().default('Paid'),
   reference: text(),

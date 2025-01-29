@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, notInArray, or, sql, SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray, or, sql, SQL } from "drizzle-orm";
 import { createHash } from "node:crypto";
 import { CartLine, carts } from "../../cart/schemas";
 import { NewOrder, NewPaymentEvent, NewTransaction, Order, OrderLine, orderLines, orderLogs, orders, orderStatusChanges, paymentEvents, transactions } from "../schemas";
@@ -88,11 +88,11 @@ class OrderService {
     }
 
     async getLogs(orderId: number) {
-        return await this.db.select().from(orderLogs).where(eq(orderLogs.orderId, orderId)).orderBy(desc(orderLogs.createdAt))
+        return await this.db.select().from(orderLogs).where(eq(orderLogs.orderId, orderId)).orderBy(asc(orderLogs.createdAt))
     }
 
     async changeStatus(orderId: number, previousStatus: OrderStatus, newStatus: OrderStatus) {
-        await this.db.update(orders).set({ status: newStatus }).where(eq(orders.id, order.id))
+        await this.db.update(orders).set({ status: newStatus }).where(eq(orders.id, orderId))
         await this.db.insert(orderStatusChanges).values({
             orderId: orderId,
             previousStatus: previousStatus,
@@ -145,7 +145,16 @@ class OrderService {
         const order = await this.db.query.orders.findFirst(
             {
                 with:{
-                    lines: true
+                    lines: {
+                        with:{
+                            product: {
+                                with: {
+                                    category: true,
+                                    brand: true
+                                }
+                            }
+                        }
+                    }
                 },
                 where: and(
                     eq(orders.id, orderId),
