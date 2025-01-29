@@ -20,10 +20,10 @@ type OrderListFilter = {
 }
 
 const STATUS_LOG: { [key in OrderStatus]: string } = {
-    Pending: 'Order placed',
+    Pending: 'Order received',
     Confirmed: 'Order confirmed',
-    Processing: 'Order processing',
-    Processed: 'Order processed',
+    Processing: 'Order in progress',
+    Processed: 'Ready for shipping',
     Couriered: 'Order couriered',
     Shipped: 'Order shipped',
     Delivered: 'Order delivered',
