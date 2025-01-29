@@ -1,4 +1,4 @@
-import { and, eq, ilike, or, SQL, sql, isNull } from 'drizzle-orm'
+import { and, eq, ilike, or, SQL, sql, isNull, desc } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products } from '../schemas'
 import { aliasedTable } from 'drizzle-orm'
@@ -164,6 +164,7 @@ class ProductService {
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+      .orderBy(desc(products.createdAt))
       .where(and(...where))
 
     if (!filter.pagination) {
@@ -319,6 +320,7 @@ class BrandService {
       .select()
       .from(brands)
       .where(and(...where))
+      .orderBy(desc(brands.createdAt))
 
     if (!filter.pagination) {
       return await query
@@ -431,6 +433,7 @@ class ProductClassService {
       .select()
       .from(productClasses)
       .where(and(...where))
+      .orderBy(desc(productClasses.createdAt))
 
     if (!filter?.pagination) {
       return await query
@@ -543,6 +546,7 @@ class CategoryService {
       .select()
       .from(categories)
       .where(and(...where))
+      .orderBy(desc(categories.createdAt))
 
     if (!filter?.pagination) {
       return await query
