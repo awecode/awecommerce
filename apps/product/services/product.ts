@@ -1,7 +1,6 @@
-import { and, eq, ilike, or, SQL, sql, isNull, desc } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNull, or, SQL, sql } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products } from '../schemas'
-import { aliasedTable } from 'drizzle-orm'
 
 type PaginationArgs = {
   page: number
@@ -21,6 +20,8 @@ interface ProductFilter {
   includeInactiveBrands?: boolean
   includeInactiveCategories?: boolean
   includeInactiveProductClasses?: boolean
+  extraFilters?: SQL[]
+  getFilters?: () => SQL[]
 }
 
 class ProductService {
@@ -110,47 +111,56 @@ class ProductService {
   async list(filter: ProductFilter) {
     const where: SQL[] = []
 
-    if (filter.brand) {
-      where.push(eq(products.brandId, filter.brand))
-    }
-    if (filter.category) {
-      where.push(eq(products.categoryId, filter.category))
-    }
-    if (filter.productClass) {
-      where.push(eq(products.productClassId, filter.productClass))
-    }
-    if (filter.status) {
-      where.push(eq(products.status, filter.status))
-    }
-    if (filter.isFeatured !== undefined) {
-      where.push(eq(products.isFeatured, filter.isFeatured))
-    }
-    if (filter.isBestSeller !== undefined) {
-      where.push(eq(products.isBestSeller, filter.isBestSeller))
-    }
-    if (filter.q) {
-      where.push(
-        or(
-          Number(filter.q) ? eq(products.id, Number(filter.q)) : undefined,
-          ilike(products.name, `%${filter.q}%`),
-        )!,
-      )
-    }
+    if(filter.getFilters){
+      where.push(...filter.getFilters())
+    }else{
 
-    if(filter.isActive !== undefined){
-      where.push(eq(products.isActive, filter.isActive))
-    }
+      if (filter.brand) {
+        where.push(eq(products.brandId, filter.brand))
+      }
+      if (filter.category) {
+        where.push(eq(products.categoryId, filter.category))
+      }
+      if (filter.productClass) {
+        where.push(eq(products.productClassId, filter.productClass))
+      }
+      if (filter.status) {
+        where.push(eq(products.status, filter.status))
+      }
+      if (filter.isFeatured !== undefined) {
+        where.push(eq(products.isFeatured, filter.isFeatured))
+      }
+      if (filter.isBestSeller !== undefined) {
+        where.push(eq(products.isBestSeller, filter.isBestSeller))
+      }
+      if (filter.q) {
+        where.push(
+          or(
+            Number(filter.q) ? eq(products.id, Number(filter.q)) : undefined,
+            ilike(products.name, `%${filter.q}%`),
+          )!,
+        )
+      }
 
-    if(!filter.includeInactiveBrands){
-      where.push(or(isNull(products.brandId), eq(brands.isActive, true)))
-    }
+      if(filter.isActive !== undefined){
+        where.push(eq(products.isActive, filter.isActive))
+      }
 
-    if(!filter.includeInactiveCategories){
-      where.push(or(isNull(products.categoryId), eq(categories.isActive, true)))
-    }
+      if(!filter.includeInactiveBrands){
+        where.push(or(isNull(products.brandId), eq(brands.isActive, true)))
+      }
 
-    if(!filter.includeInactiveProductClasses){
-      where.push(or(isNull(products.productClassId), eq(productClasses.isActive, true)))
+      if(!filter.includeInactiveCategories){
+        where.push(or(isNull(products.categoryId), eq(categories.isActive, true)))
+      }
+
+      if(!filter.includeInactiveProductClasses){
+        where.push(or(isNull(products.productClassId), eq(productClasses.isActive, true)))
+      }
+
+      if(filter.extraFilters){
+        where.push(...filter.extraFilters)
+      }
     }
 
     let query = this.db
