@@ -262,6 +262,10 @@ class OrderService {
             }
         }
     }
+
+    async delete(orderId: number) {
+        await this.db.delete(orders).where(eq(orders.id, orderId))
+    }
 }
 
 export {
