@@ -46,7 +46,7 @@ class ProductService {
   }
 
   async get(productId: number) {
-    const result = await this.db.query.products.findMany({
+    const result = await this.db.query.products.findFirst({
       columns: {
         id: true,
       },
