@@ -46,16 +46,23 @@ class ProductService {
   }
 
   async get(productId: number) {
-    const result = await this.db.query.products.findFirst({
+    const result = await this.db.query.products.findMany({
+      columns: {
+        id: true,
+      },
       with: {
-        relatedProducts: true,
+        relatedProducts: {
+          with: {
+            relatedProduct: true,
+          },
+        },
         images: true
       },
       where: eq(products.id, productId)
     })
-
     return result ? {
       ...result,
+      relatedProducts: result.relatedProducts.map((r:any) => r.relatedProduct),
       images: result.images.map((image: any) => image.imageUrl)
     } : null
   }

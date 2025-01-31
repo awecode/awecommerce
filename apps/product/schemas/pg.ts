@@ -104,10 +104,10 @@ export const productRelations = relations(products, (({one, many})=>({
   }),
   images: many(productImages),
   relatedProducts: many(productRelatedProducts,{
-    relationName: 'relatedProduct'
+    relationName: 'relatedTo'
   }),
   relatedTo: many(productRelatedProducts,{
-    relationName: 'relatedTo'
+    relationName: 'relatedProduct'
   })
 })))
 
