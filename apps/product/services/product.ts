@@ -314,6 +314,14 @@ class BrandService {
     return result[0]
   }
 
+  async hasAnyProduct(brandId: number) {
+    const result = await this.db
+      .select()
+      .from(products)
+      .where(eq(products.brandId, brandId))
+    return result.length > 0
+  }
+
   async list(filter: BrandFilter) {
     const where: SQL[] = []
 
@@ -427,6 +435,14 @@ class ProductClassService {
     return result[0]
   }
 
+  async hasAnyProduct(productClassId: number) {
+    const result = await this.db
+      .select()
+      .from(products)
+      .where(eq(products.productClassId, productClassId))
+    return result.length > 0
+  }
+
   async list(filter?: ProductClassFilter) {
     const where: SQL[] = []
 
@@ -538,6 +554,14 @@ class CategoryService {
       .where(eq(categories.id, categoryId))
       .returning()
     return result[0]
+  }
+
+  async hasAnyProduct(categoryId: number) {
+    const result = await this.db
+      .select()
+      .from(products)
+      .where(eq(products.categoryId, categoryId))
+    return result.length > 0
   }
 
   async list(filter?: CategoryFilter) {
