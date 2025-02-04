@@ -143,6 +143,21 @@ export const productRelatedProductRelations = relations(productRelatedProducts, 
   })
 })))
 
+export const productViews = pgTable('product_view', {
+  id: serial().primaryKey(),
+  productId: integer().references(() => products.id, {
+    onDelete: 'cascade'
+  }),
+  userId: text().notNull(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+})
+
+export const productViewRelations = relations(productViews, (({one})=>({
+  product: one(products, {
+    fields: [productViews.productId],
+    references: [products.id]
+  })
+})))
 
 type BaseEntity = {
   id: number

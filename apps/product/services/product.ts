@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, isNull, or, SQL, sql } from 'drizzle-orm'
 
-import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products } from '../schemas'
+import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products, productViews } from '../schemas'
 
 type PaginationArgs = {
   page: number
@@ -258,6 +258,20 @@ class ProductService {
       .where(eq(products.id, productId))
       .returning()
     return result[0]
+  }
+
+  async logProductView(productId: number, userId: string) {
+    await this.db.insert(productViews).values({ productId, userId })
+  }
+
+  async getRecentlyViewedProducts(userId: string, limit: number = 30) {
+    const results = await this.db
+      .select()
+      .from(productViews)
+      .where(eq(productViews.userId, userId))
+      .orderBy(desc(productViews.createdAt))
+      .limit(limit)
+    return results
   }
 }
 
