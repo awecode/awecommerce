@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, or, SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, getTableColumns, ilike, isNull, or, SQL, sql } from 'drizzle-orm'
 
 import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products, productViews } from '../schemas'
 
@@ -264,17 +264,40 @@ class ProductService {
     await this.db.insert(productViews).values({ productId, userId })
   }
 
-  async getRecentlyViewedProducts(userId: string, limit: number = 30) {
+  async getRecentlyViewedProducts(userId: string, limit: number) {
     const results = await this.db
-      .select()
-      .from(productViews)
-      .where(eq(productViews.userId, userId))
-      .orderBy(desc(productViews.createdAt))
-      .limit(limit)
+    .select(
+      {...getTableColumns(products)}
+    )
+    .from(
+      this.db
+        .selectDistinctOn([productViews.productId])
+        .from(productViews)
+        .leftJoin(products, eq(productViews.productId, products.id))
+        .leftJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(categories, eq(products.categoryId, categories))
+        .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+        .where(and(
+          eq(
+          productViews.userId,
+          userId
+        )),
+        eq(products.isActive, true),
+        eq(brands.isActive, true),
+        eq(categories.isActive, true),
+        eq(productClasses.isActive, true)
+      )
+        .orderBy(
+          productViews.productId,     
+          desc(productViews.createdAt)
+        )
+        .as('latest_views')
+    )
+    .orderBy(desc(sql`latest_views.created_at`))
+    .limit(limit)
     return results
   }
 }
-
 interface BrandFilter {
   q?: string
   isActive?: boolean
