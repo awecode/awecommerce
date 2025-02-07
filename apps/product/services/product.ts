@@ -265,37 +265,37 @@ class ProductService {
   }
 
   async getRecentlyViewedProducts(userId: string, limit: number) {
-    const results = await this.db
+   return await this.db
     .select(
-      {...getTableColumns(products)}
+     { ...getTableColumns(products),}
     )
     .from(
       this.db
-        .selectDistinctOn([productViews.productId])
+        .selectDistinctOn([productViews.productId], {
+          productId: productViews.productId,
+          createdAt: productViews.createdAt  
+        })
         .from(productViews)
         .leftJoin(products, eq(productViews.productId, products.id))
         .leftJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(categories, eq(products.categoryId, categories))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
         .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
         .where(and(
-          eq(
-          productViews.userId,
-          userId
-        )),
-        eq(products.isActive, true),
-        eq(brands.isActive, true),
-        eq(categories.isActive, true),
-        eq(productClasses.isActive, true)
-      )
+          eq(productViews.userId, "1"),
+          eq(products.isActive, true),
+          or(isNull(products.brandId), eq(brands.isActive, true)),
+          or(isNull(products.categoryId), eq(categories.isActive, true)),
+           or(isNull(products.productClassId), eq(productClasses.isActive, true))
+        ))
         .orderBy(
           productViews.productId,     
           desc(productViews.createdAt)
         )
         .as('latest_views')
     )
+    .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
     .orderBy(desc(sql`latest_views.created_at`))
-    .limit(limit)
-    return results
+    .limit(4)
   }
 }
 interface BrandFilter {
