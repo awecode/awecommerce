@@ -176,6 +176,13 @@
       "when": 1738924003197,
       "tag": "0024_old_stone_men",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1738926564271,
+      "tag": "0025_heavy_sir_ram",
+      "breakpoints": true
     }
   ]
 }
