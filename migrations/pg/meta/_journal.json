@@ -169,6 +169,13 @@
       "when": 1738682312590,
       "tag": "0023_flawless_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1738924003197,
+      "tag": "0024_old_stone_men",
+      "breakpoints": true
     }
   ]
 }
