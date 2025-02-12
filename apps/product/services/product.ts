@@ -84,6 +84,27 @@ class ProductService {
             relatedProduct: true,
           },
         },
+        category: {
+          columns: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        brand: {
+          columns: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        productClass: {
+          columns: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
         images: true,
       },
       where: eq(products.id, productId),
