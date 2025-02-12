@@ -1,6 +1,29 @@
-import { and, desc, eq, getTableColumns, ilike, isNull, or, SQL, sql } from 'drizzle-orm'
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  ilike,
+  isNull,
+  or,
+  SQL,
+  sql,
+} from 'drizzle-orm'
 
-import { brands, categories, NewBrand, NewCategory, NewProduct, NewProductClass, Product, productClasses, productImages, productRelatedProducts, products, productViews } from '../schemas'
+import {
+  brands,
+  categories,
+  NewBrand,
+  NewCategory,
+  NewProduct,
+  NewProductClass,
+  Product,
+  productClasses,
+  productImages,
+  productRelatedProducts,
+  products,
+  productViews,
+} from '../schemas'
 
 type PaginationArgs = {
   page: number
@@ -8,24 +31,26 @@ type PaginationArgs = {
 }
 
 interface ProductFilter {
-  brand?: number
-  category?: number
+  brands?: number[]
+  categories?: number[]
   productClass?: number
   status?: Product['status']
-  q?: string 
+  q?: string
   isFeatured?: boolean
   isBestSeller?: boolean
-  pagination?: PaginationArgs 
+  pagination?: PaginationArgs
   isActive?: boolean
   includeInactiveBrands?: boolean
   includeInactiveCategories?: boolean
   includeInactiveProductClasses?: boolean
   extraFilters?: SQL[]
+  minPrice?: number
+  maxPrice?: number
   getFilters?: () => SQL[]
 }
 
 class ProductService {
-  private db:any
+  private db: any
 
   constructor(dbInstance: any) {
     this.db = dbInstance
@@ -33,14 +58,20 @@ class ProductService {
 
   async create(product: NewProduct) {
     const { images, relatedProducts, ...productData } = product
-    const result = await this.db.insert(products).values(productData).returning()
-    if(images){
+    const result = await this.db
+      .insert(products)
+      .values(productData)
+      .returning()
+    if (images) {
       const productImageService = new ProductImageService(this.db)
       await productImageService.setImages(result[0].id, images)
     }
-    if(relatedProducts){
+    if (relatedProducts) {
       const relatedProductService = new RelatedProductService(this.db)
-      await relatedProductService.setRelatedProducts(result[0].id, relatedProducts)
+      await relatedProductService.setRelatedProducts(
+        result[0].id,
+        relatedProducts,
+      )
     }
     return result[0]
   }
@@ -53,15 +84,19 @@ class ProductService {
             relatedProduct: true,
           },
         },
-        images: true
+        images: true,
       },
-      where: eq(products.id, productId)
+      where: eq(products.id, productId),
     })
-    return result ? {
-      ...result,
-      relatedProducts: result.relatedProducts.map((r:any) => r.relatedProduct),
-      images: result.images.map((image: any) => image.imageUrl)
-    } : null
+    return result
+      ? {
+          ...result,
+          relatedProducts: result.relatedProducts.map(
+            (r: any) => r.relatedProduct,
+          ),
+          images: result.images.map((image: any) => image.imageUrl),
+        }
+      : null
   }
 
   async getBySlug(slug: string) {
@@ -93,11 +128,11 @@ class ProductService {
       })
       .where(eq(products.id, productId))
       .returning()
-    if(images){
+    if (images) {
       const productImageService = new ProductImageService(this.db)
       await productImageService.setImages(productId, images)
     }
-    if(relatedProducts){
+    if (relatedProducts) {
       const relatedProductService = new RelatedProductService(this.db)
       await relatedProductService.setRelatedProducts(productId, relatedProducts)
     }
@@ -115,15 +150,22 @@ class ProductService {
   async list(filter: ProductFilter) {
     const where: SQL[] = []
 
-    if(filter.getFilters){
+    if (filter.getFilters) {
       where.push(...filter.getFilters())
-    }else{
-
-      if (filter.brand) {
-        where.push(eq(products.brandId, filter.brand))
+    } else {
+      if (filter.brands && filter.brands.length) {
+        where.push(
+          or(...filter.brands.map((brandId) => eq(products.brandId, brandId)))!,
+        )
       }
-      if (filter.category) {
-        where.push(eq(products.categoryId, filter.category))
+      if (filter.categories && filter.categories.length) {
+        where.push(
+          or(
+            ...filter.categories.map((categoryId) =>
+              eq(products.categoryId, categoryId),
+            ),
+          )!,
+        )
       }
       if (filter.productClass) {
         where.push(eq(products.productClassId, filter.productClass))
@@ -146,23 +188,42 @@ class ProductService {
         )
       }
 
-      if(filter.isActive !== undefined){
+      if (filter.isActive !== undefined) {
         where.push(eq(products.isActive, filter.isActive))
       }
 
-      if(!filter.includeInactiveBrands){
-        where.push(or(isNull(products.brandId), eq(brands.isActive, true)))
+      if (!filter.includeInactiveBrands) {
+        where.push(or(isNull(products.brandId), eq(brands.isActive, true))!)
       }
 
-      if(!filter.includeInactiveCategories){
-        where.push(or(isNull(products.categoryId), eq(categories.isActive, true)))
+      if (!filter.includeInactiveCategories) {
+        where.push(
+          or(isNull(products.categoryId), eq(categories.isActive, true))!,
+        )
       }
 
-      if(!filter.includeInactiveProductClasses){
-        where.push(or(isNull(products.productClassId), eq(productClasses.isActive, true)))
+      if (!filter.includeInactiveProductClasses) {
+        where.push(
+          or(
+            isNull(products.productClassId),
+            eq(productClasses.isActive, true),
+          )!,
+        )
       }
 
-      if(filter.extraFilters){
+      if (filter.minPrice) {
+        where.push(
+          sql`COALESCE(${products.discountedPrice}, ${products.price}) >= ${filter.minPrice}`,
+        )
+      }
+
+      if (filter.maxPrice) {
+        where.push(
+          sql`COALESCE(${products.discountedPrice}, ${products.price}) <= ${filter.maxPrice}`,
+        )
+      }
+
+      if (filter.extraFilters) {
         where.push(...filter.extraFilters)
       }
     }
@@ -172,7 +233,7 @@ class ProductService {
         ...products,
         brand: brands,
         category: categories,
-        productClass: productClasses
+        productClass: productClasses,
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
@@ -185,24 +246,30 @@ class ProductService {
       return await query
     }
 
-    const { page, size} = filter.pagination
+    const { page, size } = filter.pagination
     const results = await query.limit(size).offset((page - 1) * size)
-    const total = Number((
-      await this.db.select({ count: sql<number>`count(*)` }).from(products).
-        leftJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(categories, eq(products.categoryId, categories.id))
-        .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
-        .where(and(...where))
-      )[0]!.count)
+    const total = Number(
+      (
+        await this.db
+          .select({ count: sql<number>`count(*)` })
+          .from(products)
+          .leftJoin(brands, eq(products.brandId, brands.id))
+          .leftJoin(categories, eq(products.categoryId, categories.id))
+          .leftJoin(
+            productClasses,
+            eq(products.productClassId, productClasses.id),
+          )
+          .where(and(...where))
+      )[0]!.count,
+    )
     return {
       results: results,
-      pagination:{
+      pagination: {
         page,
         size,
         total,
         pages: Math.ceil(total / size),
-      }
-
+      },
     }
   }
 
@@ -265,37 +332,40 @@ class ProductService {
   }
 
   async getRecentlyViewedProducts(userId: string, limit: number) {
-   return await this.db
-    .select(
-     { ...getTableColumns(products),}
-    )
-    .from(
-      this.db
-        .selectDistinctOn([productViews.productId], {
-          productId: productViews.productId,
-          createdAt: productViews.createdAt  
-        })
-        .from(productViews)
-        .leftJoin(products, eq(productViews.productId, products.id))
-        .leftJoin(brands, eq(products.brandId, brands.id))
-        .leftJoin(categories, eq(products.categoryId, categories.id))
-        .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
-        .where(and(
-          eq(productViews.userId, "1"),
-          eq(products.isActive, true),
-          or(isNull(products.brandId), eq(brands.isActive, true)),
-          or(isNull(products.categoryId), eq(categories.isActive, true)),
-           or(isNull(products.productClassId), eq(productClasses.isActive, true))
-        ))
-        .orderBy(
-          productViews.productId,     
-          desc(productViews.createdAt)
-        )
-        .as('latest_views')
-    )
-    .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
-    .orderBy(desc(sql`latest_views.created_at`))
-    .limit(4)
+    return await this.db
+      .select({ ...getTableColumns(products) })
+      .from(
+        this.db
+          .selectDistinctOn([productViews.productId], {
+            productId: productViews.productId,
+            createdAt: productViews.createdAt,
+          })
+          .from(productViews)
+          .leftJoin(products, eq(productViews.productId, products.id))
+          .leftJoin(brands, eq(products.brandId, brands.id))
+          .leftJoin(categories, eq(products.categoryId, categories.id))
+          .leftJoin(
+            productClasses,
+            eq(products.productClassId, productClasses.id),
+          )
+          .where(
+            and(
+              eq(productViews.userId, '1'),
+              eq(products.isActive, true),
+              or(isNull(products.brandId), eq(brands.isActive, true)),
+              or(isNull(products.categoryId), eq(categories.isActive, true)),
+              or(
+                isNull(products.productClassId),
+                eq(productClasses.isActive, true),
+              ),
+            ),
+          )
+          .orderBy(productViews.productId, desc(productViews.createdAt))
+          .as('latest_views'),
+      )
+      .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
+      .orderBy(desc(sql`latest_views.created_at`))
+      .limit(4)
   }
 }
 interface BrandFilter {
@@ -304,9 +374,9 @@ interface BrandFilter {
   pagination?: PaginationArgs
 }
 class BrandService {
-  private db:any
+  private db: any
 
-  constructor(dbInstance:any) {
+  constructor(dbInstance: any) {
     this.db = dbInstance
   }
 
@@ -371,7 +441,7 @@ class BrandService {
       )
     }
 
-    if(filter.isActive !== undefined){
+    if (filter.isActive !== undefined) {
       where.push(eq(brands.isActive, filter.isActive))
     }
 
@@ -395,7 +465,7 @@ class BrandService {
         size,
         total,
         pages: Math.ceil(total / size),
-      }
+      },
     }
   }
 
@@ -432,7 +502,10 @@ class ProductClassService {
   }
 
   async create(productClass: NewProductClass) {
-    const result = await this.db.insert(productClasses).values(productClass).returning()
+    const result = await this.db
+      .insert(productClasses)
+      .values(productClass)
+      .returning()
     return result[0]
   }
 
@@ -486,13 +559,15 @@ class ProductClassService {
     if (filter?.q) {
       where.push(
         or(
-          Number(filter.q) ? eq(productClasses.id, Number(filter.q)) : undefined,
+          Number(filter.q)
+            ? eq(productClasses.id, Number(filter.q))
+            : undefined,
           ilike(productClasses.name, `%${filter.q}%`),
         )!,
       )
     }
 
-    if(filter?.isActive !== undefined){
+    if (filter?.isActive !== undefined) {
       where.push(eq(productClasses.isActive, filter.isActive))
     }
 
@@ -516,7 +591,7 @@ class ProductClassService {
         size,
         total,
         pages: Math.ceil(total / size),
-      }
+      },
     }
   }
 
@@ -613,7 +688,7 @@ class CategoryService {
       )
     }
 
-    if(filter?.isActive !== undefined){
+    if (filter?.isActive !== undefined) {
       where.push(eq(categories.isActive, filter.isActive))
     }
 
@@ -637,7 +712,7 @@ class CategoryService {
         size,
         total,
         pages: Math.ceil(total / size),
-      }
+      },
     }
   }
 
@@ -679,9 +754,11 @@ class ProductImageService {
     const result = await this.db
       .delete(productImages)
       .where(eq(productImages.productId, productId))
-    if(imageUrls.length) {
-      await this.db.insert(productImages).values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
-    }   
+    if (imageUrls.length) {
+      await this.db
+        .insert(productImages)
+        .values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
+    }
     return result
   }
 }
@@ -692,13 +769,27 @@ class RelatedProductService {
   constructor(dbInstance: any) {
     this.db = dbInstance
   }
-  
+
   async setRelatedProducts(productId: number, relatedProductIds: number[]) {
-    await this.db.delete(productRelatedProducts).where(eq(productRelatedProducts.productId, productId))
-    if(relatedProductIds.length){
-      await this.db.insert(productRelatedProducts).values(relatedProductIds.map((relatedProductId) => ({ productId, relatedProductId })))
+    await this.db
+      .delete(productRelatedProducts)
+      .where(eq(productRelatedProducts.productId, productId))
+    if (relatedProductIds.length) {
+      await this.db.insert(productRelatedProducts).values(
+        relatedProductIds.map((relatedProductId) => ({
+          productId,
+          relatedProductId,
+        })),
+      )
     }
   }
 }
 
-export { BrandService, CategoryService, ProductClassService, ProductImageService, ProductService, RelatedProductService }
+export {
+  BrandService,
+  CategoryService,
+  ProductClassService,
+  ProductImageService,
+  ProductService,
+  RelatedProductService,
+}
