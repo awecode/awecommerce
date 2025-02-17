@@ -46,6 +46,7 @@ interface ProductFilter {
   extraFilters?: SQL[]
   minPrice?: number
   maxPrice?: number
+  sortBy?: 'priceAsc' | 'priceDesc'
   getFilters?: () => SQL[]
 }
 
@@ -249,6 +250,19 @@ class ProductService {
       }
     }
 
+    let orderBy: SQL | undefined
+    if (filter.sortBy) {
+      if (filter.sortBy === 'priceAsc') {
+        orderBy = sql`COALESCE(${products.discountedPrice}, ${products.price})`
+      } else {
+        orderBy = desc(
+          sql`COALESCE(${products.discountedPrice}, ${products.price})`,
+        )
+      }
+    } else {
+      orderBy = desc(products.createdAt)
+    }
+
     let query = this.db
       .select({
         ...products,
@@ -260,7 +274,7 @@ class ProductService {
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
-      .orderBy(desc(products.createdAt))
+      .orderBy(orderBy)
       .where(and(...where))
 
     if (!filter.pagination) {
