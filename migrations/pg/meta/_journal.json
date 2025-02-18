@@ -190,6 +190,13 @@
       "when": 1739880550532,
       "tag": "0026_smooth_lester",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1739880677526,
+      "tag": "0027_classy_agent_brand",
+      "breakpoints": true
     }
   ]
 }

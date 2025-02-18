@@ -25,7 +25,9 @@ export const carts = pgTable('cart', {
 export const cartLines = pgTable('cart_line', {
   id: serial().primaryKey(),
   cartId: integer().notNull().references(() => carts.id),
-  productId: integer().notNull().references(() => products.id),
+  productId: integer().notNull().references(() => products.id, {
+    onDelete: 'cascade',
+  }),
   price: numeric().notNull(),
   originalPrice: numeric().notNull(),
   quantity: integer().notNull(),
