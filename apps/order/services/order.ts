@@ -266,6 +266,11 @@ class OrderService {
     async delete(orderId: number) {
         await this.db.delete(orders).where(eq(orders.id, orderId))
     }
+
+    async hasOrderWithProductId(productId: number) {
+        const orderLinesWithProduct = await this.db.select().from(orderLines).where(eq(orderLines.productId, productId))
+        return orderLinesWithProduct.length > 0
+    }
 }
 
 export {
