@@ -24,6 +24,7 @@ import {
   products,
   productViews,
 } from '../schemas'
+import { orderLines } from '../../order/schemas'
 
 type PaginationArgs = {
   page: number
@@ -401,6 +402,14 @@ class ProductService {
       .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
       .orderBy(desc(sql`latest_views.created_at`))
       .limit(4)
+  }
+
+  async hasAnyOrder(productId: number) {
+    const result = await this.db
+      .select()
+      .from(orderLines)
+      .where(eq(orderLines.productId, productId))
+    return result.length > 0
   }
 }
 interface BrandFilter {
