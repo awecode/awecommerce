@@ -70,7 +70,7 @@ class ShippingAddressService {
     return res
   }
 
-  async markAsDefault(userId: string, id: number) {
+  async markAsDefault(id:number, userId:string) {
     await this.db.update(shippingAddresses).set({
       isDefault: false,
     }).where(
@@ -86,11 +86,11 @@ class ShippingAddressService {
     );
   }
 
-  async delete(userId:string, id: number) {
+  async delete(id: number, userId?: string) {
     return await this.db.delete(shippingAddresses).where(
       and(
         eq(shippingAddresses.id, id),
-        eq(shippingAddresses.userId, userId)
+        userId ? eq(shippingAddresses.userId, userId) :undefined
       )
     );
   }
