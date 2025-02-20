@@ -179,7 +179,7 @@ export const offers = pgTable('offer', {
   }),
 })
 
-export const offerApplicationLog = pgTable('offer_application_log', {
+export const offerApplicationLogs = pgTable('offer_application_log', {
   id: serial().primaryKey(),
   offerId: integer()
     .references(() => offers.id)
@@ -301,14 +301,14 @@ export const offerRangeIncludedProductClassRelations = relations(
 )
 
 export const offerApplicationLogRelations = relations(
-  offerApplicationLog,
+  offerApplicationLogs,
   ({ one }) => ({
     offer: one(offers, {
-      fields: [offerApplicationLog.offerId],
+      fields: [offerApplicationLogs.offerId],
       references: [offers.id],
     }),
     order: one(orders, {
-      fields: [offerApplicationLog.orderId],
+      fields: [offerApplicationLogs.orderId],
       references: [orders.id],
     }),
   }),
@@ -325,52 +325,14 @@ export type OfferRange = typeof offerRanges.$inferSelect
 export type NewOfferRange = Omit<
   typeof offerRanges.$inferInsert,
   'id' | 'createdAt' | 'updatedAt'
->
+> & {
+  includedProducts?: number[]
+  excludedProducts?: number[]
+  includedCategories?: number[]
+  includedBrands?: number[]
+  includedProductClasses?: number[]
+}
 export type UpdateOfferRange = Partial<NewOfferRange>
-
-export type OfferRangeIncludedProduct =
-  typeof offerRangeIncludedProducts.$inferSelect
-export type NewOfferRangeIncludedProduct = Omit<
-  typeof offerRangeIncludedProducts.$inferInsert,
-  'rangeId' | 'productId'
->
-export type UpdateOfferRangeIncludedProduct =
-  Partial<NewOfferRangeIncludedProduct>
-
-export type OfferRangeExcludedProduct =
-  typeof offerRangeExcludedProducts.$inferSelect
-export type NewOfferRangeExcludedProduct = Omit<
-  typeof offerRangeExcludedProducts.$inferInsert,
-  'rangeId' | 'productId'
->
-export type UpdateOfferRangeExcludedProduct =
-  Partial<NewOfferRangeExcludedProduct>
-
-export type OfferRangeIncludedCategory =
-  typeof offerRangeIncludedCategories.$inferSelect
-export type NewOfferRangeIncludedCategory = Omit<
-  typeof offerRangeIncludedCategories.$inferInsert,
-  'rangeId' | 'categoryId'
->
-export type UpdateOfferRangeIncludedCategory =
-  Partial<NewOfferRangeIncludedCategory>
-
-export type OfferRangeIncludedBrand =
-  typeof offerRangeIncludedBrands.$inferSelect
-export type NewOfferRangeIncludedBrand = Omit<
-  typeof offerRangeIncludedBrands.$inferInsert,
-  'rangeId' | 'brandId'
->
-export type UpdateOfferRangeIncludedBrand = Partial<NewOfferRangeIncludedBrand>
-
-export type OfferRangeIncludedProductClass =
-  typeof offerRangeIncludedProductClasses.$inferSelect
-export type NewOfferRangeIncludedProductClass = Omit<
-  typeof offerRangeIncludedProductClasses.$inferInsert,
-  'rangeId' | 'productClassId'
->
-export type UpdateOfferRangeIncludedProductClass =
-  Partial<NewOfferRangeIncludedProductClass>
 
 export type OfferBenefit = typeof offerBenefits.$inferSelect
 export type NewOfferBenefit = Omit<
@@ -386,9 +348,9 @@ export type NewOfferCondition = Omit<
 >
 export type UpdateOfferCondition = Partial<NewOfferCondition>
 
-export type OfferApplicationLog = typeof offerApplicationLog.$inferSelect
+export type OfferApplicationLog = typeof offerApplicationLogs.$inferSelect
 export type NewOfferApplicationLog = Omit<
-  typeof offerApplicationLog.$inferInsert,
+  typeof offerApplicationLogs.$inferInsert,
   'id' | 'createdAt'
 >
 export type UpdateOfferApplicationLog = Partial<NewOfferApplicationLog>
