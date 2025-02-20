@@ -113,7 +113,11 @@ class CartService {
     // return result[0];
     return await this.db.query.carts.findFirst({
       with: {
-        lines: true,
+        lines: {
+          with: {
+            product: true,
+          },
+        },
       },
       where: eq(carts.sessionId, sessionId),
     })

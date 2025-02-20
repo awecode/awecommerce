@@ -1,6 +1,6 @@
 {
-  "id": "2bf43b8e-822a-4d5c-ac29-0af4ab54e735",
-  "prevId": "d015bdfb-5e6d-4c3d-b54f-64366d46f309",
+  "id": "44706ac8-d9ca-4384-bf29-41adc04e75eb",
+  "prevId": "78c7a568-0d52-4050-9b94-386dfaa2c1c9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -290,7 +290,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -329,7 +329,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         },
         "product_related_products_relatedProductId_product_id_fk": {
@@ -342,7 +342,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
@@ -701,7 +701,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

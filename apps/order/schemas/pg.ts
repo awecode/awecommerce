@@ -99,8 +99,9 @@ export const transactions = pgTable('transaction', {
   amount: numeric().notNull(),
   status: transactionStatusEnum().notNull().default('Requested'),
   metadata: jsonb(),
-  createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   lastRequestedAt: timestamp({ mode: 'string', withTimezone: true }),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
 
 export const paymentEventTypes = pgEnum('payment_event_type', ['Paid', 'Refund'])
@@ -112,6 +113,8 @@ export const paymentEvents = pgTable('payment_event', {
   type: paymentEventTypes().notNull().default('Paid'),
   reference: text(),
   metadata: jsonb(),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
 
 export const orderRelations = relations(orders, ({ many }) => ({

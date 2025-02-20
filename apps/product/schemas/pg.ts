@@ -75,15 +75,21 @@ export const products = pgTable('product', {
 })
 
 export const productRelatedProducts = pgTable('product_related_products', {
-  productId: integer().references(() => products.id),
-  relatedProductId: integer().references(() => products.id),
+  productId: integer().references(() => products.id, {
+    onDelete: 'cascade'
+  }),
+  relatedProductId: integer().references(() => products.id, {
+    onDelete: 'cascade'
+  }),
 }, (t)=>({
   pk: primaryKey(t.productId, t.relatedProductId)
 }))
 
 export const productImages = pgTable('product_image', {
   id: serial().primaryKey(),
-  productId: integer().references(() => products.id),
+  productId: integer().references(() => products.id, {
+    onDelete: 'cascade'
+  }),
   imageUrl: text().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
