@@ -152,7 +152,7 @@ export const offerConditionType = pgEnum('offer_condition_type', [
 
 export const offerConditions = pgTable('offer_condition', {
   id: serial().primaryKey(),
-  rangeId: integer().references(() => offerRanges.id),
+  rangeId: integer().references(() => offerRanges.id).notNull(),
   type: offerConditionType().notNull(),
   value: integer().notNull(),
   createdAt: timestamp({
@@ -174,8 +174,8 @@ export const offers = pgTable('offer', {
   image: text(),
   type: offerType().notNull(),
   voucherCode: text(),
-  conditionId: integer().references(() => offerConditions.id),
-  benefitId: integer().references(() => offerBenefits.id),
+  conditionId: integer().references(() => offerConditions.id).notNull(),
+  benefitId: integer().references(() => offerBenefits.id).notNull(),
   startDate: timestamp({
     withTimezone: true,
     mode: 'string',
