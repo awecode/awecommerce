@@ -37,8 +37,12 @@ export const offerRanges = pgTable('offer_range', {
 export const offerRangeIncludedProducts = pgTable(
   'offer_range_included_product',
   {
-    rangeId: integer().references(() => offerRanges.id),
-    productId: integer().references(() => products.id),
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    productId: integer().references(() => products.id, {
+      onDelete: 'cascade',
+    }),
   },
   (t) => [
     primaryKey({
@@ -50,8 +54,12 @@ export const offerRangeIncludedProducts = pgTable(
 export const offerRangeExcludedProducts = pgTable(
   'offer_range_excluded_product',
   {
-    rangeId: integer().references(() => offerRanges.id),
-    productId: integer().references(() => products.id),
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    productId: integer().references(() => products.id, {
+      onDelete: 'cascade',
+    }),
   },
   (t) => [
     primaryKey({
@@ -63,8 +71,12 @@ export const offerRangeExcludedProducts = pgTable(
 export const offerRangeIncludedCategories = pgTable(
   'offer_range_included_category',
   {
-    rangeId: integer().references(() => offerRanges.id),
-    categoryId: integer().references(() => categories.id),
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    categoryId: integer().references(() => categories.id, {
+      onDelete: 'cascade',
+    }),
   },
   (t) => [
     primaryKey({
@@ -76,8 +88,12 @@ export const offerRangeIncludedCategories = pgTable(
 export const offerRangeIncludedBrands = pgTable(
   'offer_range_included_brand',
   {
-    rangeId: integer().references(() => offerRanges.id),
-    brandId: integer().references(() => brands.id),
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    brandId: integer().references(() => brands.id, {
+      onDelete: 'cascade',
+    }),
   },
   (t) => [
     primaryKey({
@@ -89,8 +105,12 @@ export const offerRangeIncludedBrands = pgTable(
 export const offerRangeIncludedProductClasses = pgTable(
   'offer_range_included_product_class',
   {
-    rangeId: integer().references(() => offerRanges.id),
-    productClassId: integer().references(() => productClasses.id),
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    productClassId: integer().references(() => productClasses.id, {
+      onDelete: 'cascade',
+    }),
   },
   (t) => [
     primaryKey({
@@ -181,12 +201,8 @@ export const offers = pgTable('offer', {
 
 export const offerApplicationLogs = pgTable('offer_application_log', {
   id: serial().primaryKey(),
-  offerId: integer()
-    .references(() => offers.id)
-    .notNull(),
-  orderId: integer()
-    .references(() => orders.id)
-    .notNull(),
+  offerId: integer(),
+  orderId: integer(),
   userId: text(),
   createdAt: timestamp({
     withTimezone: true,
