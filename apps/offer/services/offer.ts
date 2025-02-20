@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, desc, eq, ilike, SQL } from 'drizzle-orm'
 import {
   NewOfferRange,
   offerRanges,
@@ -17,6 +17,15 @@ import {
   NewOfferApplicationLog,
   UpdateOfferApplicationLog,
 } from '../schemas'
+
+interface OfferRangeListFilter {
+  pagination?: {
+    page: number
+    size: number
+  }
+  q?: string
+  isActive?: boolean
+}
 
 class OfferRangeService {
   private db: any
@@ -223,6 +232,53 @@ class OfferRangeService {
       .from(offerRanges)
       .where(eq(offerRanges.id, id))
   }
+
+  async list(filters: OfferRangeListFilter) {
+    const where: SQL[] = []
+
+    if (filters.q) {
+      where.push(ilike(offerRanges.name, `%${filters.q}%`))
+    }
+
+    if (filters.isActive !== undefined) {
+      where.push(eq(offerRanges.isActive, filters.isActive))
+    }
+
+    const query = this.db
+      .select()
+      .from(offerRanges)
+      .where(and(...where))
+      .orderBy(desc(offerRanges.createdAt))
+    if (!filters.pagination) {
+      return await query
+    }
+
+    const { page, size } = filters.pagination
+
+    const results = await query.limit(size).offset((page - 1) * size)
+
+    const total = await this.db.$count(offerRanges, and(...where))
+
+    return {
+      results,
+      pagination: {
+        page,
+        size,
+        total,
+        pages: Math.ceil(total / size),
+      },
+    }
+  }
+}
+
+interface OfferBenefitListFilter {
+  pagination?: {
+    page: number
+    size: number
+  }
+  q?: string
+  isActive?: boolean
+  type?: 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
 }
 
 class OfferBenefitService {
@@ -262,6 +318,57 @@ class OfferBenefitService {
       .from(offerBenefits)
       .where(eq(offerBenefits.id, id))
   }
+
+  async list(filters: OfferBenefitListFilter) {
+    const where: SQL[] = []
+
+    if (filters.q) {
+      where.push(ilike(offerBenefits.name, `%${filters.q}%`))
+    }
+
+    if (filters.isActive !== undefined) {
+      where.push(eq(offerBenefits.isActive, filters.isActive))
+    }
+
+    if (filters.type) {
+      where.push(eq(offerBenefits.type, filters.type))
+    }
+
+    const query = this.db
+      .select()
+      .from(offerBenefits)
+      .where(and(...where))
+      .orderBy(desc(offerBenefits.createdAt))
+    if (!filters.pagination) {
+      return await query
+    }
+
+    const { page, size } = filters.pagination
+
+    const results = await query.limit(size).offset((page - 1) * size)
+
+    const total = await this.db.$count(offerBenefits, and(...where))
+
+    return {
+      results,
+      pagination: {
+        page,
+        size,
+        total,
+        pages: Math.ceil(total / size),
+      },
+    }
+  }
+}
+
+
+interface OfferConditionListFilter {
+  pagination?: {
+    page: number
+    size: number
+  }
+  type?: 'basket_quantity' | 'basket_total' | 'distinct_items'
+  range?: number
 }
 
 class OfferConditionService {
@@ -298,6 +405,56 @@ class OfferConditionService {
       .from(offerConditions)
       .where(eq(offerConditions.id, id))
   }
+
+  async list(filters: OfferConditionListFilter) {
+    const where: SQL[] = []
+
+    if (filters.type){
+      where.push(eq(offerConditions.type, filters.type))
+    }
+
+    if (filters.range) {
+      where.push(eq(offerConditions.rangeId, filters.range))
+    }
+
+    const query = this.db
+      .select()
+      .from(offerConditions)
+      .where(and(...where))
+      .orderBy(desc(offerConditions.createdAt))
+    if (!filters.pagination) {
+      return await query
+    }
+
+    const { page, size } = filters.pagination
+
+    const results = await query.limit(size).offset((page - 1) * size)
+
+    const total = await this.db.$count(offerConditions, and(...where))
+
+    return {
+      results,
+      pagination: {
+        page,
+        size,
+        total,
+        pages: Math.ceil(total / size),
+      },
+    }
+  }
+}
+
+interface OfferListFilter {
+  pagination?: {
+    page: number
+    size: number
+  }
+  q?: string
+  type?: 'site' | 'product' | 'service'
+  condition?: number
+  benefit?: number
+  isActive?: boolean
+  isFeatured?: boolean
 }
 
 class OfferService {
@@ -327,6 +484,59 @@ class OfferService {
 
   async delete(id: number) {
     return await this.db.delete().from(offers).where(eq(offers.id, id))
+  }
+
+  async list(filters: OfferListFilter) {
+    const where: SQL[] = []
+
+    if (filters.q) {
+      where.push(ilike(offers.name, `%${filters.q}%`))
+    }
+
+    if (filters.isActive !== undefined) {
+      where.push(eq(offers.isActive, filters.isActive))
+    }
+
+    if (filters.isFeatured !== undefined) {
+      where.push(eq(offers.isFeatured, filters.isFeatured))
+    }
+
+    if (filters.type) {
+      where.push(eq(offers.type, filters.type))
+    }
+
+    if (filters.condition) {
+      where.push(eq(offers.conditionId, filters.condition))
+    }
+
+    if (filters.benefit) {
+      where.push(eq(offers.benefitId, filters.benefit))
+    }
+
+    const query = this.db
+      .select()
+      .from(offers)
+      .where(and(...where))
+      .orderBy(desc(offers.createdAt))
+    if (!filters.pagination) {
+      return await query
+    }
+
+    const { page, size } = filters.pagination
+
+    const results = await query.limit(size).offset((page - 1) * size)
+
+    const total = await this.db.$count(offers, and(...where))
+
+    return {
+      results,
+      pagination: {
+        page,
+        size,
+        total,
+        pages: Math.ceil(total / size),
+      },
+    }
   }
 }
 
