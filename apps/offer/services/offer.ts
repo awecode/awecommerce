@@ -67,7 +67,7 @@ class OfferRangeService {
     }
   }
 
-  async getById(id: number) {
+  async get(id: number) {
     const offer = await this.db.query.offerRanges.findFirst({
       where: eq(offerRanges.id, id),
       with: {
@@ -240,7 +240,7 @@ class OfferBenefitService {
     return offerBenefit
   }
 
-  async getById(id: number) {
+  async get(id: number) {
     return await this.db.query.offerBenefits.findFirst({
       where: eq(offerBenefits.id, id),
     })
@@ -279,7 +279,7 @@ class OfferConditionService {
     return offerCondition
   }
 
-  async getById(id: number) {
+  async get(id: number) {
     return await this.db.query.offerConditions.findFirst({
       where: eq(offerConditions.id, id),
     })
@@ -312,7 +312,7 @@ class OfferService {
     return offer
   }
 
-  async getById(id: number) {
+  async get(id: number) {
     return await this.db.query.offers.findFirst({
       where: eq(offers.id, id),
     })
@@ -345,7 +345,7 @@ class OfferApplicationLogService {
     return log
   }
 
-  async getById(id: number) {
+  async get(id: number) {
     return await this.db.query.offerApplicationLogs.findFirst({
       where: eq(offerApplicationLogs.id, id),
     })
