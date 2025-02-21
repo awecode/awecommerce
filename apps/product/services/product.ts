@@ -45,6 +45,7 @@ interface ProductFilter {
   includeInactiveCategories?: boolean
   includeInactiveProductClasses?: boolean
   extraFilters?: SQL[]
+  qFilter?: SQL
   minPrice?: number
   maxPrice?: number
   sortBy?: 'priceAsc' | 'priceDesc'
@@ -202,7 +203,9 @@ class ProductService {
       if (filter.isBestSeller !== undefined) {
         where.push(eq(products.isBestSeller, filter.isBestSeller))
       }
-      if (filter.q) {
+      if (filter.qFilter) {
+        where.push(filter.qFilter)
+      } else if (filter.q) {
         where.push(
           or(
             Number(filter.q) ? eq(products.id, Number(filter.q)) : undefined,
