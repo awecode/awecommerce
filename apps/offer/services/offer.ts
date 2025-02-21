@@ -155,8 +155,7 @@ class OfferRangeService {
       .returning()
     if (data.includedProducts) {
       await this.db
-        .delete()
-        .from(offerRangeIncludedProducts)
+        .delete(offerRangeIncludedProducts)
         .where(eq(offerRangeIncludedProducts.rangeId, id))
       if (data.includedProducts.length > 0) {
         await this.db.insert(offerRangeIncludedProducts).values(
@@ -169,8 +168,7 @@ class OfferRangeService {
     }
     if (data.excludedProducts) {
       await this.db
-        .delete()
-        .from(offerRangeExcludedProducts)
+        .delete(offerRangeExcludedProducts)
         .where(eq(offerRangeExcludedProducts.rangeId, id))
       if (data.excludedProducts.length > 0) {
         await this.db.insert(offerRangeExcludedProducts).values(
@@ -183,8 +181,7 @@ class OfferRangeService {
     }
     if (data.includedCategories) {
       await this.db
-        .delete()
-        .from(offerRangeIncludedCategories)
+        .delete(offerRangeIncludedCategories)
         .where(eq(offerRangeIncludedCategories.rangeId, id))
       if (data.includedCategories.length > 0) {
         await this.db.insert(offerRangeIncludedCategories).values(
@@ -197,8 +194,7 @@ class OfferRangeService {
     }
     if (data.includedBrands) {
       await this.db
-        .delete()
-        .from(offerRangeIncludedBrands)
+        .delete(offerRangeIncludedBrands)
         .where(eq(offerRangeIncludedBrands.rangeId, id))
       if (data.includedBrands.length > 0) {
         await this.db.insert(offerRangeIncludedBrands).values(
@@ -211,8 +207,7 @@ class OfferRangeService {
     }
     if (data.includedProductClasses) {
       await this.db
-        .delete()
-        .from(offerRangeIncludedProductClasses)
+        .delete(offerRangeIncludedProductClasses)
         .where(eq(offerRangeIncludedProductClasses.rangeId, id))
       if (data.includedProductClasses.length > 0) {
         await this.db.insert(offerRangeIncludedProductClasses).values(
@@ -228,8 +223,7 @@ class OfferRangeService {
 
   async delete(id: number) {
     return await this.db
-      .delete()
-      .from(offerRanges)
+      .delete(offerRanges)
       .where(eq(offerRanges.id, id))
   }
 
@@ -314,8 +308,7 @@ class OfferBenefitService {
 
   async delete(id: number) {
     return await this.db
-      .delete()
-      .from(offerBenefits)
+      .delete(offerBenefits)
       .where(eq(offerBenefits.id, id))
   }
 
@@ -401,8 +394,7 @@ class OfferConditionService {
 
   async delete(id: number) {
     return await this.db
-      .delete()
-      .from(offerConditions)
+      .delete(offerConditions)
       .where(eq(offerConditions.id, id))
   }
 
@@ -570,8 +562,7 @@ class OfferApplicationLogService {
 
   async delete(id: number) {
     return await this.db
-      .delete()
-      .from(offerApplicationLogs)
+      .delete(offerApplicationLogs)
       .where(eq(offerApplicationLogs.id, id))
   }
 }
