@@ -475,7 +475,7 @@ class OfferService {
   }
 
   async delete(id: number) {
-    return await this.db.delete().from(offers).where(eq(offers.id, id))
+    return await this.db.delete(offers).where(eq(offers.id, id))
   }
 
   async list(filters: OfferListFilter) {
