@@ -16,6 +16,7 @@ import {
   serial,
   primaryKey,
 } from 'drizzle-orm/pg-core'
+import { numeric } from 'drizzle-orm/pg-core'
 
 export const offerRanges = pgTable('offer_range', {
   id: serial().primaryKey(),
@@ -132,7 +133,7 @@ export const offerBenefits = pgTable('offer_benefit', {
   description: text(),
   isActive: boolean().default(true),
   type: offerBenefitType().notNull(),
-  value: integer().notNull(),
+  value: numeric().notNull(),
   maxAffectedItems: integer(),
   createdAt: timestamp({
     withTimezone: true,
@@ -154,7 +155,7 @@ export const offerConditions = pgTable('offer_condition', {
   id: serial().primaryKey(),
   rangeId: integer().references(() => offerRanges.id).notNull(),
   type: offerConditionType().notNull(),
-  value: integer().notNull(),
+  value: numeric().notNull(),
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
