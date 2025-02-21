@@ -39,7 +39,7 @@ class OfferRangeService {
       .insert(offerRanges)
       .values(data)
       .returning()
-    if (data.includedProducts) {
+    if (data.includedProducts && data.includedProducts.length) {
       await this.db.insert(offerRangeIncludedProducts).values(
         data.includedProducts.map((productId) => ({
           rangeId: offerRange.id,
@@ -47,7 +47,7 @@ class OfferRangeService {
         })),
       )
     }
-    if (data.excludedProducts) {
+    if (data.excludedProducts && data.excludedProducts.length) {
       await this.db.insert(offerRangeExcludedProducts).values(
         data.excludedProducts.map((productId) => ({
           rangeId: offerRange.id,
@@ -55,7 +55,7 @@ class OfferRangeService {
         })),
       )
     }
-    if (data.includedCategories) {
+    if (data.includedCategories && data.includedCategories.length) {
       await this.db.insert(offerRangeIncludedCategories).values(
         data.includedCategories.map((categoryId) => ({
           rangeId: offerRange.id,
@@ -63,10 +63,10 @@ class OfferRangeService {
         })),
       )
     }
-    if (data.includedBrands) {
+    if (data.includedBrands && data.includedBrands.length) {
       await this.db.insert(offerRangeIncludedBrands).values(data.includedBrands)
     }
-    if (data.includedProductClasses) {
+    if (data.includedProductClasses && data.includedProductClasses.length) {
       await this.db.insert(offerRangeIncludedProductClasses).values(
         data.includedProductClasses.map((productClassId) => ({
           rangeId: offerRange.id,
