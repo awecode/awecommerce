@@ -15,6 +15,7 @@ import {
   pgTable,
   serial,
   primaryKey,
+  jsonb,
 } from 'drizzle-orm/pg-core'
 import { numeric } from 'drizzle-orm/pg-core'
 
@@ -175,6 +176,8 @@ export const offers = pgTable('offer', {
   image: text(),
   type: offerType().notNull(),
   voucherCode: text(),
+  includeAllUsers: boolean().default(false),
+  includedUserIds: jsonb().default([]),
   conditionId: integer().references(() => offerConditions.id).notNull(),
   benefitId: integer().references(() => offerBenefits.id).notNull(),
   startDate: timestamp({
