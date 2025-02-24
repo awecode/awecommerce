@@ -167,7 +167,7 @@ export const offerConditions = pgTable('offer_condition', {
   }),
 })
 
-export const offerType = pgEnum('offer_type', ['site', 'product', 'service'])
+export const offerType = pgEnum('offer_type', ['site', 'voucher', 'user'])
 
 export const offers = pgTable('offer', {
   id: serial().primaryKey(),
