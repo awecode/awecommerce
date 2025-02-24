@@ -201,6 +201,7 @@ export const offers = pgTable('offer', {
     withTimezone: true,
     mode: 'string',
   }),
+  metadata: jsonb().default({}),
 })
 
 export const offerApplicationLogs = pgTable('offer_application_log', {
