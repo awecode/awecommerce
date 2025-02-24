@@ -74,6 +74,7 @@ class OfferRangeService {
         })),
       )
     }
+    return offerRange
   }
 
   async get(id: number) {
@@ -297,13 +298,14 @@ class OfferBenefitService {
   }
 
   async update(id: number, data: UpdateOfferBenefit) {
-    return await this.db
+    const [offerBenefit] = await this.db
       .update(offerBenefits)
       .set({
         ...data,
         updatedAt: new Date().toISOString(),
       })
       .where(eq(offerBenefits.id, id))
+    return offerBenefit
   }
 
   async delete(id: number) {
@@ -386,10 +388,11 @@ class OfferConditionService {
   }
 
   async update(id: number, data: { type?: string; value?: number }) {
-    return await this.db
+    const [offerCondition] = await this.db
       .update(offerConditions)
       .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(offerConditions.id, id))
+    return offerCondition
   }
 
   async delete(id: number) {
@@ -468,10 +471,12 @@ class OfferService {
   }
 
   async update(id: number, data: any) {
-    return await this.db
+    const [offer] =  await this.db
       .update(offers)
       .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(offers.id, id))
+      .returning()
+    return offer
   }
 
   async delete(id: number) {
@@ -554,10 +559,12 @@ class OfferApplicationLogService {
   }
 
   async update(id: number, data: UpdateOfferApplicationLog) {
-    return await this.db
+    const [log] = await this.db
       .update(offerApplicationLogs)
       .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(offerApplicationLogs.id, id))
+      .returning()
+    return log
   }
 
   async delete(id: number) {
