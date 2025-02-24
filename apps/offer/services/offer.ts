@@ -305,6 +305,7 @@ class OfferBenefitService {
         updatedAt: new Date().toISOString(),
       })
       .where(eq(offerBenefits.id, id))
+      .returning()
     return offerBenefit
   }
 
@@ -392,6 +393,7 @@ class OfferConditionService {
       .update(offerConditions)
       .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(offerConditions.id, id))
+      .returning()
     return offerCondition
   }
 
