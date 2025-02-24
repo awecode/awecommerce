@@ -64,7 +64,10 @@ class OfferRangeService {
       )
     }
     if (data.includedBrands && data.includedBrands.length) {
-      await this.db.insert(offerRangeIncludedBrands).values(data.includedBrands)
+      await this.db.insert(offerRangeIncludedBrands).values(data.includedBrands.map((brandId) => ({
+        rangeId: offerRange.id,
+        brandId,
+      })))
     }
     if (data.includedProductClasses && data.includedProductClasses.length) {
       await this.db.insert(offerRangeIncludedProductClasses).values(
@@ -469,6 +472,12 @@ class OfferService {
   async get(id: number) {
     return await this.db.query.offers.findFirst({
       where: eq(offers.id, id),
+    })
+  }
+
+  async getByVoucherCode(voucherCode: string) {
+    return await this.db.query.offers.findFirst({
+      where: eq(offers.voucherCode, voucherCode),
     })
   }
 

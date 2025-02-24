@@ -175,7 +175,7 @@ export const offers = pgTable('offer', {
   description: text(),
   image: text(),
   type: offerType().notNull(),
-  voucherCode: text(),
+  voucherCode: text().unique(),
   includeAllUsers: boolean().default(false),
   includedUserIds: jsonb().default([]),
   conditionId: integer().references(() => offerConditions.id).notNull(),
