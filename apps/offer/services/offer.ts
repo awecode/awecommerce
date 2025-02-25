@@ -631,26 +631,6 @@ class OfferService {
         type: offerBenefits.type,
         value: offerBenefits.value,
       },
-      products: sql`coalesce(
-        jsonb_agg(
-          jsonb_build_object(
-            'id', ${products.id},
-            'name', ${products.name},
-            'description', ${products.description},
-            'thumbnail', ${products.thumbnail},
-            'price', ${products.price},
-            'discountedPrice', ${products.discountedPrice},
-            'category', jsonb_build_object(
-              'id', ${categories.id},
-              'name', ${categories.name}
-            ),
-            'brand', jsonb_build_object(
-              'id', ${brands.id},
-              'name', ${brands.name}
-            )
-          )
-        ), '[]'
-      )`
     })
     .from(offers)
     .where(
@@ -666,24 +646,38 @@ class OfferService {
     )
     .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
     .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
-    .leftJoin(offerRangeIncludedProducts, eq(offers.conditionId, offerConditions.id))
-    .leftJoin(products, eq(offerRangeIncludedProducts.productId, products.id))
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .leftJoin(brands, eq(products.brandId, brands.id))
-    .having(
-      or(
-        isNull(offers.limitPerUser),
-        sql`(
-          SELECT COUNT(*) FROM ${offerApplicationLogs} 
-          WHERE ${offerApplicationLogs.offerId} = ${offers.id} 
-          AND ${offerApplicationLogs.userId} = ${userId}
-        ) < ${offers.limitPerUser}`
-      )
-    )
     .groupBy(offers.id, offerBenefits.id)
     .orderBy(desc(offers.createdAt))
     
     return offer
+  }
+
+  async getIncludedProducts(offerId: number, q?:string) {
+    return await this.db
+      .select({
+        id: products.id,
+        name: products.name,
+        description: products.description,
+        thumbnail: products.thumbnail,
+        price: products.price,
+        discount: products.discountedPrice,
+        isFeatured: products.isFeatured,
+      })
+      .from(products)
+      .where(
+        and(
+        q ? ilike(products.name, `%${q}%`) : undefined,
+        sql`
+          EXISTS (
+            SELECT 1 FROM ${offers}
+            LEFT JOIN ${offerConditions} ON ${offers.conditionId} = ${offerConditions.id}
+            LEFT JOIN ${offerRangeIncludedProducts} ON ${offerConditions.rangeId} = ${offerRangeIncludedProducts.rangeId}
+            WHERE ${offers.id} = ${offerId}
+            AND ${products.id} = ${offerRangeIncludedProducts.productId}
+          )
+        `
+        )
+      )
   }
 }
 
