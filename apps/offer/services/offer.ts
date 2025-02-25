@@ -17,7 +17,7 @@ import {
   NewOfferApplicationLog,
   UpdateOfferApplicationLog,
 } from '../schemas'
-import { products } from 'apps/product/schemas'
+import { brands, categories, products } from '../../product/schemas'
 
 interface OfferRangeListFilter {
   pagination?: {
@@ -610,6 +610,80 @@ class OfferService {
     )
     .groupBy(offers.id, offerBenefits.id)
     .orderBy(desc(offers.createdAt))
+  }
+
+  async getActiveUserOfferDetails(userId: string, offerId: number) {
+    const now = new Date().toISOString();
+
+    const [offer] = await this.db
+    .select({
+      id: offers.id,
+      name: offers.name,
+      description: offers.description,
+      image: offers.image,
+      startDate: offers.startDate,
+      endDate: offers.endDate,
+      isActive: offers.isActive,
+      isFeatured: offers.isFeatured,
+      type: offers.type,
+      metadata: offers.metadata,
+      benefit: {
+        type: offerBenefits.type,
+        value: offerBenefits.value,
+      },
+      products: sql`coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', ${products.id},
+            'name', ${products.name},
+            'description', ${products.description},
+            'thumbnail', ${products.thumbnail},
+            'price', ${products.price},
+            'discountedPrice', ${products.discountedPrice},
+            'category', jsonb_build_object(
+              'id', ${categories.id},
+              'name', ${categories.name}
+            ),
+            'brand', jsonb_build_object(
+              'id', ${brands.id},
+              'name', ${brands.name}
+            )
+          )
+        ), '[]'
+      )`
+    })
+    .from(offers)
+    .where(
+      and(
+        eq(offers.id, offerId),
+        eq(offers.type, 'user'),
+        eq(offers.isActive, true),
+        or(eq(offers.includeAllUsers, true), sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`),
+        or(isNull(offers.startDate), gte(offers.startDate, now)),
+        or(isNull(offers.endDate), lte(offers.endDate, now)),
+        or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+      )
+    )
+    .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+    .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+    .leftJoin(offerRangeIncludedProducts, eq(offers.conditionId, offerConditions.id))
+    .leftJoin(products, eq(offerRangeIncludedProducts.productId, products.id))
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .leftJoin(brands, eq(products.brandId, brands.id))
+    .having(
+      or(
+        isNull(offers.limitPerUser),
+        sql`(
+          SELECT COUNT(*) FROM ${offerApplicationLogs} 
+          WHERE ${offerApplicationLogs.offerId} = ${offers.id} 
+          AND ${offerApplicationLogs.userId} = ${userId}
+        ) < ${offers.limitPerUser}`
+      )
+    )
+    .groupBy(offers.id, offerBenefits.id)
+    .orderBy(desc(offers.createdAt))
+    
+    return offer
   }
 }
 
