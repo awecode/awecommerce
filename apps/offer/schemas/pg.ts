@@ -29,11 +29,11 @@ export const offerRanges = pgTable('offer_range', {
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
   updatedAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
 })
 
 export const offerRangeIncludedProducts = pgTable(
@@ -139,11 +139,11 @@ export const offerBenefits = pgTable('offer_benefit', {
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
   updatedAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
 })
 
 export const offerConditionType = pgEnum('offer_condition_type', [
@@ -160,11 +160,11 @@ export const offerConditions = pgTable('offer_condition', {
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
   updatedAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
 })
 
 export const offerType = pgEnum('offer_type', ['site', 'voucher', 'user'])
@@ -197,11 +197,11 @@ export const offers = pgTable('offer', {
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
   updatedAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
   metadata: jsonb().default({}),
 })
 
@@ -213,7 +213,7 @@ export const offerApplicationLogs = pgTable('offer_application_log', {
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
-  }),
+  }).defaultNow(),
 })
 
 export const offerRangeRelations = relations(offerRanges, ({ many }) => ({
