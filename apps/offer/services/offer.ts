@@ -648,6 +648,10 @@ class OfferService {
       benefit: {
         type: offerBenefits.type,
         value: offerBenefits.value,
+      },
+      condition: {
+        type: offerConditions.type,
+        value: offerConditions.value,
       }
     })
     .from(offers)
@@ -662,6 +666,7 @@ class OfferService {
       )
     )
     .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+    .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
     .having(
       or(
         isNull(offers.limitPerUser),
@@ -672,7 +677,7 @@ class OfferService {
         ) < ${offers.limitPerUser}`
       )
     )
-    .groupBy(offers.id, offerBenefits.id)
+    .groupBy(offers.id, offerBenefits.id, offerConditions.id)
     .orderBy(desc(offers.createdAt))
   }
 
@@ -695,6 +700,10 @@ class OfferService {
         type: offerBenefits.type,
         value: offerBenefits.value,
       },
+      condition: {
+        type: offerConditions.type,
+        value: offerConditions
+      }
     })
     .from(offers)
     .where(
@@ -710,7 +719,7 @@ class OfferService {
     )
     .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
     .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
-    .groupBy(offers.id, offerBenefits.id)
+    .groupBy(offers.id, offerBenefits.id, offerConditions.id)
     .orderBy(desc(offers.createdAt))
     
     return offer
