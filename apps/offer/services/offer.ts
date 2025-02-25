@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, SQL } from 'drizzle-orm'
+import { and, desc, eq, ilike, SQL, or, sql, gte, isNull, lte, lt, getTableColumns } from 'drizzle-orm'
 import {
   NewOfferRange,
   offerRanges,
@@ -17,6 +17,7 @@ import {
   NewOfferApplicationLog,
   UpdateOfferApplicationLog,
 } from '../schemas'
+import { products } from 'apps/product/schemas'
 
 interface OfferRangeListFilter {
   pagination?: {
@@ -563,6 +564,52 @@ class OfferService {
       .where(eq(offers.id, id))
       .returning()
     return offer
+  }
+
+  async getActiveUserOffers(userId: string) {
+    const now = new Date().toISOString();
+
+    return await this.db
+    .select({
+      id: offers.id,
+      name: offers.name,
+      description: offers.description,
+      image: offers.image,
+      startDate: offers.startDate,
+      endDate: offers.endDate,
+      isActive: offers.isActive,
+      isFeatured: offers.isFeatured,
+      type: offers.type,
+      metadata: offers.metadata,
+      benefit: {
+        type: offerBenefits.type,
+        value: offerBenefits.value,
+      }
+    })
+    .from(offers)
+    .where(
+      and(
+        eq(offers.type, 'user'),
+        eq(offers.isActive, true),
+        or(eq(offers.includeAllUsers, true), sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`),
+        or(isNull(offers.startDate), gte(offers.startDate, now)),
+        or(isNull(offers.endDate), lte(offers.endDate, now)),
+        or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+      )
+    )
+    .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+    .having(
+      or(
+        isNull(offers.limitPerUser),
+        sql`(
+          SELECT COUNT(*) FROM ${offerApplicationLogs} 
+          WHERE ${offerApplicationLogs.offerId} = ${offers.id} 
+          AND ${offerApplicationLogs.userId} = ${userId}
+        ) < ${offers.limitPerUser}`
+      )
+    )
+    .groupBy(offers.id, offerBenefits.id)
+    .orderBy(desc(offers.createdAt))
   }
 }
 
