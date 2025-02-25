@@ -193,6 +193,7 @@ export const offers = pgTable('offer', {
   priority: integer().default(0),
   limitPerUser: integer(),
   overallLimit: integer(),
+  usageCount: integer().default(0),
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
