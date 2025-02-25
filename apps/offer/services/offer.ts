@@ -5,8 +5,11 @@ import {
   offerRangeExcludedProducts,
   offerRangeIncludedProducts,
   offerRangeIncludedBrands,
+  offerRangeExcludedBrands,
   offerRangeIncludedCategories,
+  offerRangeExcludedCategories,
   offerRangeIncludedProductClasses,
+  offerRangeExcludedProductClasses,
   UpdateOfferRange,
   NewOfferBenefit,
   offerBenefits,
@@ -64,8 +67,22 @@ class OfferRangeService {
         })),
       )
     }
+    if(data.excludedCategories && data.excludedCategories.length) {
+      await this.db.insert(offerRangeExcludedCategories).values(
+        data.excludedCategories.map((categoryId) => ({
+          rangeId: offerRange.id,
+          categoryId,
+        })),
+      )
+    }
     if (data.includedBrands && data.includedBrands.length) {
       await this.db.insert(offerRangeIncludedBrands).values(data.includedBrands.map((brandId) => ({
+        rangeId: offerRange.id,
+        brandId,
+      })))
+    }
+    if (data.excludedBrands && data.excludedBrands.length) {
+      await this.db.insert(offerRangeExcludedBrands).values(data.excludedBrands.map((brandId) => ({
         rangeId: offerRange.id,
         brandId,
       })))
@@ -73,6 +90,14 @@ class OfferRangeService {
     if (data.includedProductClasses && data.includedProductClasses.length) {
       await this.db.insert(offerRangeIncludedProductClasses).values(
         data.includedProductClasses.map((productClassId) => ({
+          rangeId: offerRange.id,
+          productClassId,
+        })),
+      )
+    }
+    if (data.excludedProductClasses && data.excludedProductClasses.length) {
+      await this.db.insert(offerRangeExcludedProductClasses).values(
+        data.excludedProductClasses.map((productClassId) => ({
           rangeId: offerRange.id,
           productClassId,
         })),
@@ -197,6 +222,19 @@ class OfferRangeService {
         )
       }
     }
+    if (data.excludedCategories) {
+      await this.db
+        .delete(offerRangeExcludedCategories)
+        .where(eq(offerRangeExcludedCategories.rangeId, id))
+      if (data.excludedCategories.length > 0) {
+        await this.db.insert(offerRangeExcludedCategories).values(
+          data.excludedCategories.map((categoryId) => ({
+            rangeId: id,
+            categoryId,
+          })),
+        )
+      }
+    }
     if (data.includedBrands) {
       await this.db
         .delete(offerRangeIncludedBrands)
@@ -210,6 +248,19 @@ class OfferRangeService {
         )
       }
     }
+    if (data.excludedBrands) {
+      await this.db
+        .delete(offerRangeExcludedBrands)
+        .where(eq(offerRangeExcludedBrands.rangeId, id))
+      if (data.excludedBrands.length > 0) {
+        await this.db.insert(offerRangeExcludedBrands).values(
+          data.excludedBrands.map((brandId) => ({
+            rangeId: id,
+            brandId,
+          })),
+        )
+      }
+    }
     if (data.includedProductClasses) {
       await this.db
         .delete(offerRangeIncludedProductClasses)
@@ -217,6 +268,19 @@ class OfferRangeService {
       if (data.includedProductClasses.length > 0) {
         await this.db.insert(offerRangeIncludedProductClasses).values(
           data.includedProductClasses.map((productClassId) => ({
+            rangeId: id,
+            productClassId,
+          })),
+        )
+      }
+    }
+    if (data.excludedProductClasses) {
+      await this.db
+        .delete(offerRangeExcludedProductClasses)
+        .where(eq(offerRangeExcludedProductClasses.rangeId, id))
+      if (data.excludedProductClasses.length > 0) {
+        await this.db.insert(offerRangeExcludedProductClasses).values(
+          data.excludedProductClasses.map((productClassId) => ({
             rangeId: id,
             productClassId,
           })),

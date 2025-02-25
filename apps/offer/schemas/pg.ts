@@ -24,8 +24,11 @@ export const offerRanges = pgTable('offer_range', {
   name: text().notNull(),
   description: text(),
   isActive: boolean().default(true),
-  includeAllProducts: boolean().default(false),
   inclusiveFilter: boolean().default(false),
+  includeAllProducts: boolean().default(false),
+  includeAllCategories: boolean().default(false),
+  includeAllBrands: boolean().default(false),
+  includeAllProductClasses: boolean().default(false),
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
@@ -87,6 +90,23 @@ export const offerRangeIncludedCategories = pgTable(
   ],
 )
 
+export const offerRangeExcludedCategories = pgTable(
+  'offer_range_excluded_category',
+  {
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    categoryId: integer().references(() => categories.id, {
+      onDelete: 'cascade',
+    }),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.rangeId, t.categoryId],
+    }),
+  ],
+)
+
 export const offerRangeIncludedBrands = pgTable(
   'offer_range_included_brand',
   {
@@ -104,8 +124,42 @@ export const offerRangeIncludedBrands = pgTable(
   ],
 )
 
+export const offerRangeExcludedBrands = pgTable(
+  'offer_range_excluded_brand',
+  {
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    brandId: integer().references(() => brands.id, {
+      onDelete: 'cascade',
+    }),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.rangeId, t.brandId],
+    }),
+  ],
+)
+
 export const offerRangeIncludedProductClasses = pgTable(
   'offer_range_included_product_class',
+  {
+    rangeId: integer().references(() => offerRanges.id, {
+      onDelete: 'cascade',
+    }),
+    productClassId: integer().references(() => productClasses.id, {
+      onDelete: 'cascade',
+    }),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.rangeId, t.productClassId],
+    }),
+  ],
+)
+
+export const offerRangeExcludedProductClasses = pgTable(
+  'offer_range_excluded_product_class',
   {
     rangeId: integer().references(() => offerRanges.id, {
       onDelete: 'cascade',
@@ -220,8 +274,11 @@ export const offerRangeRelations = relations(offerRanges, ({ many }) => ({
   includedProducts: many(offerRangeIncludedProducts),
   excludedProducts: many(offerRangeExcludedProducts),
   includedCategories: many(offerRangeIncludedCategories),
+  excludedCategories : many(offerRangeExcludedCategories),
   includedBrands: many(offerRangeIncludedBrands),
+  excludedBrands : many(offerRangeExcludedBrands),
   includedProductClasses: many(offerRangeIncludedProductClasses),
+  excludedProductClasses : many(offerRangeExcludedProductClasses),
 }))
 
 export const offerBenefitRelations = relations(offerBenefits, ({ one }) => ({
@@ -294,6 +351,21 @@ export const offerRangeIncludedCategoryRelations = relations(
   }),
 )
 
+export const offerRangeExcludedCategoryRelations = relations(
+  offerRangeExcludedCategories,
+  ({ one }) => ({
+    range: one(offerRanges, {
+      fields: [offerRangeExcludedCategories.rangeId],
+      references: [offerRanges.id],
+    }),
+    category: one(categories, {
+      fields: [offerRangeExcludedCategories.categoryId],
+      references: [categories.id],
+    }),
+  }),
+)
+
+
 export const offerRangeIncludedBrandRelations = relations(
   offerRangeIncludedBrands,
   ({ one }) => ({
@@ -308,6 +380,20 @@ export const offerRangeIncludedBrandRelations = relations(
   }),
 )
 
+export const offerRangeExcludedBrandRelations = relations(
+  offerRangeExcludedBrands,
+  ({ one }) => ({
+    range: one(offerRanges, {
+      fields: [offerRangeExcludedBrands.rangeId],
+      references: [offerRanges.id],
+    }),
+    brand: one(brands, {
+      fields: [offerRangeExcludedBrands.brandId],
+      references: [brands.id],
+    }),
+  }),
+)
+
 export const offerRangeIncludedProductClassRelations = relations(
   offerRangeIncludedProductClasses,
   ({ one }) => ({
@@ -317,6 +403,20 @@ export const offerRangeIncludedProductClassRelations = relations(
     }),
     productClass: one(productClasses, {
       fields: [offerRangeIncludedProductClasses.productClassId],
+      references: [productClasses.id],
+    }),
+  }),
+)
+
+export const offerRangeExcludedProductClassRelations = relations(
+  offerRangeExcludedProductClasses,
+  ({ one }) => ({
+    range: one(offerRanges, {
+      fields: [offerRangeExcludedProductClasses.rangeId],
+      references: [offerRanges.id],
+    }),
+    productClass: one(productClasses, {
+      fields: [offerRangeExcludedProductClasses.productClassId],
       references: [productClasses.id],
     }),
   }),
@@ -353,6 +453,9 @@ export type NewOfferRange = Omit<
   includedCategories?: number[]
   includedBrands?: number[]
   includedProductClasses?: number[]
+  excludedCategories?: number[]
+  excludedBrands?: number[]
+  excludedProductClasses?: number[]
 }
 export type UpdateOfferRange = Partial<NewOfferRange>
 
