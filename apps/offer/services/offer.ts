@@ -550,7 +550,7 @@ class OfferService {
   async markAsActive(id: number) {
     const [offer] = await this.db
       .update(offers)
-      .set({ isActive: true, updatedAt: new Date().toISOString() })
+      .set({ isActive: true })
       .where(eq(offers.id, id))
       .returning()
     return offer
@@ -559,7 +559,7 @@ class OfferService {
   async markAsInactive(id: number) {
     const [offer] = await this.db
       .update(offers)
-      .set({ isActive: false, updatedAt: new Date().toISOString() })
+      .set({ isActive: false })
       .where(eq(offers.id, id))
       .returning()
     return offer
