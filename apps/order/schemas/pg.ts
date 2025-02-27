@@ -32,7 +32,10 @@ export const shippingAddresses = pgTable('shipping_address', {
 export const shippingMethods = pgTable('shipping_method', {
   id: serial().primaryKey(),
   name: text().notNull(),
-  price: numeric().notNull(),
+  price: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
   metadata: jsonb(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
@@ -50,8 +53,14 @@ export const orders = pgTable('order', {
   paymentStatus: paymentStatusEnum().notNull().default('Pending'),
   shippingAddress: jsonb().default({}),
   shippingMethod: jsonb().default({}),
-  discount: numeric().notNull().default('0'),
-  tax: numeric().notNull().default('0'),
+  discount: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull().default('0'),
+  tax: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull().default('0'),
   metadata: jsonb(),
   cancelledBy: text(),
   cancelledAt: timestamp({ mode: 'string', withTimezone: true }),
@@ -80,9 +89,18 @@ export const orderLines = pgTable('order_line', {
   id: serial().primaryKey(),
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   productId: integer().notNull().references(() => products.id),
-  price: numeric().notNull(),
-  discount: numeric().notNull().default('0'),
-  tax: numeric().notNull().default('0'),
+  price: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
+  discount: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull().default('0'),
+  tax: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull().default('0'),
   quantity: integer().notNull(),
   status: orderStatusEnum().notNull().default('Pending'),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
@@ -96,7 +114,10 @@ export const transactions = pgTable('transaction', {
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   gateway: text().notNull(),
   reference: text(),
-  amount: numeric().notNull(),
+  amount: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
   status: transactionStatusEnum().notNull().default('Requested'),
   metadata: jsonb(),
   lastRequestedAt: timestamp({ mode: 'string', withTimezone: true }),
@@ -109,7 +130,10 @@ export const paymentEventTypes = pgEnum('payment_event_type', ['Paid', 'Refund']
 export const paymentEvents = pgTable('payment_event', {
   id: serial().primaryKey(),
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
-  amount: numeric().notNull(),
+  amount: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
   type: paymentEventTypes().notNull().default('Paid'),
   reference: text(),
   metadata: jsonb(),

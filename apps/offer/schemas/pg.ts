@@ -188,7 +188,10 @@ export const offerBenefits = pgTable('offer_benefit', {
   description: text(),
   isActive: boolean().default(true),
   type: offerBenefitType().notNull(),
-  value: numeric().notNull(),
+  value: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
   maxAffectedItems: integer(),
   createdAt: timestamp({
     withTimezone: true,
@@ -210,7 +213,10 @@ export const offerConditions = pgTable('offer_condition', {
   id: serial().primaryKey(),
   rangeId: integer().references(() => offerRanges.id).notNull(),
   type: offerConditionType().notNull(),
-  value: numeric().notNull(),
+  value: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
