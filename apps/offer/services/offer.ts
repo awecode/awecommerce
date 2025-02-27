@@ -19,6 +19,7 @@ import {
   offerApplicationLogs,
   NewOfferApplicationLog,
   UpdateOfferApplicationLog,
+  offerUsages,
 } from '../schemas'
 import { brands, categories, products } from '../../product/schemas'
 
@@ -657,12 +658,12 @@ class OfferService {
     .from(offers)
     .where(
       and(
-        eq(offers.type, 'user'),
-        eq(offers.isActive, true),
-        or(eq(offers.includeAllUsers, true), sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`),
-        or(isNull(offers.startDate), lte(offers.startDate, now)),
-        or(isNull(offers.endDate), gte(offers.endDate, now)),
-        or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+      eq(offers.type, 'user'),
+      eq(offers.isActive, true),
+      or(eq(offers.includeAllUsers, true), sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`),
+      or(isNull(offers.startDate), lte(offers.startDate, now)),
+      or(isNull(offers.endDate), gte(offers.endDate, now)),
+      or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
       )
     )
     .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
@@ -670,11 +671,10 @@ class OfferService {
     .having(
       or(
         isNull(offers.limitPerUser),
-        sql`(
-          SELECT COUNT(*) FROM ${offerApplicationLogs} 
-          WHERE ${offerApplicationLogs.offerId} = ${offers.id} 
-          AND ${offerApplicationLogs.userId} = ${userId}
-        ) < ${offers.limitPerUser}`
+        lt(
+          sql`COALESCE((SELECT COUNT(*) FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${offers.id} AND ${offerUsages.userId} = ${sql.raw(userId)}), 0)`,
+          offers.limitPerUser
+        )
       )
     )
     .groupBy(offers.id, offerBenefits.id, offerConditions.id)

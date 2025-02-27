@@ -264,10 +264,18 @@ export const offerApplicationLogs = pgTable('offer_application_log', {
   offerId: integer(),
   orderId: integer(),
   userId: text(),
+  remarks: text(),
   createdAt: timestamp({
     withTimezone: true,
     mode: 'string',
   }).defaultNow(),
+})
+
+export const offerUsages = pgTable('offer_usage', {
+  id: serial().primaryKey(),
+  offerId: integer(),
+  userId: text(),
+  usageCount: integer().default(1),
 })
 
 export const offerRangeRelations = relations(offerRanges, ({ many }) => ({
