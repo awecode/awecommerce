@@ -703,7 +703,9 @@ class OfferService {
       condition: {
         type: offerConditions.type,
         value: offerConditions.value
-      }
+      },
+      includedCategories : sql`coalesce(jsonb_agg(jsonb_build_object('id', ${categories.id}, 'name', ${categories.name})), '[]'::jsonb)`,
+      includedBrands : sql`coalesce(jsonb_agg(jsonb_build_object('id', ${brands.id}, 'name', ${brands.name})), '[]'::jsonb)`,
     })
     .from(offers)
     .where(
@@ -719,6 +721,10 @@ class OfferService {
     )
     .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
     .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+    .leftJoin(offerRangeIncludedCategories, eq(offerConditions.rangeId, offerRangeIncludedCategories.rangeId))
+    .leftJoin(categories, eq(offerRangeIncludedCategories.categoryId, categories.id))
+    .leftJoin(offerRangeIncludedBrands, eq(offerConditions.rangeId, offerRangeIncludedBrands.rangeId))
+    .leftJoin(brands, eq(offerRangeIncludedBrands.brandId, brands.id))
     .groupBy(offers.id, offerBenefits.id, offerConditions.id)
     .orderBy(desc(offers.createdAt))
     
