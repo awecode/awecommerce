@@ -389,7 +389,7 @@ class ProductService {
           )
           .where(
             and(
-              eq(productViews.userId, '1'),
+              eq(productViews.userId, userId),
               eq(products.isActive, true),
               or(isNull(products.brandId), eq(brands.isActive, true)),
               or(isNull(products.categoryId), eq(categories.isActive, true)),
