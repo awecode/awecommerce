@@ -131,7 +131,7 @@ class OrderService {
         );
     }
 
-    async cancel(orderId: number, cancelledBy: string, cancellationReason: string, cancellationRemarks?: string | null) {
+    async cancel(orderId: number, previousStatus: OrderStatus, cancelledBy: string, cancellationReason: string, cancellationRemarks?: string | null) {
         await this.db.update(orders).set({
             status: 'Cancelled',
             cancelledBy,
@@ -139,6 +139,8 @@ class OrderService {
             cancellationReason,
             cancellationRemarks
         }).where(eq(orders.id, orderId))
+        await this.changeStatus(orderId, previousStatus, 'Cancelled')
+        await this.createLog(orderId, STATUS_LOG.Cancelled)
     }
 
     async get(orderId: number, userId?: string) {
