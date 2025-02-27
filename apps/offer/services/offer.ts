@@ -670,11 +670,11 @@ class OfferService {
     .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
     .having(
       or(
-        isNull(offers.limitPerUser),
-        lt(
-          sql`COALESCE((SELECT COUNT(*) FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${offers.id} AND ${offerUsages.userId} = ${sql.raw(userId)}), 0)`,
-          offers.limitPerUser
-        )
+      isNull(offers.limitPerUser),
+      lt(
+        sql`COALESCE((SELECT COUNT(*) FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${offers.id} AND ${offerUsages.userId} = '${sql.raw(userId)}'), 0)`,
+        offers.limitPerUser
+      )
       )
     )
     .groupBy(offers.id, offerBenefits.id, offerConditions.id)
@@ -702,7 +702,7 @@ class OfferService {
       },
       condition: {
         type: offerConditions.type,
-        value: offerConditions
+        value: offerConditions.value
       }
     })
     .from(offers)
