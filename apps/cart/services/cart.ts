@@ -66,11 +66,9 @@ class CartService {
     const productService = new ProductService(this.db)
     const { price, discountedPrice } = await productService.getPrices(productId)
 
-    if (!price) {
+    if (!discountedPrice && !price) {
       throw new Error('Product price not found')
     }
-
-    const cartPrice = discountedPrice || price
 
     const result = await this.db
       .insert(cartLines)
@@ -78,8 +76,6 @@ class CartService {
         cartId,
         productId,
         quantity,
-        price: cartPrice,
-        originalPrice: price,
       })
       .returning()
 
