@@ -132,7 +132,10 @@ class CartService {
     return result[0]
   }
 
-  async getCartContentForSession(sessionId: string): Promise<CartContent> {
+  async getCartContentForSession(
+    sessionId: string,
+    withOffersInfo = true,
+  ): Promise<CartContent> {
     const content = await this.db.query.carts.findFirst({
       with: {
         lines: {
@@ -167,22 +170,27 @@ class CartService {
       voucherOfferDiscounts: [],
       totalOfferDiscount: 0,
     }
-    if (cartContent.userId) {
-      cartContent = await this.applyUserOffers(cartContent, cartContent.userId)
-    }
-    await this.resetAppliedVoucherOffers(cartContent.id)
-    if (appliedVoucherOffers.length) {
-      const offerService = new OfferService(this.db)
-      for (const appliedOffer of appliedVoucherOffers) {
-        try {
-          cartContent = await offerService.applyVoucherCode(
-            cartContent,
-            appliedOffer.offer,
-            undefined,
-            cartContent.userId || undefined,
-          )
-        } catch (e) {
-          console.error(e)
+    if (withOffersInfo) {
+      if (cartContent.userId) {
+        cartContent = await this.applyUserOffers(
+          cartContent,
+          cartContent.userId,
+        )
+      }
+      await this.resetAppliedVoucherOffers(cartContent.id)
+      if (appliedVoucherOffers.length) {
+        const offerService = new OfferService(this.db)
+        for (const appliedOffer of appliedVoucherOffers) {
+          try {
+            cartContent = await offerService.applyVoucherCode(
+              cartContent,
+              appliedOffer.offer,
+              undefined,
+              cartContent.userId || undefined,
+            )
+          } catch (e) {
+            console.error(e)
+          }
         }
       }
     }
