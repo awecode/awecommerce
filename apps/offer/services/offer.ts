@@ -1053,7 +1053,7 @@ class OfferService {
       cartLinesOfProductsInOfferRange.every(
         (line) =>
           line.totalOfferDiscount >=
-          Number(line.product.discountedPrice ?? line.product.price),
+          Number(line.product.discountedPrice ?? line.product.price) * line.quantity,
       )
     ) {
       throw new Error('Discount already applied to all applicable products')
@@ -1165,12 +1165,12 @@ class OfferService {
                 Number(voucherOffer.benefit.value) * line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!)
+                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) - updatedLine!.totalOfferDiscount
+                  ) * line.quantity - updatedLine!.totalOfferDiscount
               }
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1190,17 +1190,17 @@ class OfferService {
                 (l) => l.productId === line.productId,
               )
               let offerDiscount =
-                (Number((line.product.discountedPrice ?? line.product.price)!) *
+                ((Number((line.product.discountedPrice ?? line.product.price)!) *
                   Number(voucherOffer.benefit.value)) /
-                100
+                100) * line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!)
+                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) - updatedLine!.totalOfferDiscount
+                  ) * line.quantity - updatedLine!.totalOfferDiscount
               }
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1255,7 +1255,7 @@ class OfferService {
       cartLinesOfProductsInOfferRange.every(
         (line) =>
           line.totalOfferDiscount >=
-          Number(line.product.discountedPrice ?? line.product.price),
+          Number(line.product.discountedPrice ?? line.product.price) * line.quantity,
       )
     ) {
       return cartContent
@@ -1357,12 +1357,12 @@ class OfferService {
               let offerDiscount = Number(offer.benefit.value) * line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!)
+                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) - updatedLine!.totalOfferDiscount
+                  ) * line.quantity - updatedLine!.totalOfferDiscount
               }
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
@@ -1381,17 +1381,17 @@ class OfferService {
                 (l) => l.productId === line.productId,
               )
               let offerDiscount =
-                (Number((line.product.discountedPrice ?? line.product.price)!) *
+                ((Number((line.product.discountedPrice ?? line.product.price)!) *
                   Number(offer.benefit.value)) /
-                100
+                100 ) * line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!)
+                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) - updatedLine!.totalOfferDiscount
+                  ) * line.quantity - updatedLine!.totalOfferDiscount
               }
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
