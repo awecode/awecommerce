@@ -18,6 +18,7 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core'
 import { numeric } from 'drizzle-orm/pg-core'
+import { unique } from 'drizzle-orm/pg-core'
 
 export const offerRanges = pgTable('offer_range', {
   id: serial().primaryKey(),
@@ -211,7 +212,9 @@ export const offerConditionType = pgEnum('offer_condition_type', [
 
 export const offerConditions = pgTable('offer_condition', {
   id: serial().primaryKey(),
-  rangeId: integer().references(() => offerRanges.id).notNull(),
+  rangeId: integer()
+    .references(() => offerRanges.id)
+    .notNull(),
   type: offerConditionType().notNull(),
   value: numeric({
     precision: 100,
@@ -238,8 +241,12 @@ export const offers = pgTable('offer', {
   voucherCode: text().unique(),
   includeAllUsers: boolean().default(false),
   includedUserIds: jsonb().default([]),
-  conditionId: integer().references(() => offerConditions.id).notNull(),
-  benefitId: integer().references(() => offerBenefits.id).notNull(),
+  conditionId: integer()
+    .references(() => offerConditions.id)
+    .notNull(),
+  benefitId: integer()
+    .references(() => offerBenefits.id)
+    .notNull(),
   startDate: timestamp({
     withTimezone: true,
     mode: 'string',
@@ -277,22 +284,28 @@ export const offerApplicationLogs = pgTable('offer_application_log', {
   }).defaultNow(),
 })
 
-export const offerUsages = pgTable('offer_usage', {
-  id: serial().primaryKey(),
-  offerId: integer(),
-  userId: text(),
-  usageCount: integer().default(1),
-})
+export const offerUsages = pgTable(
+  'offer_usage',
+  {
+    id: serial().primaryKey(),
+    offerId: integer(),
+    userId: text(),
+    usageCount: integer().default(1),
+  },
+  (t) => ({
+    uniqueOfferUser: unique().on(t.offerId, t.userId),
+  }),
+)
 
 export const offerRangeRelations = relations(offerRanges, ({ many }) => ({
   includedProducts: many(offerRangeIncludedProducts),
   excludedProducts: many(offerRangeExcludedProducts),
   includedCategories: many(offerRangeIncludedCategories),
-  excludedCategories : many(offerRangeExcludedCategories),
+  excludedCategories: many(offerRangeExcludedCategories),
   includedBrands: many(offerRangeIncludedBrands),
-  excludedBrands : many(offerRangeExcludedBrands),
+  excludedBrands: many(offerRangeExcludedBrands),
   includedProductClasses: many(offerRangeIncludedProductClasses),
-  excludedProductClasses : many(offerRangeExcludedProductClasses),
+  excludedProductClasses: many(offerRangeExcludedProductClasses),
 }))
 
 export const offerBenefitRelations = relations(offerBenefits, ({ one }) => ({
@@ -378,7 +391,6 @@ export const offerRangeExcludedCategoryRelations = relations(
     }),
   }),
 )
-
 
 export const offerRangeIncludedBrandRelations = relations(
   offerRangeIncludedBrands,

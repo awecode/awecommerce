@@ -53,6 +53,7 @@ export const orders = pgTable('order', {
   paymentStatus: paymentStatusEnum().notNull().default('Pending'),
   shippingAddress: jsonb().default({}),
   shippingMethod: jsonb().default({}),
+  offers: jsonb().default([]),
   discount: numeric({
     precision: 100,
     scale: 20,

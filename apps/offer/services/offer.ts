@@ -53,7 +53,7 @@ type CartContent = Extend<
         product: {
           price: number
           discountedPrice?: number
-        },
+        }
         userOfferDiscounts: {
           id: number
           discount: number
@@ -1053,7 +1053,8 @@ class OfferService {
       cartLinesOfProductsInOfferRange.every(
         (line) =>
           line.totalOfferDiscount >=
-          Number(line.product.discountedPrice ?? line.product.price) * line.quantity,
+          Number(line.product.discountedPrice ?? line.product.price) *
+            line.quantity,
       )
     ) {
       throw new Error('Discount already applied to all applicable products')
@@ -1165,12 +1166,15 @@ class OfferService {
                 Number(voucherOffer.benefit.value) * line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
+                Number((line.product.discountedPrice ?? line.product.price)!) *
+                  line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) * line.quantity - updatedLine!.totalOfferDiscount
+                  ) *
+                    line.quantity -
+                  updatedLine!.totalOfferDiscount
               }
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1190,17 +1194,23 @@ class OfferService {
                 (l) => l.productId === line.productId,
               )
               let offerDiscount =
-                ((Number((line.product.discountedPrice ?? line.product.price)!) *
+                ((Number(
+                  (line.product.discountedPrice ?? line.product.price)!,
+                ) *
                   Number(voucherOffer.benefit.value)) /
-                100) * line.quantity
+                  100) *
+                line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
+                Number((line.product.discountedPrice ?? line.product.price)!) *
+                  line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) * line.quantity - updatedLine!.totalOfferDiscount
+                  ) *
+                    line.quantity -
+                  updatedLine!.totalOfferDiscount
               }
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1255,7 +1265,8 @@ class OfferService {
       cartLinesOfProductsInOfferRange.every(
         (line) =>
           line.totalOfferDiscount >=
-          Number(line.product.discountedPrice ?? line.product.price) * line.quantity,
+          Number(line.product.discountedPrice ?? line.product.price) *
+            line.quantity,
       )
     ) {
       return cartContent
@@ -1357,12 +1368,15 @@ class OfferService {
               let offerDiscount = Number(offer.benefit.value) * line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
+                Number((line.product.discountedPrice ?? line.product.price)!) *
+                  line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) * line.quantity - updatedLine!.totalOfferDiscount
+                  ) *
+                    line.quantity -
+                  updatedLine!.totalOfferDiscount
               }
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
@@ -1381,17 +1395,23 @@ class OfferService {
                 (l) => l.productId === line.productId,
               )
               let offerDiscount =
-                ((Number((line.product.discountedPrice ?? line.product.price)!) *
+                ((Number(
+                  (line.product.discountedPrice ?? line.product.price)!,
+                ) *
                   Number(offer.benefit.value)) /
-                100 ) * line.quantity
+                  100) *
+                line.quantity
               if (
                 updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) * line.quantity
+                Number((line.product.discountedPrice ?? line.product.price)!) *
+                  line.quantity
               ) {
                 offerDiscount =
                   Number(
                     (line.product.discountedPrice ?? line.product.price)!,
-                  ) * line.quantity - updatedLine!.totalOfferDiscount
+                  ) *
+                    line.quantity -
+                  updatedLine!.totalOfferDiscount
               }
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
@@ -1415,16 +1435,67 @@ class OfferService {
     }
     throw new Error('Not implemented')
   }
-}
 
-class OfferApplicationLogService {
-  private db: any
+  async increaseUsage(offerId: number, userId: string) {
+    const [offerUsage] = await this.db
+      .update(offerUsages)
+      .set({
+        usageCount: sql`${offerUsages.usageCount} + 1`,
+      })
+      .where(
+        and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)),
+      )
+      .returning()
 
-  constructor(db: any) {
-    this.db = db
+    if (!offerUsage) {
+      await this.db.insert(offerUsages).values({
+        offerId,
+        userId,
+        usageCount: 1,
+      })
+    }
   }
 
-  async create(data: NewOfferApplicationLog) {
+  async increaseUsageMultiple(offerIds: number[], userId: string) {
+    const updatedOfferUsages = await this.db
+      .update(offerUsages)
+      .set({
+        usageCount: sql`${offerUsages.usageCount} + 1`,
+      })
+      .where(
+        and(
+          inArray(offerUsages.offerId, offerIds),
+          eq(offerUsages.userId, userId),
+        ),
+      )
+      .returning()
+
+    const existingOfferIds = updatedOfferUsages.map((o) => o.offerId)
+    const newOfferIds = offerIds.filter((id) => !existingOfferIds.includes(id))
+
+    if (newOfferIds.length > 0) {
+      await this.db.insert(offerUsages).values(
+        newOfferIds.map((id) => ({
+          offerId: id,
+          userId,
+          usageCount: 1,
+        })),
+      )
+    }
+  }
+
+  async decreaseUsage(offerId: number, userId: string) {
+    await this.db
+      .update(offerUsages)
+      .set({
+        usageCount: sql`${offerUsages.usageCount} - 1`,
+      })
+      .where(
+        and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)),
+      )
+  }
+
+  async createApplicationLog(data: NewOfferApplicationLog) {
     const [log] = await this.db
       .insert(offerApplicationLogs)
       .values(data)
@@ -1432,25 +1503,8 @@ class OfferApplicationLogService {
     return log
   }
 
-  async get(id: number) {
-    return await this.db.query.offerApplicationLogs.findFirst({
-      where: eq(offerApplicationLogs.id, id),
-    })
-  }
-
-  async update(id: number, data: UpdateOfferApplicationLog) {
-    const [log] = await this.db
-      .update(offerApplicationLogs)
-      .set({ ...data, updatedAt: new Date().toISOString() })
-      .where(eq(offerApplicationLogs.id, id))
-      .returning()
-    return log
-  }
-
-  async delete(id: number) {
-    return await this.db
-      .delete(offerApplicationLogs)
-      .where(eq(offerApplicationLogs.id, id))
+  async createApplicationLogs(data: NewOfferApplicationLog[]) {
+    return await this.db.insert(offerApplicationLogs).values(data)
   }
 }
 
@@ -1459,5 +1513,4 @@ export {
   OfferBenefitService,
   OfferConditionService,
   OfferService,
-  OfferApplicationLogService,
 }
