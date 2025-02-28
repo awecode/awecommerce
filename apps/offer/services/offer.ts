@@ -695,7 +695,7 @@ class OfferService {
     return offer
   }
 
-  async getActiveUserOffers(userId: string) {
+  async getActiveUserOffers(userId: string, type: 'user' | 'voucher' = 'user') {
     const now = new Date().toISOString()
 
     return await this.db
@@ -703,6 +703,7 @@ class OfferService {
         id: offers.id,
         name: offers.name,
         description: offers.description,
+        voucherCode: offers.voucherCode,
         image: offers.image,
         startDate: offers.startDate,
         endDate: offers.endDate,
@@ -724,7 +725,7 @@ class OfferService {
       .from(offers)
       .where(
         and(
-          eq(offers.type, 'user'),
+          eq(offers.type, type),
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
@@ -789,7 +790,6 @@ class OfferService {
       .where(
         and(
           eq(offers.id, offerId),
-          eq(offers.type, 'user'),
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
