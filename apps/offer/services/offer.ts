@@ -1451,6 +1451,9 @@ class OfferService {
         usageCount: 1,
       })
     }
+    await this.db.update(offers).set({
+      usageCount: sql`${offers.usageCount} + 1`,
+    }).where(eq(offers.id, offerId))
   }
 
   async increaseUsageMultiple(offerIds: number[], userId: string) {
@@ -1479,6 +1482,13 @@ class OfferService {
         })),
       )
     }
+
+    await this.db
+      .update(offers)
+      .set({
+        usageCount: sql`${offers.usageCount} + 1`,
+      })
+      .where(inArray(offers.id, offerIds))
   }
 
   async decreaseUsage(offerId: number, userId: string) {
