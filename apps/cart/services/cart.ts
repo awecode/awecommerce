@@ -59,7 +59,10 @@ class CartService {
     return result[0]
   }
 
-  async addToCart(sessionId: string, productId: number, quantity: number) {
+  async addToCart(cartId: number, productId: number, quantity: number) {
+    if (quantity < 1) {
+      throw new Error('Quantity must be at least 1')
+    }
     const productService = new ProductService(this.db)
     const { price, discountedPrice } = await productService.getPrices(productId)
 
@@ -68,13 +71,6 @@ class CartService {
     }
 
     const cartPrice = discountedPrice || price
-
-    const cartId = (
-      await this.db
-        .select({ id: carts.id })
-        .from(carts)
-        .where(eq(carts.sessionId, sessionId))
-    )[0].id
 
     const result = await this.db
       .insert(cartLines)
