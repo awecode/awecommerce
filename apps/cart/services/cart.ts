@@ -269,8 +269,6 @@ class CartService {
               quantity: sumProductQuantityOnCartMerge
                 ? userLine.quantity + sessionLine.quantity
                 : sessionLine.quantity,
-              price: sessionLine.price,
-              originalPrice: sessionLine.originalPrice,
             })
           } else {
             lines.push({
@@ -278,8 +276,6 @@ class CartService {
               cartId: sessionCart.id,
               productId: userLine.productId,
               quantity: userLine.quantity,
-              price: userLine.price,
-              originalPrice: userLine.originalPrice,
             })
           }
         }

@@ -50,6 +50,10 @@ type CartContent = Extend<
     lines: Extend<
       CartLine,
       {
+        product: {
+          price: number
+          discountedPrice?: number
+        },
         userOfferDiscounts: {
           id: number
           discount: number
@@ -970,7 +974,7 @@ class OfferService {
     voucherCode?: string,
     userId?: string,
   ): Promise<CartContent> {
-    if(!voucherOffer){ 
+    if (!voucherOffer) {
       voucherOffer = await this.getByVoucherCode(voucherCode!)
     }
     if (
@@ -987,7 +991,8 @@ class OfferService {
     }
 
     if (
-      voucherOffer.overallLimit && voucherOffer.usageCount &&
+      voucherOffer.overallLimit &&
+      voucherOffer.usageCount &&
       voucherOffer.usageCount >= voucherOffer.overallLimit
     ) {
       throw new Error('Voucher code usage limit exceeded')
@@ -1046,7 +1051,9 @@ class OfferService {
 
     if (
       cartLinesOfProductsInOfferRange.every(
-        (line) => line.totalOfferDiscount >= Number(line.price),
+        (line) =>
+          line.totalOfferDiscount >=
+          Number(line.product.discountedPrice ?? line.product.price),
       )
     ) {
       throw new Error('Discount already applied to all applicable products')
@@ -1088,10 +1095,16 @@ class OfferService {
               if (voucherOffer.benefit.type === 'fixed_amount') {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
-                ) 
+                )
                 let offerDiscount = Number(voucherOffer.benefit.value)
-                if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                  offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+                if (
+                  updatedLine!.totalOfferDiscount + offerDiscount >
+                  Number((line.product.discountedPrice ?? line.product.price)!)
+                ) {
+                  offerDiscount =
+                    Number(
+                      (line.product.discountedPrice ?? line.product.price)!,
+                    ) - updatedLine!.totalOfferDiscount
                 }
                 updatedLine!.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
@@ -1110,9 +1123,20 @@ class OfferService {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount = (Number(line.price!) * Number(voucherOffer.benefit.value)) / 100
-                if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                  offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+                let offerDiscount =
+                  (Number(
+                    (line.product.discountedPrice ?? line.product.price)!,
+                  ) *
+                    Number(voucherOffer.benefit.value)) /
+                  100
+                if (
+                  updatedLine!.totalOfferDiscount + offerDiscount >
+                  Number((line.product.discountedPrice ?? line.product.price)!)
+                ) {
+                  offerDiscount =
+                    Number(
+                      (line.product.discountedPrice ?? line.product.price)!,
+                    ) - updatedLine!.totalOfferDiscount
                 }
                 updatedLine!.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
@@ -1127,7 +1151,7 @@ class OfferService {
                 updatedLine!.totalOfferDiscount += offerDiscount
                 cartContent.totalOfferDiscount += offerDiscount
                 isVoucherApplied = true
-              }else{
+              } else {
                 throw new Error('Not implemented')
               }
               discountAppliedTo += 1
@@ -1137,9 +1161,16 @@ class OfferService {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount = Number(voucherOffer.benefit.value) * line.quantity
-              if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+              let offerDiscount =
+                Number(voucherOffer.benefit.value) * line.quantity
+              if (
+                updatedLine!.totalOfferDiscount + offerDiscount >
+                Number((line.product.discountedPrice ?? line.product.price)!)
+              ) {
+                offerDiscount =
+                  Number(
+                    (line.product.discountedPrice ?? line.product.price)!,
+                  ) - updatedLine!.totalOfferDiscount
               }
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1158,9 +1189,18 @@ class OfferService {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount = (Number(line.price!) * Number(voucherOffer.benefit.value)) / 100
-              if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+              let offerDiscount =
+                (Number((line.product.discountedPrice ?? line.product.price)!) *
+                  Number(voucherOffer.benefit.value)) /
+                100
+              if (
+                updatedLine!.totalOfferDiscount + offerDiscount >
+                Number((line.product.discountedPrice ?? line.product.price)!)
+              ) {
+                offerDiscount =
+                  Number(
+                    (line.product.discountedPrice ?? line.product.price)!,
+                  ) - updatedLine!.totalOfferDiscount
               }
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1175,14 +1215,16 @@ class OfferService {
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount
               isVoucherApplied = true
-            }else{
+            } else {
               throw new Error('Not implemented')
             }
           }
         }
       }
-      if(!isVoucherApplied) {
-        throw new Error('Voucher code is not applicable to any product in the cart')
+      if (!isVoucherApplied) {
+        throw new Error(
+          'Voucher code is not applicable to any product in the cart',
+        )
       }
       await this.db.insert(cartAppliedVoucherOffers).values({
         cartId: cartContent.id,
@@ -1195,7 +1237,10 @@ class OfferService {
     throw new Error('Not implemented')
   }
 
-  async applyUserOffer(offer: any, cartContent: CartContent): Promise<CartContent> {
+  async applyUserOffer(
+    offer: any,
+    cartContent: CartContent,
+  ): Promise<CartContent> {
     const productIds = cartContent.lines.map((line) => line.productId)
     const productIdsInOfferRange = await this.getProductIdsInOfferRange(
       offer.condition.rangeId,
@@ -1208,7 +1253,9 @@ class OfferService {
 
     if (
       cartLinesOfProductsInOfferRange.every(
-        (line) => line.totalOfferDiscount >= Number(line.price),
+        (line) =>
+          line.totalOfferDiscount >=
+          Number(line.product.discountedPrice ?? line.product.price),
       )
     ) {
       return cartContent
@@ -1245,8 +1292,14 @@ class OfferService {
                   (l) => l.productId === line.productId,
                 )
                 let offerDiscount = Number(offer.benefit.value)
-                if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                  offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+                if (
+                  updatedLine!.totalOfferDiscount + offerDiscount >
+                  Number((line.product.discountedPrice ?? line.product.price)!)
+                ) {
+                  offerDiscount =
+                    Number(
+                      (line.product.discountedPrice ?? line.product.price)!,
+                    ) - updatedLine!.totalOfferDiscount
                 }
                 updatedLine!.userOfferDiscounts.push({
                   id: offer.id,
@@ -1264,9 +1317,20 @@ class OfferService {
                 const updateLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount = (Number(line.price!) * Number(offer.benefit.value)) / 100
-                if(updateLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                  offerDiscount = Number(line.price!) - updateLine!.totalOfferDiscount
+                let offerDiscount =
+                  (Number(
+                    (line.product.discountedPrice ?? line.product.price)!,
+                  ) *
+                    Number(offer.benefit.value)) /
+                  100
+                if (
+                  updateLine!.totalOfferDiscount + offerDiscount >
+                  Number((line.product.discountedPrice ?? line.product.price)!)
+                ) {
+                  offerDiscount =
+                    Number(
+                      (line.product.discountedPrice ?? line.product.price)!,
+                    ) - updateLine!.totalOfferDiscount
                 }
                 updateLine!.userOfferDiscounts.push({
                   id: offer.id,
@@ -1280,8 +1344,7 @@ class OfferService {
                 })
                 updateLine!.totalOfferDiscount += offerDiscount
                 cartContent.totalOfferDiscount += offerDiscount
-              }
-              else{
+              } else {
                 throw new Error('Not implemented')
               }
               discountAppliedTo += 1
@@ -1292,8 +1355,14 @@ class OfferService {
                 (l) => l.productId === line.productId,
               )
               let offerDiscount = Number(offer.benefit.value) * line.quantity
-              if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+              if (
+                updatedLine!.totalOfferDiscount + offerDiscount >
+                Number((line.product.discountedPrice ?? line.product.price)!)
+              ) {
+                offerDiscount =
+                  Number(
+                    (line.product.discountedPrice ?? line.product.price)!,
+                  ) - updatedLine!.totalOfferDiscount
               }
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
@@ -1307,14 +1376,22 @@ class OfferService {
               })
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount
-            }
-            else if (offer.benefit.type === 'percentage') {
+            } else if (offer.benefit.type === 'percentage') {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount = (Number(line.price!) * Number(offer.benefit.value)) / 100
-              if(updatedLine!.totalOfferDiscount + offerDiscount > Number(line.price!)){
-                offerDiscount = Number(line.price!) - updatedLine!.totalOfferDiscount
+              let offerDiscount =
+                (Number((line.product.discountedPrice ?? line.product.price)!) *
+                  Number(offer.benefit.value)) /
+                100
+              if (
+                updatedLine!.totalOfferDiscount + offerDiscount >
+                Number((line.product.discountedPrice ?? line.product.price)!)
+              ) {
+                offerDiscount =
+                  Number(
+                    (line.product.discountedPrice ?? line.product.price)!,
+                  ) - updatedLine!.totalOfferDiscount
               }
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
@@ -1328,8 +1405,7 @@ class OfferService {
               })
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount
-            }
-            else{
+            } else {
               throw new Error('Not implemented')
             }
           }

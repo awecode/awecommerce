@@ -3,7 +3,6 @@ import { products } from '../../product/schemas'
 import { relations, sql } from 'drizzle-orm'
 import {
   integer,
-  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -46,14 +45,6 @@ export const cartLines = pgTable('cart_line', {
   productId: integer().notNull().references(() => products.id, {
     onDelete: 'cascade',
   }),
-  price: numeric({
-    precision: 100,
-    scale: 20,
-  }).notNull(),
-  originalPrice: numeric({
-    precision: 100,
-    scale: 20,
-  }).notNull(),
   quantity: integer().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),

@@ -36,8 +36,6 @@ test('should add a product to the cart', async () => {
   expect(cartLine).toBeDefined()
   expect(cartLine.cartId).toBe(cart.id)
   expect(cartLine.productId).toBe(product.id)
-  expect(cartLine.price).toBe(discountedPrice || price)
-  expect(cartLine.originalPrice).toBe(price)
 })
 
 test('should get cart content for session', async () => {
@@ -49,8 +47,6 @@ test('should get cart content for session', async () => {
   const cartContent = await cartService.getCartContentForSession(cart.sessionId)
   expect(cartContent).toBeDefined()
   expect(cartContent).toBeDefined()
-  expect(cartContent.lines[0].price.toString()).toBe(product1.discountedPrice || product1.price)
-  expect(cartContent.lines[1].price.toString()).toBe(product2.discountedPrice || product2.price)
 })
 
 test('should merge carts', async () => {
@@ -83,9 +79,6 @@ test('should merge carts', async () => {
   expect(mergedCart.lines.find((l) => l.productId === product1.id)?.price).toBe(
     line1.price,
   )
-  expect(
-    mergedCart.lines.find((l) => l.productId === product1.id)?.originalPrice,
-  ).toBe(line1.originalPrice)
   // Line 2 should be on merged cart with same id
   expect(mergedCart.lines.find((l) => l.id === line2.id)).toBeDefined()
 })
