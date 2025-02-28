@@ -20,6 +20,10 @@ type CartContent = Extend<
     lines: Extend<
       CartLine,
       {
+        product: {
+          price: number
+          discountedPrice?: number
+        }
         userOfferDiscounts: {
           id: number
           discount: number

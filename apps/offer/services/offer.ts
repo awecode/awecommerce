@@ -31,7 +31,6 @@ import {
   offers,
   offerApplicationLogs,
   NewOfferApplicationLog,
-  UpdateOfferApplicationLog,
   offerUsages,
 } from '../schemas'
 import {
@@ -700,61 +699,61 @@ class OfferService {
 
     return await this.db
       .select({
-        id: offers.id,
-        name: offers.name,
-        description: offers.description,
-        voucherCode: offers.voucherCode,
-        image: offers.image,
-        startDate: offers.startDate,
-        endDate: offers.endDate,
-        isActive: offers.isActive,
-        isFeatured: offers.isFeatured,
-        type: offers.type,
-        metadata: offers.metadata,
-        benefit: {
-          isActive: offerBenefits.isActive,
-          type: offerBenefits.type,
-          value: offerBenefits.value,
-        },
-        condition: {
-          rangeId: offerConditions.rangeId,
-          type: offerConditions.type,
-          value: offerConditions.value,
-        },
+      id: offers.id,
+      name: offers.name,
+      description: offers.description,
+      voucherCode: offers.voucherCode,
+      image: offers.image,
+      startDate: offers.startDate,
+      endDate: offers.endDate,
+      isActive: offers.isActive,
+      isFeatured: offers.isFeatured,
+      type: offers.type,
+      metadata: offers.metadata,
+      benefit: {
+        isActive: offerBenefits.isActive,
+        type: offerBenefits.type,
+        value: offerBenefits.value,
+      },
+      condition: {
+        rangeId: offerConditions.rangeId,
+        type: offerConditions.type,
+        value: offerConditions.value,
+      },
       })
       .from(offers)
       .where(
-        and(
-          eq(offers.type, type),
-          eq(offers.isActive, true),
-          or(
-            eq(offers.includeAllUsers, true),
-            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
-              offers.includedUserIds
-            }))`,
-          ),
-          or(isNull(offers.startDate), lte(offers.startDate, now)),
-          or(isNull(offers.endDate), gte(offers.endDate, now)),
-          or(
-            isNull(offers.overallLimit),
-            lt(offers.usageCount, offers.overallLimit),
-          ),
+      and(
+        eq(offers.type, type),
+        eq(offers.isActive, true),
+        or(
+        eq(offers.includeAllUsers, true),
+        sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
+          offers.includedUserIds
+        }))`,
         ),
+        or(isNull(offers.startDate), lte(offers.startDate, now)),
+        or(isNull(offers.endDate), gte(offers.endDate, now)),
+        or(
+        isNull(offers.overallLimit),
+        lt(offers.usageCount, offers.overallLimit),
+        ),
+      ),
       )
       .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
       .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
       .having(
-        or(
-          isNull(offers.limitPerUser),
-          lt(
-            sql`COALESCE((SELECT COUNT(*) FROM ${offerUsages} WHERE ${
-              offerUsages.offerId
-            } = ${offers.id} AND ${offerUsages.userId} = '${sql.raw(
-              userId,
-            )}'), 0)`,
-            offers.limitPerUser,
-          ),
+      or(
+        isNull(offers.limitPerUser),
+        lt(
+        sql`COALESCE((SELECT ${offerUsages.usageCount} FROM ${offerUsages} WHERE ${
+          offerUsages.offerId
+        } = ${offers.id} AND ${offerUsages.userId} = '${sql.raw(
+          userId,
+        )}'), 0)`,
+        offers.limitPerUser,
         ),
+      ),
       )
       .groupBy(offers.id, offerBenefits.id, offerConditions.id)
       .orderBy(desc(offers.priority), desc(offers.createdAt))
@@ -1008,7 +1007,7 @@ class OfferService {
           eq(offerUsages.userId, userId),
         ),
       })
-      if (userUsageCount && userUsageCount >= voucherOffer.limitPerUser) {
+      if (userUsageCount && userUsageCount.usageCount >= voucherOffer.limitPerUser) {
         throw new Error('Voucher code usage limit exceeded')
       }
     }
@@ -1240,10 +1239,8 @@ class OfferService {
         cartId: cartContent.id,
         offerId: voucherOffer.id,
       })
-      return cartContent
-    } else if (voucherOffer.condition.type === 'basket_total') {
-      throw new Error('Not implemented')
-    }
+      return cartContent   
+    } 
     throw new Error('Not implemented')
   }
 
