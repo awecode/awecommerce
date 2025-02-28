@@ -1,3 +1,4 @@
+import { offers } from '../../offer/schemas'
 import { products } from '../../product/schemas'
 import { relations, sql } from 'drizzle-orm'
 import {
@@ -9,6 +10,7 @@ import {
   text,
   timestamp,
   uuid,
+  primaryKey,
 } from 'drizzle-orm/pg-core'
 
 export const cartStatus = pgEnum('cart_status', ['Open', 'Frozen', 'Cancelled', 'Merged'])
@@ -21,6 +23,22 @@ export const carts = pgTable('cart', {
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
+
+export const cartAppliedVoucherOffers = pgTable('cart_applied_offer', {
+  cartId: integer().notNull().references(() => carts.id, {
+    onDelete: 'cascade',
+  }),
+  offerId: integer().notNull().references(() => products.id, {
+    onDelete: 'cascade',
+  }),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+},  (t) => [
+    primaryKey({
+      columns: [t.cartId, t.offerId],
+    }),
+  ],
+  )
 
 export const cartLines = pgTable('cart_line', {
   id: serial().primaryKey(),
@@ -41,8 +59,20 @@ export const cartLines = pgTable('cart_line', {
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
+export const cartAppliedVoucherOfferRelations = relations(cartAppliedVoucherOffers, ({ one }) => ({
+  cart: one(carts, {
+    fields: [cartAppliedVoucherOffers.cartId],
+    references: [carts.id],
+  }),
+  offer: one(offers, {
+    fields: [cartAppliedVoucherOffers.offerId],
+    references: [offers.id],
+  }),
+}))
+
 export const cartRelations = relations(carts, ({ many }) => ({
   lines: many(cartLines),
+  appliedVoucherOffers: many(cartAppliedVoucherOffers),
 }))
 
 export const cartLineRelations = relations(cartLines, ({ one }) => ({
