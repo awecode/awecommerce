@@ -134,7 +134,7 @@ class CartService {
 
   async getCartContentForSession(
     sessionId: string,
-    withOffersInfo = true,
+    withOffersInfo = false,
   ): Promise<CartContent> {
     const content = await this.db.query.carts.findFirst({
       with: {
