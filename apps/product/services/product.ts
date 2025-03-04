@@ -372,7 +372,12 @@ class ProductService {
 
   async getRecentlyViewedProducts(userId: string, limit: number) {
     return await this.db
-      .select({ ...getTableColumns(products) })
+      .select({ 
+        ...getTableColumns(products),
+        category: getTableColumns(categories),
+        brand: getTableColumns(brands),
+        productClass: getTableColumns(productClasses),
+       })
       .from(
         this.db
           .selectDistinctOn([productViews.productId], {
