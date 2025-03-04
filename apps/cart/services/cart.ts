@@ -370,7 +370,7 @@ class CartService {
 
   async applyUserOffers(cartContent: CartContent, userId: string) {
     const offerService = new OfferService(this.db)
-    let offers = await offerService.getActiveUserOffers(userId, 'user')
+    let offers = await offerService.getActiveUserOffers(userId)
     offers = offers.filter((offer) => offer.benefit.isActive)
     offers = offers.filter(
       (offer) => offer.condition.type === 'basket_quantity',

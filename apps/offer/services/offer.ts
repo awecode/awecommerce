@@ -579,6 +579,11 @@ interface OfferListFilter {
   isFeatured?: boolean
 }
 
+interface ActiveUserOfferListFilter {
+  type?: 'voucher' | 'user'
+  isFeatured?: boolean
+}
+
 class OfferService {
   private db: any
 
@@ -694,8 +699,16 @@ class OfferService {
     return offer
   }
 
-  async getActiveUserOffers(userId: string, type: 'user' | 'voucher' = 'user') {
+  async getActiveUserOffers(userId: string, filters?: ActiveUserOfferListFilter) {
     const now = new Date().toISOString()
+
+    const where = []
+
+    where.push(eq(offers.type, filters?.type || 'user'))
+
+    if (filters?.isFeatured !== undefined) {
+      where.push(eq(offers.isFeatured, filters.isFeatured))
+    }
 
     return await this.db
       .select({
@@ -724,7 +737,7 @@ class OfferService {
       .from(offers)
       .where(
         and(
-          eq(offers.type, type),
+          ...where,
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
