@@ -372,12 +372,12 @@ class ProductService {
 
   async getRecentlyViewedProducts(userId: string, limit: number) {
     return await this.db
-      .select({ 
+      .select({
         ...getTableColumns(products),
         category: getTableColumns(categories),
         brand: getTableColumns(brands),
         productClass: getTableColumns(productClasses),
-       })
+      })
       .from(
         this.db
           .selectDistinctOn([productViews.productId], {
@@ -386,28 +386,25 @@ class ProductService {
           })
           .from(productViews)
           .leftJoin(products, eq(productViews.productId, products.id))
-          .leftJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(categories, eq(products.categoryId, categories.id))
-          .leftJoin(
-            productClasses,
-            eq(products.productClassId, productClasses.id),
-          )
-          .where(
-            and(
-              eq(productViews.userId, userId),
-              eq(products.isActive, true),
-              or(isNull(products.brandId), eq(brands.isActive, true)),
-              or(isNull(products.categoryId), eq(categories.isActive, true)),
-              or(
-                isNull(products.productClassId),
-                eq(productClasses.isActive, true),
-              ),
-            ),
-          )
+          .where(and(eq(productViews.userId, userId)))
           .orderBy(productViews.productId, desc(productViews.createdAt))
           .as('latest_views'),
       )
       .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+      .where(
+        and(
+          eq(products.isActive, true),
+          or(isNull(products.brandId), eq(brands.isActive, true)),
+          or(isNull(products.categoryId), eq(categories.isActive, true)),
+          or(
+            isNull(products.productClassId),
+            eq(productClasses.isActive, true),
+          ),
+        ),
+      )
       .orderBy(desc(sql`latest_views.created_at`))
       .limit(4)
   }
