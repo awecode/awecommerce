@@ -24,7 +24,13 @@ class LoyaltyService {
   }
 
   async updateSettings(data: UpdateLoyaltySettings) {
-    return await this.db.update(loyaltySettings).set(data).returning()
+    const [setting] = await this.db
+      .update(loyaltySettings)
+      .set(data)
+      .returning()
+    if (!setting) {
+      await this.db.insert(loyaltySettings).values(data).returning()
+    }
   }
 
   async addLoyaltyPoint(userId: string, orderId: number, price: number) {
@@ -132,11 +138,12 @@ class LoyaltyService {
       const redeemablePoints =
         Number(point.earnedPoints) - Number(point.redeemedPoints)
       const pointsToRedeemFromThis = Math.min(pointsToDeduct, redeemablePoints)
-      await this.db.update(loyaltyPoints).set({
-        redeemedPoints: Number(point.redeemedPoints) + pointsToRedeemFromThis,
-      }).where(
-        eq(loyaltyPoints.id, point.id),
-      )
+      await this.db
+        .update(loyaltyPoints)
+        .set({
+          redeemedPoints: Number(point.redeemedPoints) + pointsToRedeemFromThis,
+        })
+        .where(eq(loyaltyPoints.id, point.id))
       pointsToDeduct -= pointsToRedeemFromThis
     }
     await this.createLog({
