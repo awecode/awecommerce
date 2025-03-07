@@ -16,7 +16,11 @@ class LoyaltyService {
   }
 
   async getSettings() {
-    let setting = await this.db.query.loyaltySettings.findFirst()
+    let setting = await this.db.query.loyaltySettings.findFirst({
+      columns: {
+        id: false,
+      },
+    })
     if (!setting) {
       setting = await this.db.insert(loyaltySettings).values({}).returning()
     }
