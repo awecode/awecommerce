@@ -79,6 +79,17 @@ class LoyaltyService {
     )
   }
 
+  async getTotalRedeemablePointsAndValue(userId: string) {
+    const settings = await this.getSettings()
+    const totalRedeemablePoints = await this.getTotalRedeemablePoints(userId)
+    return {
+      totalRedeemablePoints,
+      totalRedeemableValue: settings.redeemRate
+        ? totalRedeemablePoints * Number(settings.redeemRate)
+        : 0,
+    }
+  }
+
   async getUserLoyaltyPoints(userId: string) {
     let points = await this.db.query.loyaltyPoints.findMany({
       where: eq(loyaltyPoints.userId, userId),
