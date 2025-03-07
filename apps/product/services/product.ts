@@ -84,7 +84,12 @@ class ProductService {
       with: {
         relatedProducts: {
           with: {
-            relatedProduct: true,
+            relatedProduct: {
+              with:{
+                category: true,
+                brand: true,
+              }
+            },
           },
         },
         category: {
