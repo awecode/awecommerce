@@ -1,84 +1,46 @@
+import { CartContent } from '../../cart/types'
 import {
   and,
   desc,
   eq,
-  ilike,
-  SQL,
-  or,
-  sql,
   gte,
-  isNull,
-  lte,
-  lt,
+  ilike,
   inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+  SQL,
+  sql,
 } from 'drizzle-orm'
-import {
-  NewOfferRange,
-  offerRanges,
-  offerRangeExcludedProducts,
-  offerRangeIncludedProducts,
-  offerRangeIncludedBrands,
-  offerRangeExcludedBrands,
-  offerRangeIncludedCategories,
-  offerRangeExcludedCategories,
-  offerRangeIncludedProductClasses,
-  offerRangeExcludedProductClasses,
-  UpdateOfferRange,
-  NewOfferBenefit,
-  offerBenefits,
-  UpdateOfferBenefit,
-  offerConditions,
-  offers,
-  offerApplicationLogs,
-  NewOfferApplicationLog,
-  offerUsages,
-} from '../schemas'
+import { cartAppliedVoucherOffers } from '../../cart/schemas'
 import {
   brands,
   categories,
   productClasses,
   products,
 } from '../../product/schemas'
-import { Cart, cartAppliedVoucherOffers, CartLine } from '../../cart/schemas'
-
-type Extend<T, U> = T & U
-
-type CartContent = Extend<
-  Cart,
-  {
-    lines: Extend<
-      CartLine,
-      {
-        product: {
-          price: number
-          discountedPrice?: number
-        }
-        userOfferDiscounts: {
-          id: number
-          discount: number
-          name: string
-        }[]
-        voucherOfferDiscounts: {
-          id: number
-          discount: number
-          name: string
-        }[]
-        totalOfferDiscount: number
-      }
-    >[]
-    userOfferDiscounts: {
-      id: number
-      discount: number
-      name: string
-    }[]
-    voucherOfferDiscounts: {
-      id: number
-      discount: number
-      name: string
-    }[]
-    totalOfferDiscount: number
-  }
->
+import {
+  NewOfferApplicationLog,
+  NewOfferBenefit,
+  NewOfferRange,
+  offerApplicationLogs,
+  offerBenefits,
+  offerConditions,
+  offerRangeExcludedBrands,
+  offerRangeExcludedCategories,
+  offerRangeExcludedProductClasses,
+  offerRangeExcludedProducts,
+  offerRangeIncludedBrands,
+  offerRangeIncludedCategories,
+  offerRangeIncludedProductClasses,
+  offerRangeIncludedProducts,
+  offerRanges,
+  offers,
+  offerUsages,
+  UpdateOfferBenefit,
+  UpdateOfferRange,
+} from '../schemas'
 
 interface OfferRangeListFilter {
   pagination?: {
@@ -699,7 +661,10 @@ class OfferService {
     return offer
   }
 
-  async getActiveUserOffers(userId: string, filters?: ActiveUserOfferListFilter) {
+  async getActiveUserOffers(
+    userId: string,
+    filters?: ActiveUserOfferListFilter,
+  ) {
     const now = new Date().toISOString()
 
     const where = []
@@ -1535,8 +1500,8 @@ class OfferService {
 }
 
 export {
-  OfferRangeService,
   OfferBenefitService,
   OfferConditionService,
+  OfferRangeService,
   OfferService,
 }

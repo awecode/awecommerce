@@ -58,6 +58,14 @@ export const orders = pgTable('order', {
     precision: 100,
     scale: 20,
   }).notNull().default('0'),
+  loyaltyDiscount: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull().default('0'),
+  shippingCharge: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull().default('0'),
   tax: numeric({
     precision: 100,
     scale: 20,

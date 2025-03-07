@@ -9,47 +9,13 @@ import {
 } from '../schemas'
 import { OfferService } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
+import { CartContent } from '../types'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
 type Extend<T, U> = T & U
 
-type CartContent = Extend<
-  Cart,
-  {
-    lines: Extend<
-      CartLine,
-      {
-        product: {
-          price: number
-          discountedPrice?: number
-        }
-        userOfferDiscounts: {
-          id: number
-          discount: number
-          name: string
-        }[]
-        voucherOfferDiscounts: {
-          id: number
-          discount: number
-          name: string
-        }[]
-        totalOfferDiscount: number
-      }
-    >[]
-    userOfferDiscounts: {
-      id: number
-      discount: number
-      name: string
-    }[]
-    voucherOfferDiscounts: {
-      id: number
-      discount: number
-      name: string
-    }[]
-    totalOfferDiscount: number
-  }
->
+
 
 class CartService {
   private db: any
