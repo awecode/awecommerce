@@ -107,7 +107,9 @@ class OrderService {
         orderId: order.id,
         productId: line.productId,
         price: line.product.discountedPrice ?? line.product.price,
-        discount: line.product.discountedPrice ?? line.product.price,
+        discount: line.product.discountedPrice
+          ? line.product.price - line.product.discountedPrice
+          : 0,
         quantity: line.quantity,
       })),
     )
@@ -116,27 +118,6 @@ class OrderService {
       ...order,
       hash: this.generateHash(order.id.toString()),
     }
-  }
-
-  async calculateTotal(
-    order: Pick<Order, 'id' | 'discount' | 'tax'>,
-    lines?: OrderLine[],
-  ) {
-    if (!lines) {
-      lines = await this.db
-        .select()
-        .from(orderLines)
-        .where(eq(orderLines.orderId, order.id))
-    }
-    lines = lines?.filter((line: OrderLine) => line.status !== 'Cancelled')
-    const subtotal = lines!.reduce(
-      (total: number, line: OrderLine) =>
-        total + (Number(line.price) - Number(line.discount)) * line.quantity,
-      0,
-    )
-    const discount = Number(order.discount) || 0
-    const tax = Number(order.tax) || 0
-    return subtotal - discount + tax
   }
 
   async createLog(orderId: number, log: string) {
