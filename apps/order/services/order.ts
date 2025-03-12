@@ -229,10 +229,7 @@ class OrderService {
     if (!order) {
       return null
     }
-    return {
-      ...order,
-      total: await this.calculateTotal(order),
-    }
+    return order
   }
 
   async getByHash(orderId: number, hash: string) {
