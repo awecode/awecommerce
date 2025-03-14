@@ -48,7 +48,7 @@ export const orders = pgTable('order', {
   id: serial().primaryKey(),
   userId: text(),
   guestUser: jsonb(),
-  cartId: integer().notNull().references(() => carts.id),
+  cartId: integer().references(() => carts.id),
   status: orderStatusEnum().notNull().default('Pending'),
   paymentStatus: paymentStatusEnum().notNull().default('Pending'),
   shippingAddress: jsonb().default({}),
