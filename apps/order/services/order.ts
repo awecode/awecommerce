@@ -106,7 +106,7 @@ class OrderService {
       cartLines.map((line) => ({
         orderId: order.id,
         productId: line.productId,
-        price: line.product.discountedPrice ?? line.product.price,
+        price: line.product.price,
         discount: line.product.discountedPrice
           ? line.product.price - line.product.discountedPrice
           : 0,
