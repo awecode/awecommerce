@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   inArray,
   notInArray,
   or,
@@ -203,7 +204,9 @@ class OrderService {
       where.push(eq(orders.userId, filters.userId))
     }
     const results = await this.db
-      .select()
+      .select(
+        getTableColumns(paymentEvents),
+      )
       .from(paymentEvents)
       .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
       .orderBy(asc(paymentEvents.createdAt))
