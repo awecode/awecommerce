@@ -153,11 +153,19 @@ class OrderService {
     await this.createLog(orderId, STATUS_LOG[newStatus])
   }
 
-  async createTransaction(orderId: number, transaction: NewTransaction) {
-    await this.db.insert(transactions).values({
-      ...transaction,
-      orderId,
-    })
+  async createTransaction(data: NewTransaction) {
+    const [transaction] = await this.db
+      .insert(transactions)
+      .values(data)
+      .returning()
+    return transaction
+  }
+
+  async updateTransactionStatus(transactionId: number, newStatus: string) {
+    await this.db
+      .update(transactions)
+      .set({ status: newStatus })
+      .where(eq(transactions.id, transactionId))
   }
 
   // async calculateTotalPayments(order: Pick<Order, 'id'>) {
@@ -196,17 +204,15 @@ class OrderService {
     }
   }) {
     const { page, size } = filters.pagination
-    const where : SQL[] = []
-    if(filters.orderId) {
+    const where: SQL[] = []
+    if (filters.orderId) {
       where.push(eq(paymentEvents.orderId, filters.orderId))
     }
-    if(filters.userId) {
+    if (filters.userId) {
       where.push(eq(orders.userId, filters.userId))
     }
     const results = await this.db
-      .select(
-        getTableColumns(paymentEvents),
-      )
+      .select(getTableColumns(paymentEvents))
       .from(paymentEvents)
       .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
       .orderBy(asc(paymentEvents.createdAt))
