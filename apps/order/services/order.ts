@@ -16,8 +16,6 @@ import {
   NewOrder,
   NewPaymentEvent,
   NewTransaction,
-  Order,
-  OrderLine,
   orderLines,
   orderLogs,
   orders,
@@ -25,6 +23,7 @@ import {
   paymentEvents,
   transactions,
 } from '../schemas'
+import { products } from '../../product/schemas'
 
 type Extend<T, U> = T & U
 
@@ -168,6 +167,73 @@ class OrderService {
       .where(eq(transactions.id, transactionId))
   }
 
+  async listTransactions(filters: {
+    orderId?: number
+    userId?: string
+    status?: string
+    pagination: {
+      page: number
+      size: number
+    }
+  }) {
+    const { page, size } = filters.pagination
+    const where: SQL[] = []
+    if (filters.orderId) {
+      where.push(eq(transactions.orderId, filters.orderId))
+    }
+    if (filters.userId) {
+      where.push(eq(orders.userId, filters.userId))
+    }
+    if (filters.status) {
+      where.push(eq(transactions.status, filters.status))
+    }
+    const results = await this.db
+      .select({
+        ...getTableColumns(transactions),
+        order: {
+          ...getTableColumns(orders),
+          lines: sql`json_agg(json_build_object(
+            'id', ${orderLines.id},
+            'quantity', ${orderLines.quantity},
+            'price', ${orderLines.price},
+            'tax', ${orderLines.tax},
+            'discount', ${orderLines.discount},
+            'product', json_build_object(
+                'id', ${products.id},
+                'name', ${products.name},
+                'description', ${products.description},
+                'price', ${products.price},
+                'discountedPrice', ${products.discountedPrice}
+            )
+        ))`.as('lines'),
+        },
+      })
+      .from(transactions)
+      .leftJoin(orders, eq(orders.id, transactions.orderId))
+      .leftJoin(orderLines, eq(orderLines.orderId, orders.id))
+      .leftJoin(products, eq(products.id, orderLines.productId))
+      .orderBy(asc(transactions.createdAt))
+      .where(and(...where))
+      .limit(size)
+      .offset((page - 1) * size)
+    const total = (
+      await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(transactions)
+        .leftJoin(orders, eq(orders.id, transactions.orderId))
+        .where(and(...where))
+    )[0].count
+    return {
+      results,
+      pagination: {
+        page: page,
+        size: size,
+        total,
+        pages: Math.ceil(total / size),
+      },
+    }
+  }
+
   // async calculateTotalPayments(order: Pick<Order, 'id'>) {
   //     const payments = await this.db.select().from(paymentEvents).where(eq(paymentEvents.orderId, order.id));
   //     return payments.reduce((total: number, payment: NewPaymentEvent) => {
@@ -219,7 +285,13 @@ class OrderService {
       .where(and(...where))
       .limit(size)
       .offset((page - 1) * size)
-    const total = await this.db.$count(paymentEvents)
+    const total = (
+      await this.db
+        .select(sql<number>`count(*)`)
+        .from(paymentEvents)
+        .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
+        .where(and(...where))
+    )[0].count
 
     return {
       results,
