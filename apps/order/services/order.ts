@@ -212,8 +212,10 @@ class OrderService {
       .leftJoin(orders, eq(orders.id, transactions.orderId))
       .leftJoin(orderLines, eq(orderLines.orderId, orders.id))
       .leftJoin(products, eq(products.id, orderLines.productId))
-      .orderBy(asc(transactions.createdAt))
+
       .where(and(...where))
+      .groupBy(transactions.id, orders.id)
+      .orderBy(asc(transactions.createdAt))
       .limit(size)
       .offset((page - 1) * size)
     const total = (
