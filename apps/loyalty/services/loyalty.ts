@@ -96,8 +96,13 @@ class LoyaltyService {
       orderBy: desc(loyaltyPoints.createdAt),
     })
 
+    const settings = await this.getSettings()
+
     points = points.map((point: LoyaltyPoints) => ({
       ...point,
+      pointsWorth: settings.redeemRate
+        ? Number(point.earnedPoints) * Number(settings.redeemRate)
+        : 0,
       status:
         point.expiresAt && point.expiresAt < new Date()
           ? 'expired'
@@ -114,8 +119,6 @@ class LoyaltyService {
       (point: { status: 'usable' | 'redeemed' | 'expired' }) =>
         point.status === 'usable',
     )
-
-    const settings = await this.getSettings()
 
     const totalRedeemablePoints = usablePoints.reduce(
       (acc: number, point: LoyaltyPoints) =>
