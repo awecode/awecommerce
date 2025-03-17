@@ -188,6 +188,7 @@ class OrderService {
 
   async listPaymentEvents(filters: {
     userId?: string
+    orderId?: number
     pagination: {
       page: number
       size: number
@@ -195,6 +196,9 @@ class OrderService {
   }) {
     const { page, size } = filters.pagination
     const where : SQL[] = []
+    if(filters.orderId) {
+      where.push(eq(paymentEvents.orderId, filters.orderId))
+    }
     if(filters.userId) {
       where.push(eq(orders.userId, filters.userId))
     }
@@ -207,7 +211,7 @@ class OrderService {
       .limit(size)
       .offset((page - 1) * size)
     const total = await this.db.$count(paymentEvents)
-    
+
     return {
       results,
       pagination: {
