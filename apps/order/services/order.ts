@@ -218,13 +218,15 @@ class OrderService {
       .orderBy(asc(transactions.createdAt))
       .limit(size)
       .offset((page - 1) * size)
-    const total = (
-      await this.db
-        .select({ count: sql<number>`count(*)` })
-        .from(transactions)
-        .leftJoin(orders, eq(orders.id, transactions.orderId))
-        .where(and(...where))
-    )[0].count
+    const total = Number(
+      (
+        await this.db
+          .select({ count: sql<number>`count(*)` })
+          .from(transactions)
+          .leftJoin(orders, eq(orders.id, transactions.orderId))
+          .where(and(...where))
+      )[0].count,
+    )
     return {
       results,
       pagination: {
@@ -287,13 +289,15 @@ class OrderService {
       .where(and(...where))
       .limit(size)
       .offset((page - 1) * size)
-    const total = (
-      await this.db
-        .select(sql<number>`count(*)`)
-        .from(paymentEvents)
-        .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
-        .where(and(...where))
-    )[0].count
+    const total = Number(
+      (
+        await this.db
+          .select(sql<number>`count(*)`)
+          .from(paymentEvents)
+          .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
+          .where(and(...where))
+      )[0].count,
+    )
 
     return {
       results,
