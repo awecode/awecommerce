@@ -43,7 +43,7 @@ class LoyaltyService {
       return
     }
     const earnedPoints = price * Number(settings.earnRate)
-    await this.db.query.insert({
+    await this.db.insert(loyaltyPoints).values({
       userId,
       orderId,
       earnedPoints,
