@@ -186,6 +186,39 @@ class OrderService {
     )
   }
 
+  async listPaymentEvents(filters: {
+    userId?: string
+    pagination: {
+      page: number
+      size: number
+    }
+  }) {
+    const { page, size } = filters.pagination
+    const where : SQL[] = []
+    if(filters.userId) {
+      where.push(eq(orders.userId, filters.userId))
+    }
+    const results = await this.db
+      .select()
+      .from(paymentEvents)
+      .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
+      .orderBy(asc(paymentEvents.createdAt))
+      .where(and(...where))
+      .limit(size)
+      .offset((page - 1) * size)
+    const total = await this.db.$count(paymentEvents)
+    
+    return {
+      results,
+      pagination: {
+        page: page,
+        size: size,
+        total,
+        pages: Math.ceil(total / size),
+      },
+    }
+  }
+
   async cancel(
     orderId: number,
     previousStatus: OrderStatus,
