@@ -265,6 +265,16 @@ class OrderService {
     )
   }
 
+  async getLastPaymentEvent(orderId: number) {
+    const [paymentEvent] = await this.db
+      .select()
+      .from(paymentEvents)
+      .where(eq(paymentEvents.orderId, orderId))
+      .orderBy(desc(paymentEvents.createdAt))
+      .limit(1)
+    return paymentEvent
+  }
+
   async listPaymentEvents(filters: {
     userId?: string
     orderId?: number
