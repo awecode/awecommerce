@@ -102,7 +102,7 @@ class OrderService {
       .update(carts)
       .set({ status: 'Frozen' })
       .where(eq(carts.id, data.cartId))
-    await this.db.insert(orderLines).values(
+    const lines = await this.db.insert(orderLines).values(
       cartLines.map((line) => ({
         orderId: order.id,
         productId: line.productId,
@@ -112,10 +112,11 @@ class OrderService {
           : 0,
         quantity: line.quantity,
       })),
-    )
+    ).returning()
     await this.createLog(order.id, STATUS_LOG.Pending)
     return {
       ...order,
+      lines,
       hash: this.generateHash(order.id.toString()),
     }
   }
