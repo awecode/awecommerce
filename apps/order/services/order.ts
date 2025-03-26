@@ -102,17 +102,29 @@ class OrderService {
       .update(carts)
       .set({ status: 'Frozen' })
       .where(eq(carts.id, data.cartId))
-    const lines = await this.db.insert(orderLines).values(
-      cartLines.map((line) => ({
-        orderId: order.id,
-        productId: line.productId,
-        price: line.product.price,
-        discount: line.product.discountedPrice
-          ? line.product.price - line.product.discountedPrice
-          : 0,
-        quantity: line.quantity,
-      })),
-    ).returning()
+    await this.db
+      .insert(orderLines)
+      .values(
+        cartLines.map((line) => ({
+          orderId: order.id,
+          productId: line.productId,
+          price: line.product.price,
+          discount: line.product.discountedPrice
+            ? line.product.price - line.product.discountedPrice
+            : 0,
+          quantity: line.quantity,
+        })),
+      )
+      .returning()
+    const lines = await this.db.query.orderLines.findMany({
+      where: eq(orderLines.orderId, order.id),
+      with: {
+        product: {
+          name: true,
+          thumbnail: true,
+        },
+      },
+    })
     await this.createLog(order.id, STATUS_LOG.Pending)
     return {
       ...order,
