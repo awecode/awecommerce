@@ -37,12 +37,15 @@ class LoyaltyService {
     }
   }
 
-  async addLoyaltyPoint(userId: string, orderId: number, price: number) {
+  async addLoyaltyPoint(userId: string, orderId: number, price: number, roundOff = false) {
     const settings = await this.getSettings()
     if (!settings.isEnabled || !settings.earnRate) {
       return
     }
-    const earnedPoints = price * Number(settings.earnRate)
+    let earnedPoints = price * Number(settings.earnRate)
+    if(roundOff) {
+      earnedPoints = Math.round(earnedPoints)
+    }
     await this.db.insert(loyaltyPoints).values({
       userId,
       orderId,
