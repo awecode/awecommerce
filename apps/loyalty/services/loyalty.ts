@@ -114,6 +114,7 @@ class LoyaltyService {
           : 'redeemed',
     })) as Array<
       LoyaltyPoints & {
+        pointsWorth: number
         status: 'usable' | 'redeemed' | 'expired'
       }
     >
