@@ -449,8 +449,8 @@ class OrderService {
     const results = await this.db.query.orders.findMany({
       ...query,
       orderBy: desc(orders.createdAt),
-      skip: (page - 1) * size,
-      take: size,
+      offset: (page - 1) * size,
+      limit: size,
     })
 
     const total = await this.db.$count(orders, and(...where))
