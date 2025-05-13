@@ -367,6 +367,16 @@ class OrderService {
             },
           },
         },
+        paymentEvents: {
+          columns: {
+            amount: true,
+            type: true,
+            reference: true,
+            metadata: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
       where: and(
         eq(orders.id, orderId),
