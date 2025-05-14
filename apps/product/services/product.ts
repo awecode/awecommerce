@@ -4,6 +4,7 @@ import {
   eq,
   getTableColumns,
   ilike,
+  isNotNull,
   isNull,
   or,
   SQL,
@@ -85,10 +86,10 @@ class ProductService {
         relatedProducts: {
           with: {
             relatedProduct: {
-              with:{
+              with: {
                 category: true,
                 brand: true,
-              }
+              },
             },
           },
         },
@@ -671,6 +672,8 @@ class ProductClassService {
 interface CategoryFilter {
   q?: string
   isActive?: boolean
+  parentIds?: number[]
+  isRootCategory?: boolean
   pagination?: PaginationArgs
 }
 
@@ -723,11 +726,19 @@ class CategoryService {
   }
 
   async hasAnyProduct(categoryId: number) {
-    const result = await this.db
-      .select()
-      .from(products)
-      .where(eq(products.categoryId, categoryId))
-    return result.length > 0
+    const result = await this.db.$count(
+      products,
+      eq(products.categoryId, categoryId),
+    )
+    return result > 0
+  }
+
+  async hasSubCategories(categoryId: number) {
+    const result = await this.db.$count(
+      categories,
+      eq(categories.parentId, categoryId),
+    )
+    return result > 0
   }
 
   async list(filter?: CategoryFilter) {
@@ -738,6 +749,24 @@ class CategoryService {
         or(
           Number(filter.q) ? eq(categories.id, Number(filter.q)) : undefined,
           ilike(categories.name, `%${filter.q}%`),
+        )!,
+      )
+    }
+
+    if (filter?.isRootCategory !== undefined) {
+      if (filter.isRootCategory) {
+        where.push(isNull(categories.parentId))
+      } else {
+        where.push(isNotNull(categories.parentId))
+      }
+    }
+
+    if (filter?.parentIds && filter.parentIds.length) {
+      where.push(
+        or(
+          ...filter.parentIds.map((parentId) =>
+            eq(categories.parentId, parentId),
+          ),
         )!,
       )
     }
