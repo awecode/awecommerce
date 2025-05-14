@@ -26,6 +26,7 @@ import {
   productViews,
 } from '../schemas'
 import { orderLines } from '../../order/schemas'
+import { aliasedTable } from 'drizzle-orm'
 
 type PaginationArgs = {
   page: number
@@ -775,9 +776,15 @@ class CategoryService {
       where.push(eq(categories.isActive, filter.isActive))
     }
 
+    const parentCategories = aliasedTable(categories, 'parent_categories')
+
     const query = this.db
-      .select()
+      .select({
+        ...getTableColumns(categories),
+        parent: getTableColumns(parentCategories),
+      })
       .from(categories)
+      .leftJoin(parentCategories, eq(parentCategories.id, categories.parentId))
       .where(and(...where))
       .orderBy(desc(categories.createdAt))
 
