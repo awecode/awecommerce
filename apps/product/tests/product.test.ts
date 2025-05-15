@@ -1,10 +1,13 @@
 import { faker } from '@faker-js/faker'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { expect, test } from 'vitest'
 
 import { db } from 'core/db'
 import { products } from '../schemas/pg'
-import { productService } from '../services/product'
+
+import { ProductService } from 'apps/product/services/product'
+
+const productService = new ProductService(db)
 
 test('should create a product', async () => {
   const name = faker.commerce.productName()
@@ -12,6 +15,8 @@ test('should create a product', async () => {
   const price = faker.number.int({ min: 10, max: 100 }).toString()
   const product = await productService.create({
     name,
+    slug: name,
+    sku: name,
     description,
     price: price,
   })
@@ -30,8 +35,8 @@ test('should create a product', async () => {
   expect(productFromDb.price).toBe(price)
 })
 
-test('should filter products', async () => {
-  const products = await productService.filter({
+test('should list products applying given filter', async () => {
+  const products = await productService.list({
     status: 'Draft',
   })
   expect(products).toHaveLength(1)

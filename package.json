@@ -2,9 +2,11 @@
   "name": "awecommerce",
   "version": "0.1.0",
   "description": "Awecommerce",
-  "main": "index.ts",
   "scripts": {
     "test": "vitest",
+    "prepare": "unbuild",
+    "build": "unbuild",
+    "build:stub": "unbuild --stub",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
@@ -16,20 +18,38 @@
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@9.4.0+sha1.9217c800d4ab947a7aee520242a7b70d64fc7638",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "exports": {
+    "./*": {
+      "import": {
+        "default": "./dist/*.mjs",
+        "types": "./dist/*.d.ts"
+      },
+      "require": {
+        "default": "./dist/*.cjs",
+        "types": "./dist/*.d.ts"
+      }
+    }
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.38.4",
+    "pg": "^8.13.0",
+    "postgres": "^3.4.4",
+    "unbuild": "^3.3.1",
+    "typescript": "^5.6.2"
+  },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.10",
     "@faker-js/faker": "^9.0.3",
     "@libsql/client": "^0.14.0",
     "@types/pg": "^8.11.10",
-    "drizzle-kit": "^0.25.0",
+    "drizzle-kit": "^0.30.2",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2",
     "vite": "^5.4.8",
     "vitest": "^2.1.2"
-  },
-  "dependencies": {
-    "drizzle-orm": "^0.34.1",
-    "pg": "^8.13.0",
-    "postgres": "^3.4.4"
   }
 }

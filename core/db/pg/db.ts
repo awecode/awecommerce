@@ -3,6 +3,7 @@ import { type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { uuid_ossp } from '@electric-sql/pglite/contrib/uuid_ossp'
+import * as tables from '../pg/schema'
 
 import {
   drizzle as drizzlePglite,
@@ -23,7 +24,9 @@ const initializeDb = () => {
       extensions: { uuid_ossp }
     }) as PGliteWithEnd
 
-    db = drizzlePglite(client)
+    db = drizzlePglite(client,{
+      schema: tables
+    })
   } else {
     const postgresUrl = process.env.POSTGRES_URL
     if (!postgresUrl) {
@@ -32,7 +35,9 @@ const initializeDb = () => {
     const pool = new Pool({
       connectionString: postgresUrl,
     })
-    db = drizzle(pool)
+    db = drizzle(pool,{
+      schema: tables
+    })
   }
 
   if (client instanceof PGlite) {
