@@ -105,6 +105,10 @@ export const productRelations = relations(products, (({one, many})=>({
     fields: [products.categoryId],
     references: [categories.id]
   }),
+  subCategory: one(categories, {
+    fields: [products.subCategoryId],
+    references: [categories.id]
+  }),
   productClass: one(productClasses, {
     fields: [products.productClassId],
     references: [productClasses.id]

@@ -363,6 +363,7 @@ class OrderService {
               with: {
                 category: true,
                 brand: true,
+                subCategory: true,
               },
             },
           },

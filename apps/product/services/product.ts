@@ -89,12 +89,20 @@ class ProductService {
             relatedProduct: {
               with: {
                 category: true,
+                subCategory: true,
                 brand: true,
               },
             },
           },
         },
         category: {
+          columns: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        subCategory: {
           columns: {
             id: true,
             name: true,
