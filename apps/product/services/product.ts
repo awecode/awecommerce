@@ -688,7 +688,7 @@ class ProductClassService {
 interface CategoryFilter {
   q?: string
   isActive?: boolean
-  parentIds?: number[]
+  parent?: number[]
   isRootCategory?: boolean
   pagination?: PaginationArgs
 }
@@ -780,10 +780,10 @@ class CategoryService {
       }
     }
 
-    if (filter?.parentIds && filter.parentIds.length) {
+    if (filter?.parent && filter.parent.length) {
       where.push(
         or(
-          ...filter.parentIds.map((parentId) =>
+          ...filter.parent.map((parentId) =>
             eq(categories.parentId, parentId),
           ),
         )!,
