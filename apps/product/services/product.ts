@@ -36,6 +36,7 @@ type PaginationArgs = {
 interface ProductFilter {
   brands?: number[]
   categories?: number[]
+  subCategories?: number[]
   productClass?: number
   status?: Product['status']
   q?: string
@@ -205,6 +206,15 @@ class ProductService {
                 eq(products.categoryId, categoryId),
                 eq(products.subCategoryId, categoryId),
               ),
+            ),
+          )!,
+        )
+      }
+      if(filter.subCategories && filter.subCategories.length) {
+        where.push(
+          or(
+            ...filter.subCategories.map((subCategoryId) =>
+              eq(products.subCategoryId, subCategoryId),
             ),
           )!,
         )
@@ -791,9 +801,7 @@ class CategoryService {
     if (filter?.parent && filter.parent.length) {
       where.push(
         or(
-          ...filter.parent.map((parentId) =>
-            eq(categories.parentId, parentId),
-          ),
+          ...filter.parent.map((parentId) => eq(categories.parentId, parentId)),
         )!,
       )
     }
