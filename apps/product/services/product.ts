@@ -193,7 +193,10 @@ class ProductService {
         where.push(
           or(
             ...filter.categories.map((categoryId) =>
-              eq(products.categoryId, categoryId),
+              or(
+                eq(products.categoryId, categoryId),
+                eq(products.subCategoryId, categoryId),
+              ),
             ),
           )!,
         )
@@ -232,6 +235,9 @@ class ProductService {
       if (!filter.includeInactiveCategories) {
         where.push(
           or(isNull(products.categoryId), eq(categories.isActive, true))!,
+        )
+        where.push(
+          or(isNull(products.subCategoryId), eq(categories.isActive, true))!,
         )
       }
 
@@ -274,16 +280,20 @@ class ProductService {
       orderBy = desc(products.createdAt)
     }
 
+    const subCategories = aliasedTable(categories, 'sub_categories')
+
     let query = this.db
       .select({
         ...products,
         brand: brands,
         category: categories,
         productClass: productClasses,
+        subCategory: subCategories,
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(subCategories, eq(products.subCategoryId, subCategories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
       .orderBy(orderBy)
       .where(and(...where))
@@ -301,6 +311,7 @@ class ProductService {
           .from(products)
           .leftJoin(brands, eq(products.brandId, brands.id))
           .leftJoin(categories, eq(products.categoryId, categories.id))
+          .leftJoin(subCategories, eq(products.subCategoryId, subCategories.id))
           .leftJoin(
             productClasses,
             eq(products.productClassId, productClasses.id),
@@ -378,12 +389,14 @@ class ProductService {
   }
 
   async getRecentlyViewedProducts(userId: string, limit: number) {
+    const subCategories = aliasedTable(categories, 'sub_categories')
     return await this.db
       .select({
         ...getTableColumns(products),
         category: getTableColumns(categories),
         brand: getTableColumns(brands),
         productClass: getTableColumns(productClasses),
+        subCategory: getTableColumns(subCategories),
       })
       .from(
         this.db
@@ -400,12 +413,14 @@ class ProductService {
       .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(subCategories, eq(products.subCategoryId, subCategories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
       .where(
         and(
           eq(products.isActive, true),
           or(isNull(products.brandId), eq(brands.isActive, true)),
           or(isNull(products.categoryId), eq(categories.isActive, true)),
+          or(isNull(products.subCategoryId), eq(subCategories.isActive, true)),
           or(
             isNull(products.productClassId),
             eq(productClasses.isActive, true),
@@ -729,7 +744,10 @@ class CategoryService {
   async hasAnyProduct(categoryId: number) {
     const result = await this.db.$count(
       products,
-      eq(products.categoryId, categoryId),
+      or(
+        eq(products.categoryId, categoryId),
+        eq(products.subCategoryId, categoryId),
+      ),
     )
     return result > 0
   }

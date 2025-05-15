@@ -58,6 +58,7 @@ export const products = pgTable('product', {
   specification: text(),
   brandId: integer().references(() => brands.id),
   categoryId: integer().references(() => categories.id),
+  subCategoryId: integer().references(() => categories.id),
   productClassId: integer().references(() => productClasses.id),
   link: text(),
   thumbnail: text(),
