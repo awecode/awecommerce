@@ -875,13 +875,13 @@ class OfferService {
                       AND (${offerRanges.includeAllCategories} = true OR EXISTS (
                           SELECT 1 FROM ${offerRangeIncludedCategories}
                           WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                          OR ${offerRangeIncludedCategories.subCategoryId} = ${products.subCategoryId}
+                          OR ${offerRangeIncludedCategories.categoryId} = ${products.subCategoryId}
                           AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
                       ))
                       AND NOT EXISTS (
                           SELECT 1 FROM ${offerRangeExcludedCategories}
                           WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                          OR ${offerRangeExcludedCategories.subCategoryId} = ${products.subCategoryId}
+                          OR ${offerRangeExcludedCategories.categoryId} = ${products.subCategoryId}
                           AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
                       )
                       AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
@@ -920,13 +920,13 @@ class OfferService {
                       OR ((${offerRanges.includeAllCategories} = true OR EXISTS (
                           SELECT 1 FROM ${offerRangeIncludedCategories}
                           WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                          OR ${offerRangeIncludedCategories.subCategoryId} = ${products.subCategoryId}
+                          OR ${offerRangeIncludedCategories.categoryId} = ${products.subCategoryId}
                           AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
                       ))
                       AND NOT EXISTS (
                           SELECT 1 FROM ${offerRangeExcludedCategories}
                           WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                          OR ${offerRangeExcludedCategories.subCategoryId} = ${products.subCategoryId}
+                          OR ${offerRangeExcludedCategories.categoryId} = ${products.subCategoryId}
                           AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
                       ))
                       OR ((${offerRanges.includeAllProductClasses} = true OR EXISTS (
