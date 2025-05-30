@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   exists,
@@ -540,7 +541,7 @@ class BrandService {
       .select()
       .from(brands)
       .where(and(...where))
-      .orderBy(desc(brands.createdAt))
+      .orderBy(asc(brands.order))
 
     if (!filter.pagination) {
       return await query
