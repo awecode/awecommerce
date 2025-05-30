@@ -11,24 +11,34 @@ export type CartContent = Cart & {
         id: number
         discount: number
         name: string
+        benefitType: 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
+        benefitValue: number
       }[]
       voucherOfferDiscounts: {
         id: number
         discount: number
         name: string
+        voucherCode: string
+        benefitType: 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
+        benefitValue: number
       }[]
       totalOfferDiscount: number
     }
   >[]
   userOfferDiscounts: {
-    id: number
-    discount: number
-    name: string
-  }[]
+        id: number
+        discount: number
+        name: string
+        benefitType: 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
+        benefitValue: number
+      }[]
   voucherOfferDiscounts: {
     id: number
     discount: number
     name: string
+    voucherCode: string
+    benefitType: 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
+    benefitValue: number
   }[]
   totalOfferDiscount: number
 }
