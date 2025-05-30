@@ -541,10 +541,10 @@ class BrandService {
       .select()
       .from(brands)
       .where(and(...where))
-      .orderBy([
+      .orderBy(
         asc(brands.order),
         desc(brands.createdAt)
-      ])
+      )
 
     if (!filter.pagination) {
       return await query
