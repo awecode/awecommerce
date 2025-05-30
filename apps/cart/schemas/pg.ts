@@ -27,7 +27,7 @@ export const cartAppliedVoucherOffers = pgTable('cart_applied_offer', {
   cartId: integer().notNull().references(() => carts.id, {
     onDelete: 'cascade',
   }),
-  offerId: integer().notNull().references(() => products.id, {
+  offerId: integer().notNull().references(() => offers.id, {
     onDelete: 'cascade',
   }),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
