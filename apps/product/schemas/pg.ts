@@ -137,7 +137,12 @@ export const productClassRelations = relations(productClasses, (({many})=>({
 })))
 
 export const categoryRelations = relations(categories, (({many})=>({
-  products: many(products)
+  products: many(products,{
+    relationName: 'category'
+  }),
+  productsWithSubCategory: many(products,{
+    relationName: 'subCategory'
+  }),
 })))
 
 export const brandRelations = relations(brands, (({many})=>({
