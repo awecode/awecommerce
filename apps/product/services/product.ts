@@ -2,10 +2,12 @@ import {
   and,
   desc,
   eq,
+  exists,
   getTableColumns,
   ilike,
   isNotNull,
   isNull,
+  notExists,
   or,
   SQL,
   sql,
@@ -708,6 +710,8 @@ interface CategoryFilter {
   isActive?: boolean
   parent?: number[]
   isRootCategory?: boolean
+  hasProducts?: boolean
+  hasActiveProducts?: boolean
   pagination?: PaginationArgs
 }
 
@@ -789,6 +793,89 @@ class CategoryService {
         )!,
       )
     }
+
+    if(filter?.hasProducts !== undefined) {
+      if (filter.hasProducts) {
+        where.push(
+          exists(
+            this.db
+              .select()
+              .from(products)
+              .where(
+                or(
+                  eq(products.categoryId, categories.id),
+                  eq(products.subCategoryId, categories.id),
+                ),
+              ),
+          )
+        )
+      }
+      else {
+        where.push(
+          notExists(
+            this.db
+              .select()
+              .from(products)
+              .where(
+                or(
+                  eq(products.categoryId, categories.id),
+                  eq(products.subCategoryId, categories.id),
+                ),
+              ),
+          ),
+        )
+      }
+    }
+
+    if(filter?.hasActiveProducts !== undefined) {
+      if (filter.hasActiveProducts) {
+        where.push(
+            exists(
+              this.db
+                .select()
+                .from(products)
+                .leftJoin(brands, eq(products.brandId, brands.id))
+                .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+                .where(
+                  and(
+                    or(
+                      eq(products.categoryId, categories.id),
+                      eq(products.subCategoryId, categories.id),
+                    ),
+                    eq(products.isActive, true),
+                    or(
+                      isNull(products.brandId),
+                      eq(brands.isActive, true),
+                    ),
+                    or(
+                      isNull(products.productClassId),
+                      eq(productClasses.isActive, true),
+                    ),
+                  ),
+                ),
+            )
+          )
+      }
+      else {
+        where.push(
+            notExists(
+              this.db
+                .select()
+                .from(products)
+                .where(
+                  and(
+                    or(
+                      eq(products.categoryId, categories.id),
+                      eq(products.subCategoryId, categories.id),
+                    ),
+                    eq(products.isActive, true),
+                  ),
+                ),
+            )
+          )
+      }
+    }
+
 
     if (filter?.isRootCategory !== undefined) {
       if (filter.isRootCategory) {
