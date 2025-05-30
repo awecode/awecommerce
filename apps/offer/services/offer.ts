@@ -1095,6 +1095,9 @@ class OfferService {
                   id: voucherOffer.id,
                   name: voucherOffer.name,
                   discount: offerDiscount,
+                  voucherCode: voucherOffer.voucherCode,
+                  benefitType: voucherOffer.benefit.type,
+                  benefitValue: voucherOffer.benefit.value,
                 })
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
@@ -1130,6 +1133,9 @@ class OfferService {
                   id: voucherOffer.id,
                   name: voucherOffer.name,
                   discount: offerDiscount,
+                  voucherCode: voucherOffer.voucherCode,
+                  benefitType: voucherOffer.benefit.type,
+                  benefitValue: voucherOffer.benefit.value,
                 })
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
@@ -1170,6 +1176,9 @@ class OfferService {
                 id: voucherOffer.id,
                 name: voucherOffer.name,
                 discount: offerDiscount,
+                voucherCode: voucherOffer.voucherCode,
+                benefitType: voucherOffer.benefit.type,
+                benefitValue: voucherOffer.benefit.value,
               })
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1209,6 +1218,9 @@ class OfferService {
                 id: voucherOffer.id,
                 name: voucherOffer.name,
                 discount: offerDiscount,
+                voucherCode: voucherOffer.voucherCode,
+                benefitType: voucherOffer.benefit.type,
+                benefitValue: voucherOffer.benefit.value,
               })
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1310,6 +1322,8 @@ class OfferService {
                   id: offer.id,
                   name: offer.name,
                   discount: offerDiscount,
+                  benefitType: offer.benefit.type,
+                  benefitValue: offer.benefit.value,
                 })
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
@@ -1343,6 +1357,8 @@ class OfferService {
                   id: offer.id,
                   name: offer.name,
                   discount: offerDiscount,
+                  benefitType: offer.benefit.type,
+                  benefitValue: offer.benefit.value,
                 })
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
@@ -1380,6 +1396,8 @@ class OfferService {
                 id: offer.id,
                 name: offer.name,
                 discount: offerDiscount,
+                benefitType: offer.benefit.type,
+                benefitValue: offer.benefit.value,
               })
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
@@ -1417,6 +1435,8 @@ class OfferService {
                 id: offer.id,
                 name: offer.name,
                 discount: offerDiscount,
+                benefitType: offer.benefit.type,
+                benefitValue: offer.benefit.value,
               })
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
