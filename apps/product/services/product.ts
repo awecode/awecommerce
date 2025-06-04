@@ -6,6 +6,7 @@ import {
   exists,
   getTableColumns,
   ilike,
+  inArray,
   isNotNull,
   isNull,
   notExists,
@@ -716,6 +717,8 @@ interface CategoryFilter {
   isRootCategory?: boolean
   hasProducts?: boolean
   hasActiveProducts?: boolean
+  hasActiveProductWithBrands?: number[]
+  productBrands?: number[]
   pagination?: PaginationArgs
 }
 
@@ -855,6 +858,7 @@ class CategoryService {
                       isNull(products.productClassId),
                       eq(productClasses.isActive, true),
                     ),
+                    filter.hasActiveProductWithBrands ? inArray(products.brandId, filter.hasActiveProductWithBrands) : undefined,
                   ),
                 ),
             )
