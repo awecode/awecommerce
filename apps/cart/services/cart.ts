@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ProductService } from '../../product/services/product'
 import {
   Cart,
@@ -316,16 +316,33 @@ class CartService {
   }
 
   async unapplyVoucherCode(sessionId: string, voucherCode: string) {
-    await this.db
-      .delete(cartAppliedVoucherOffers)
-      .leftJoin(carts, eq(cartAppliedVoucherOffers.cartId, carts.id))
-      .leftJoin(offers, eq(cartAppliedVoucherOffers.offerId, offers.id))
+    const rowsToDelete = await this.db
+      .select({
+        cartId: cartAppliedVoucherOffers.cartId,
+        offerId: cartAppliedVoucherOffers.offerId,
+      })
+      .from(cartAppliedVoucherOffers)
+      .innerJoin(carts, eq(cartAppliedVoucherOffers.cartId, carts.id))
+      .innerJoin(offers, eq(cartAppliedVoucherOffers.offerId, offers.id))
       .where(
         and(
           eq(carts.sessionId, sessionId),
           eq(offers.voucherCode, voucherCode),
         ),
-      )
+      );
+
+    if (!rowsToDelete.length) {
+      return
+    }
+
+    await this.db
+      .delete(cartAppliedVoucherOffers)
+      .where(
+        and(
+          inArray(cartAppliedVoucherOffers.offerId, rowsToDelete.map(r => r.offerId)),
+          eq(cartAppliedVoucherOffers.cartId, rowsToDelete[0].cartId),
+        ),
+      );
   }
 
   async resetAppliedVoucherOffers(cartId: number) {
