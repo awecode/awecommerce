@@ -47,6 +47,7 @@ type OrderListFilter = {
   userId?: string
   createdAt?: string
   paymentStatus?: OrderPaymentStatus
+  extraFilters?: SQL[]
   pagination?: {
     page: number
     size: number
@@ -439,6 +440,10 @@ class OrderService {
 
     if (filters?.paymentStatus) {
       where.push(eq(orders.paymentStatus, filters.paymentStatus))
+    }
+
+    if (filters?.extraFilters) {
+      where.push(...filters.extraFilters)
     }
 
     const query = {
