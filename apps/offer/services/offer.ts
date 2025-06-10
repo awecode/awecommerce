@@ -1,4 +1,4 @@
-import { CartContent } from '../../cart/types'
+import { CartContent, Database } from '../../types'
 import {
   and,
   desc,
@@ -52,9 +52,9 @@ interface OfferRangeListFilter {
 }
 
 class OfferRangeService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
+  constructor(db: Database) {
     this.db = db
   }
 
@@ -367,9 +367,9 @@ interface OfferBenefitListFilter {
 }
 
 class OfferBenefitService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
+  constructor(db: Database) {
     this.db = db
   }
 
@@ -445,23 +445,25 @@ class OfferBenefitService {
   }
 }
 
+type OfferConditionType = 'basket_quantity' | 'basket_total' | 'distinct_items'
+
 interface OfferConditionListFilter {
   pagination?: {
     page: number
     size: number
   }
-  type?: 'basket_quantity' | 'basket_total' | 'distinct_items'
+  type?: OfferConditionType
   range?: number
 }
 
 class OfferConditionService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
+  constructor(db: Database) {
     this.db = db
   }
 
-  async create(data: { rangeId: number; type: string; value: number }) {
+  async create(data: { rangeId: number; type: OfferConditionType; value: string }) {
     const [offerCondition] = await this.db
       .insert(offerConditions)
       .values(data)
@@ -475,7 +477,7 @@ class OfferConditionService {
     })
   }
 
-  async update(id: number, data: { type?: string; value?: number }) {
+  async update(id: number, data: { type?: OfferConditionType; value?: string }) {
     const [offerCondition] = await this.db
       .update(offerConditions)
       .set({ ...data, updatedAt: new Date().toISOString() })
@@ -534,7 +536,7 @@ interface OfferListFilter {
     size: number
   }
   q?: string
-  type?: 'site' | 'product' | 'service'
+  type?: 'site' | 'voucher' | 'user'
   condition?: number
   benefit?: number
   isActive?: boolean
@@ -547,9 +549,9 @@ interface ActiveUserOfferListFilter {
 }
 
 class OfferService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
+  constructor(db: Database) {
     this.db = db
   }
 
@@ -990,7 +992,7 @@ class OfferService {
         ),
       })
       if (
-        userUsageCount &&
+        userUsageCount && userUsageCount.usageCount &&
         userUsageCount.usageCount >= voucherOffer.limitPerUser
       ) {
         throw new Error('Voucher code usage limit exceeded')
@@ -1046,11 +1048,11 @@ class OfferService {
 
     if (voucherOffer.condition.type === 'basket_quantity') {
       const productQuantities = cartLinesOfProductsInOfferRange.reduce(
-        (acc, line) => {
+        (acc: Record<number, number>, line) => {
           acc[line.productId] = (acc[line.productId] || 0) + line.quantity
           return acc
         },
-        {},
+        {} as Record<number, number>,
       )
 
       if (
@@ -1284,11 +1286,11 @@ class OfferService {
 
     if (offer.condition.type === 'basket_quantity') {
       const productQuantities = cartLinesOfProductsInOfferRange.reduce(
-        (acc, line) => {
+        (acc: Record<number, number>, line) => {
           acc[line.productId] = (acc[line.productId] || 0) + line.quantity
           return acc
         },
-        {},
+        {} as Record<number, number>,
       )
 
       for (const line of cartLinesOfProductsInOfferRange) {

@@ -24,6 +24,7 @@ import {
   transactions,
 } from '../schemas'
 import { products } from '../../product/schemas'
+import { Database } from '../../types'
 
 type Extend<T, U> = T & U
 
@@ -68,7 +69,9 @@ const STATUS_LOG: { [key in OrderStatus]: string } = {
 }
 
 class OrderService {
-  constructor(private db: any) {
+  private db: Database
+
+  constructor(db: Database) {
     this.db = db
   }
 
@@ -99,20 +102,22 @@ class OrderService {
     >,
   ) {
     const [order] = await this.db.insert(orders).values(data).returning()
-    await this.db
-      .update(carts)
-      .set({ status: 'Frozen' })
-      .where(eq(carts.id, data.cartId))
+    if(data.cartId) {
+      await this.db
+        .update(carts)
+        .set({ status: 'Frozen' })
+        .where(eq(carts.id, data.cartId))
+    }
     await this.db
       .insert(orderLines)
       .values(
         cartLines.map((line) => ({
           orderId: order.id,
           productId: line.productId,
-          price: line.product.price,
+          price: line.product.price.toString(),
           discount: line.product.discountedPrice
-            ? line.product.price - line.product.discountedPrice
-            : 0,
+            ? (line.product.price - line.product.discountedPrice).toString()
+            : '0',
           quantity: line.quantity,
         })),
       )
@@ -121,8 +126,10 @@ class OrderService {
       where: eq(orderLines.orderId, order.id),
       with: {
         product: {
-          name: true,
-          thumbnail: true,
+          columns: {
+            name: true,
+            thumbnail: true,
+          },
         },
       },
     })
@@ -174,7 +181,7 @@ class OrderService {
     return transaction
   }
 
-  async updateTransactionStatus(transactionId: number, newStatus: string) {
+  async updateTransactionStatus(transactionId: number, newStatus: "Refunded" | "Requested" | "Success" | "Failed" | "Error" | "Disproved" ) {
     await this.db
       .update(transactions)
       .set({ status: newStatus })
@@ -184,7 +191,7 @@ class OrderService {
   async listTransactions(filters: {
     orderId?: number
     userId?: string
-    status?: string
+    status?: "Refunded" | "Requested" | "Success" | "Failed" | "Error" | "Disproved" 
     pagination: {
       page: number
       size: number
@@ -316,7 +323,7 @@ class OrderService {
     const total = Number(
       (
         await this.db
-          .select(sql<number>`count(*)`)
+          .select({ count: sql<number>`count(*)` })
           .from(paymentEvents)
           .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
           .where(and(...where))
@@ -346,7 +353,7 @@ class OrderService {
       .set({
         status: 'Cancelled',
         cancelledBy,
-        cancelledAt: new Date(),
+        cancelledAt: new Date().toISOString(),
         cancellationReason,
         cancellationRemarks,
       })
@@ -446,7 +453,8 @@ class OrderService {
       where.push(...filters.extraFilters)
     }
 
-    const query = {
+    if (!filters?.pagination) {
+      return await this.db.query.orders.findMany( {
       with: {
         lines: {
           with: {
@@ -455,15 +463,19 @@ class OrderService {
         },
       },
       where: and(...where),
-    }
-
-    if (!filters?.pagination) {
-      return await this.db.query.orders.findMany(query)
+    })
     }
 
     const { page, size } = filters.pagination
     const results = await this.db.query.orders.findMany({
-      ...query,
+      with: {
+        lines: {
+          with: {
+            product: true,
+          },
+        },
+      },
+      where: and(...where),
       orderBy: desc(orders.createdAt),
       offset: (page - 1) * size,
       limit: size,

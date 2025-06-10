@@ -1,10 +1,11 @@
 import { desc, eq } from 'drizzle-orm';
 import { NewShippingMethod, shippingMethods, UpdateShippingMethod } from '../schemas';
+import { Database } from '../../types';
 
 class ShippingMethodService {
-    private db: any;
+    private db: Database;
 
-    constructor(dbInstance: any) {
+    constructor(dbInstance: Database) {
         this.db = dbInstance;
     }
 

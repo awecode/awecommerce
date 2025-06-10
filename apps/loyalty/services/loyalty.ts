@@ -7,11 +7,12 @@ import {
   loyaltySettings,
   UpdateLoyaltySettings,
 } from '../schemas'
+import { Database } from '../../types'
 
 class LoyaltyService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -22,7 +23,8 @@ class LoyaltyService {
       },
     })
     if (!setting) {
-      setting = await this.db.insert(loyaltySettings).values({}).returning()
+      const newSetting = await this.db.insert(loyaltySettings).values({}).returning()
+      setting = newSetting[0]
     }
     return setting
   }
@@ -49,7 +51,7 @@ class LoyaltyService {
     await this.db.insert(loyaltyPoints).values({
       userId,
       orderId,
-      earnedPoints,
+      earnedPoints: earnedPoints.toString(),
     })
     await this.createLog({
       userId,
@@ -94,14 +96,14 @@ class LoyaltyService {
   }
 
   async getUserLoyaltyPoints(userId: string) {
-    let points = await this.db.query.loyaltyPoints.findMany({
+    const availablePoints = await this.db.query.loyaltyPoints.findMany({
       where: eq(loyaltyPoints.userId, userId),
       orderBy: desc(loyaltyPoints.createdAt),
     })
 
     const settings = await this.getSettings()
 
-    points = points.map((point: LoyaltyPoints) => ({
+    const points = availablePoints.map((point) => ({
       ...point,
       pointsWorth: settings.redeemRate
         ? Number(point.earnedPoints) * Number(settings.redeemRate)
@@ -163,7 +165,7 @@ class LoyaltyService {
       await this.db
         .update(loyaltyPoints)
         .set({
-          redeemedPoints: Number(point.redeemedPoints) + pointsToRedeemFromThis,
+          redeemedPoints: (Number(point.redeemedPoints) + pointsToRedeemFromThis).toString(),
         })
         .where(eq(loyaltyPoints.id, point.id))
       pointsToDeduct -= pointsToRedeemFromThis

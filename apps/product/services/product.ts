@@ -31,6 +31,7 @@ import {
 } from '../schemas'
 import { orderLines } from '../../order/schemas'
 import { aliasedTable } from 'drizzle-orm'
+import { Database } from '../../types'
 
 type PaginationArgs = {
   page: number
@@ -60,9 +61,9 @@ interface ProductFilter {
 }
 
 class ProductService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -306,11 +307,11 @@ class ProductService {
 
     let query = this.db
       .select({
-        ...products,
-        brand: brands,
-        category: categories,
-        productClass: productClasses,
-        subCategory: subCategories,
+        ...getTableColumns(products),
+        brand: getTableColumns(brands),
+        category: getTableColumns(categories),
+        productClass: getTableColumns(productClasses),
+        subCategory: getTableColumns(subCategories),
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
@@ -467,9 +468,9 @@ interface BrandFilter {
   pagination?: PaginationArgs
 }
 class BrandService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -591,9 +592,9 @@ interface ProductClassFilter {
 }
 
 class ProductClassService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -723,9 +724,9 @@ interface CategoryFilter {
 }
 
 class CategoryService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -955,9 +956,9 @@ class CategoryService {
 }
 
 class ProductImageService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -983,9 +984,9 @@ class ProductImageService {
 }
 
 class RelatedProductService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 

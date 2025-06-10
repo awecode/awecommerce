@@ -9,18 +9,14 @@ import {
 } from '../schemas'
 import { OfferService } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
-import { CartContent } from '../types'
+import { CartContent, CartContentWithoutOfferInfo, Database } from '../../types'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
-type Extend<T, U> = T & U
-
-
-
 class CartService {
-  private db: any
+  private db: Database
 
-  constructor(dbInstance: any) {
+  constructor(dbInstance: Database) {
     this.db = dbInstance
   }
 
@@ -122,11 +118,13 @@ class CartService {
       },
       where: eq(carts.sessionId, sessionId),
     })
-    const appliedVoucherOffers = content.appliedVoucherOffers || []
+    if(!content) {
+      throw new Error(`Cart not found for session: ${sessionId}`)
+    }
+    const {appliedVoucherOffers, ...rest} = content
     let cartContent: CartContent = {
-      ...content,
-      appliedVoucherOffers: undefined,
-      lines: content.lines.map((line) => ({
+      ...rest,
+      lines: rest.lines.map((line) => ({
         ...line,
         userOfferDiscounts: [],
         voucherOfferDiscounts: [],
@@ -167,7 +165,7 @@ class CartService {
     userId: string,
     sessionId: string,
     sumProductQuantityOnCartMerge: boolean = SUM_PRODUCT_QUANTITY_ON_CART_MERGE,
-  ): Promise<CartContent> {
+  ): Promise<CartContentWithoutOfferInfo> {
     // const userCart = await this.db
     //   .select({
     //     cart: carts,
@@ -180,7 +178,16 @@ class CartService {
     //   .orderBy(desc(carts.updatedAt));
     const userCart = await this.db.query.carts.findFirst({
       with: {
-        lines: true,
+        lines: {
+          with: {
+            product: {
+              columns: {
+                price: true,
+                discountedPrice: true,
+              },
+            },
+          },
+        },
       },
       where: eq(carts.userId, userId),
       orderBy: desc(carts.updatedAt),
@@ -211,7 +218,16 @@ class CartService {
     //   .orderBy(desc(carts.updatedAt));
     const sessionCart = await this.db.query.carts.findFirst({
       with: {
-        lines: true,
+        lines: {
+          with: {
+            product: {
+              columns: {
+                price: true,
+                discountedPrice: true,
+              },
+            },
+          },
+        },
       },
       where: eq(carts.sessionId, sessionId),
       orderBy: desc(carts.updatedAt),
@@ -259,13 +275,13 @@ class CartService {
           sessionLine.createdAt &&
           typeof sessionLine.createdAt === 'string'
         ) {
-          sessionLine.createdAt = new Date(sessionLine.createdAt)
+          sessionLine.createdAt = sessionLine.createdAt
         }
         if (
           sessionLine.updatedAt &&
           typeof sessionLine.updatedAt === 'string'
         ) {
-          sessionLine.updatedAt = new Date(sessionLine.updatedAt)
+          sessionLine.updatedAt = sessionLine.updatedAt
         }
         lines.push(sessionLine)
       }
@@ -280,7 +296,6 @@ class CartService {
           target: cartLines.id,
           set: {
             quantity: sql`excluded.quantity`,
-            price: sql`excluded.price`,
           },
         })
         .returning()
@@ -298,9 +313,21 @@ class CartService {
 
     sessionCart.userId = userId
 
+    const insertedLinesWithProduct = await this.db.query.cartLines.findMany({
+      where: inArray(cartLines.id, insertedLines.map(l => l.id)),
+      with: {
+        product: {
+          columns: {
+            price: true,
+            discountedPrice: true,
+          },
+        },
+      },
+    })
+
     return {
       ...sessionCart,
-      lines: insertedLines,
+      lines: insertedLinesWithProduct
     }
   }
 
@@ -354,9 +381,9 @@ class CartService {
   async applyUserOffers(cartContent: CartContent, userId: string) {
     const offerService = new OfferService(this.db)
     let offers = await offerService.getActiveUserOffers(userId)
-    offers = offers.filter((offer) => offer.benefit.isActive)
+    offers = offers.filter((offer) => offer.benefit?.isActive)
     offers = offers.filter(
-      (offer) => offer.condition.type === 'basket_quantity',
+      (offer) => offer.condition?.type === 'basket_quantity',
     )
     // TODO: Implement other offer types
     for (const offer of offers) {
