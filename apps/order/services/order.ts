@@ -71,8 +71,8 @@ const STATUS_LOG: { [key in OrderStatus]: string } = {
 class OrderService {
   private db: Database
 
-  constructor(db: Database) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   generateHash(orderId: string): string {

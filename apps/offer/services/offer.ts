@@ -54,8 +54,8 @@ interface OfferRangeListFilter {
 class OfferRangeService {
   private db: Database
 
-  constructor(db: Database) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: NewOfferRange) {
@@ -369,8 +369,8 @@ interface OfferBenefitListFilter {
 class OfferBenefitService {
   private db: Database
 
-  constructor(db: Database) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: NewOfferBenefit) {
@@ -459,8 +459,8 @@ interface OfferConditionListFilter {
 class OfferConditionService {
   private db: Database
 
-  constructor(db: Database) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: { rangeId: number; type: OfferConditionType; value: string }) {
@@ -551,8 +551,8 @@ interface ActiveUserOfferListFilter {
 class OfferService {
   private db: Database
 
-  constructor(db: Database) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: any) {

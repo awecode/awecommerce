@@ -63,8 +63,8 @@ interface ProductFilter {
 class ProductService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(product: NewProduct) {
@@ -470,8 +470,8 @@ interface BrandFilter {
 class BrandService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(brand: NewBrand) {
@@ -594,8 +594,8 @@ interface ProductClassFilter {
 class ProductClassService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(productClass: NewProductClass) {
@@ -726,8 +726,8 @@ interface CategoryFilter {
 class CategoryService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(category: NewCategory) {
@@ -958,8 +958,8 @@ class CategoryService {
 class ProductImageService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async getImages(productId: number) {
@@ -986,8 +986,8 @@ class ProductImageService {
 class RelatedProductService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async setRelatedProducts(productId: number, relatedProductIds: number[]) {

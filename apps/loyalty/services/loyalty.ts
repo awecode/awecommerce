@@ -12,8 +12,8 @@ import { Database } from '../../types'
 class LoyaltyService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async getSettings() {

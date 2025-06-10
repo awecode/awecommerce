@@ -16,8 +16,8 @@ const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 class CartService {
   private db: Database
 
-  constructor(dbInstance: Database) {
-    this.db = dbInstance
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(userId?: string) {
