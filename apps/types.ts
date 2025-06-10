@@ -34,6 +34,7 @@ export type CartContent = Cart & {
       product: {
         stockQuantity: number | null
         price: string | null
+        inventoryCost: string | null
         discountedPrice: string | null
       }
       userOfferDiscounts: OfferDiscount[]
@@ -51,6 +52,7 @@ export type CartContentWithoutOfferInfo = Cart & {
     CartLine & {
       product: {
         stockQuantity: number | null
+        inventoryCost: string | null
         price: string | null
         discountedPrice: string | null
       }

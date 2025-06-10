@@ -184,6 +184,7 @@ class CartService {
               columns: {
                 price: true,
                 stockQuantity: true,
+                inventoryCost: true,
                 discountedPrice: true,
               },
             },
@@ -226,6 +227,7 @@ class CartService {
                 price: true,
                 discountedPrice: true,
                 stockQuantity: true,
+                inventoryCost: true,
               },
             },
           },
@@ -322,6 +324,7 @@ class CartService {
           columns: {
             price: true,
             stockQuantity: true,
+            inventoryCost: true,
             discountedPrice: true,
           },
         },
