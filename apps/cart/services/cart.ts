@@ -183,6 +183,7 @@ class CartService {
             product: {
               columns: {
                 price: true,
+                stockQuantity: true,
                 discountedPrice: true,
               },
             },
@@ -204,7 +205,7 @@ class CartService {
           lines: [],
         }
       }
-      return await this.getCartContentForSession(result[0].sessionId)
+      return await this.getCartContentForSession(result[0].sessionId) as CartContentWithoutOfferInfo
     }
     // const sessionCart = await this.db
     //   .select({
@@ -224,6 +225,7 @@ class CartService {
               columns: {
                 price: true,
                 discountedPrice: true,
+                stockQuantity: true,
               },
             },
           },
@@ -319,6 +321,7 @@ class CartService {
         product: {
           columns: {
             price: true,
+            stockQuantity: true,
             discountedPrice: true,
           },
         },

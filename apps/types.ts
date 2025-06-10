@@ -32,6 +32,7 @@ export type CartContent = Cart & {
   lines: Array<
     CartLine & {
       product: {
+        stockQuantity: number | null
         price: string | null
         discountedPrice: string | null
       }
@@ -49,6 +50,7 @@ export type CartContentWithoutOfferInfo = Cart & {
   lines: Array<
     CartLine & {
       product: {
+        stockQuantity: number | null
         price: string | null
         discountedPrice: string | null
       }
