@@ -94,8 +94,8 @@ class OrderService {
         CartLine,
         {
           product: {
-            price: number
-            discountedPrice?: number
+            price: string
+            discountedPrice?: string
           }
         }
       >
@@ -114,9 +114,9 @@ class OrderService {
         cartLines.map((line) => ({
           orderId: order.id,
           productId: line.productId,
-          price: line.product.price.toString(),
+          price: line.product.price,
           discount: line.product.discountedPrice
-            ? (line.product.price - line.product.discountedPrice).toString()
+            ? (Number(line.product.price) - Number(line.product.discountedPrice)).toString()
             : '0',
           quantity: line.quantity,
         })),

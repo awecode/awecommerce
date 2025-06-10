@@ -47,7 +47,7 @@ interface ProductFilter {
   q?: string
   isFeatured?: boolean
   isBestSeller?: boolean
-  pagination?: PaginationArgs
+  pagination: PaginationArgs
   isActive?: boolean
   includeInactiveBrands?: boolean
   includeInactiveCategories?: boolean
@@ -320,10 +320,6 @@ class ProductService {
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
       .orderBy(orderBy)
       .where(and(...where))
-
-    if (!filter.pagination) {
-      return await query
-    }
 
     const { page, size } = filter.pagination
     const results = await query.limit(size).offset((page - 1) * size)

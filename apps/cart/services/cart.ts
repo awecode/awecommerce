@@ -182,6 +182,7 @@ class CartService {
           with: {
             product: {
               columns: {
+                name: true,
                 price: true,
                 stockQuantity: true,
                 inventoryCost: true,
@@ -224,6 +225,7 @@ class CartService {
           with: {
             product: {
               columns: {
+                name: true,
                 price: true,
                 discountedPrice: true,
                 stockQuantity: true,
@@ -322,6 +324,7 @@ class CartService {
       with: {
         product: {
           columns: {
+            name: true,
             price: true,
             stockQuantity: true,
             inventoryCost: true,
