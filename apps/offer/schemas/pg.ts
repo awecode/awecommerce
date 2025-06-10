@@ -240,7 +240,7 @@ export const offers = pgTable('offer', {
   type: offerType().notNull(),
   voucherCode: text().unique(),
   includeAllUsers: boolean().default(false),
-  includedUserIds: jsonb().default([]),
+  includedUserIds: jsonb().default([]).$type<string[]>(),
   conditionId: integer()
     .references(() => offerConditions.id)
     .notNull(),
@@ -269,7 +269,7 @@ export const offers = pgTable('offer', {
     withTimezone: true,
     mode: 'string',
   }).defaultNow(),
-  metadata: jsonb().default({}),
+  metadata: jsonb().default({}).$type<Record<string, any>>(),
 })
 
 export const offerApplicationLogs = pgTable('offer_application_log', {
