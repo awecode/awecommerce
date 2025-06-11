@@ -359,7 +359,6 @@ class OrderService {
       })
       .where(eq(orders.id, orderId))
     await this.changeStatus(orderId, previousStatus, 'Cancelled')
-    await this.createLog(orderId, STATUS_LOG.Cancelled)
   }
 
   async get(orderId: number, userId?: string) {
