@@ -742,6 +742,15 @@ class OfferService {
   async getActiveApplicableVoucherOffers(userId: string, productIds: number[]) {
     const now = new Date().toISOString();
 
+    const userUsage = this.db
+      .select({
+        offerId: offerUsages.offerId,
+        usageCount: offerUsages.usageCount,
+      })
+      .from(offerUsages)
+      .where(eq(offerUsages.userId, userId))
+      .as('user_usage');
+
     return await this.db
       .select({
         id: offers.id,
@@ -767,6 +776,8 @@ class OfferService {
       })
       .from(offers)
       .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+      .leftJoin(userUsage, eq(userUsage.offerId, offers.id))
       .where(
         and(
           eq(offers.type, 'voucher'),
@@ -777,9 +788,10 @@ class OfferService {
           ),
           or(isNull(offers.startDate), lte(offers.startDate, now)),
           or(isNull(offers.endDate), gte(offers.endDate, now)),
+          or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
           or(
-            isNull(offers.overallLimit),
-            lt(offers.usageCount, offers.overallLimit),
+            isNull(offers.limitPerUser),
+            sql`COALESCE(${userUsage.usageCount}, 0) < ${offers.limitPerUser}`,
           ),
           sql`
             EXISTS (
@@ -889,22 +901,12 @@ class OfferService {
                 )
               )
             )
-          `,
-        ),
+          `
+        )
       )
-      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
-      .having(
-        or(
-          isNull(offers.limitPerUser),
-          lt(
-            sql`COALESCE((SELECT ${offerUsages.usageCount} FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${offers.id} AND ${offerUsages.userId} = '${sql.raw(userId)}'), 0)`,
-            offers.limitPerUser,
-          ),
-        ),
-      )
-      .groupBy(offers.id, offerBenefits.id, offerConditions.id)
       .orderBy(desc(offers.priority), desc(offers.createdAt));
-  }
+}
+
 
   async getActiveUserOfferDetails(userId: string, offerId: number) {
     const now = new Date().toISOString()
