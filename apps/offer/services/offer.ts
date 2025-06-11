@@ -739,6 +739,169 @@ class OfferService {
       .orderBy(desc(offers.priority), desc(offers.createdAt))
   }
 
+  async getActiveApplicableVoucherOffers(userId: string, productIds: number[]) {
+    const now = new Date().toISOString();
+
+    return await this.db
+      .select({
+        id: offers.id,
+        name: offers.name,
+        description: offers.description,
+        voucherCode: offers.voucherCode,
+        image: offers.image,
+        startDate: offers.startDate,
+        endDate: offers.endDate,
+        isActive: offers.isActive,
+        isFeatured: offers.isFeatured,
+        type: offers.type,
+        metadata: offers.metadata,
+        benefit: {
+          isActive: offerBenefits.isActive,
+          type: offerBenefits.type,
+          value: offerBenefits.value,
+        },
+      })
+      .from(offers)
+      .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+      .where(
+        and(
+          eq(offers.type, 'voucher'),
+          eq(offers.isActive, true),
+          or(
+            eq(offers.includeAllUsers, true),
+            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
+          ),
+          or(isNull(offers.startDate), lte(offers.startDate, now)),
+          or(isNull(offers.endDate), gte(offers.endDate, now)),
+          or(
+            isNull(offers.overallLimit),
+            lt(offers.usageCount, offers.overallLimit),
+          ),
+          sql`
+            EXISTS (
+              SELECT 1 FROM ${products}
+              LEFT JOIN ${brands} ON ${products.brandId} = ${brands.id}
+              LEFT JOIN ${categories} ON ${products.categoryId} = ${categories.id}
+              LEFT JOIN ${productClasses} ON ${products.productClassId} = ${productClasses.id}
+              WHERE ${products.id} IN (${sql.join(productIds, sql.raw)})
+              AND EXISTS (
+                SELECT 1 FROM ${offerRanges}
+                WHERE ${offerRanges.id} = ${offerConditions.rangeId}
+                AND ${offerRanges.isActive} = true
+                AND (
+                  (${offerRanges.inclusiveFilter} = true AND (
+                    (${offerRanges.includeAllProducts} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedProducts}
+                      WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
+                      AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedProducts}
+                      WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
+                      AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllBrands} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedBrands}
+                      WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
+                      AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedBrands}
+                      WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
+                      AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllCategories} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedCategories}
+                      WHERE (${offerRangeIncludedCategories.categoryId} = ${products.categoryId} OR ${offerRangeIncludedCategories.categoryId} = ${products.subCategoryId})
+                      AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedCategories}
+                      WHERE (${offerRangeExcludedCategories.categoryId} = ${products.categoryId} OR ${offerRangeExcludedCategories.categoryId} = ${products.subCategoryId})
+                      AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedProductClasses}
+                      WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
+                      AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedProductClasses}
+                      WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
+                      AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
+                    )
+                  ))
+                  OR
+                  (${offerRanges.inclusiveFilter} = false AND (
+                    (
+                      (${offerRanges.includeAllProducts} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedProducts}
+                        WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
+                        AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedProducts}
+                        WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
+                        AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllBrands} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedBrands}
+                        WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
+                        AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedBrands}
+                        WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
+                        AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllCategories} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedCategories}
+                        WHERE (${offerRangeIncludedCategories.categoryId} = ${products.categoryId} OR ${offerRangeIncludedCategories.categoryId} = ${products.subCategoryId})
+                        AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedCategories}
+                        WHERE (${offerRangeExcludedCategories.categoryId} = ${products.categoryId} OR ${offerRangeExcludedCategories.categoryId} = ${products.subCategoryId})
+                        AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllProductClasses} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedProductClasses}
+                        WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
+                        AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedProductClasses}
+                        WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
+                        AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                  ))
+                )
+              )
+            )
+          `,
+        ),
+      )
+      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+      .having(
+        or(
+          isNull(offers.limitPerUser),
+          lt(
+            sql`COALESCE((SELECT ${offerUsages.usageCount} FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${offers.id} AND ${offerUsages.userId} = '${sql.raw(userId)}'), 0)`,
+            offers.limitPerUser,
+          ),
+        ),
+      )
+      .groupBy(offers.id, offerBenefits.id)
+      .orderBy(desc(offers.priority), desc(offers.createdAt));
+  }
+
   async getActiveUserOfferDetails(userId: string, offerId: number) {
     const now = new Date().toISOString()
 
