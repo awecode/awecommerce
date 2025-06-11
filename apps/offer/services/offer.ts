@@ -902,7 +902,7 @@ class OfferService {
           ),
         ),
       )
-      .groupBy(offers.id, offerBenefits.id)
+      .groupBy(offers.id, offerBenefits.id, offerConditions.id)
       .orderBy(desc(offers.priority), desc(offers.createdAt));
   }
 
