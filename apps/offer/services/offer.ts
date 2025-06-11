@@ -755,6 +755,10 @@ class OfferService {
         isFeatured: offers.isFeatured,
         type: offers.type,
         metadata: offers.metadata,
+        condition: {
+          type: offerConditions.type,
+          value: offerConditions.value,
+        },
         benefit: {
           isActive: offerBenefits.isActive,
           type: offerBenefits.type,
