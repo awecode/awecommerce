@@ -1100,6 +1100,8 @@ class OfferService {
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
@@ -1108,6 +1110,8 @@ class OfferService {
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
                 updatedLine!.totalOfferDiscount += offerDiscount
                 cartContent.totalOfferDiscount += offerDiscount
@@ -1138,6 +1142,8 @@ class OfferService {
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
@@ -1146,6 +1152,8 @@ class OfferService {
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
                 updatedLine!.totalOfferDiscount += offerDiscount
                 cartContent.totalOfferDiscount += offerDiscount
@@ -1181,6 +1189,8 @@ class OfferService {
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1189,6 +1199,8 @@ class OfferService {
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount
@@ -1223,6 +1235,8 @@ class OfferService {
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
@@ -1231,6 +1245,8 @@ class OfferService {
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount
@@ -1326,6 +1342,8 @@ class OfferService {
                   discount: offerDiscount,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
@@ -1333,6 +1351,8 @@ class OfferService {
                   discount: offerDiscount,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
                 updatedLine!.totalOfferDiscount += offerDiscount
                 cartContent.totalOfferDiscount += offerDiscount
@@ -1361,6 +1381,8 @@ class OfferService {
                   discount: offerDiscount,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
@@ -1368,6 +1390,8 @@ class OfferService {
                   discount: offerDiscount,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
                 updateLine!.totalOfferDiscount += offerDiscount
                 cartContent.totalOfferDiscount += offerDiscount
@@ -1400,6 +1424,8 @@ class OfferService {
                 discount: offerDiscount,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
@@ -1407,6 +1433,8 @@ class OfferService {
                 discount: offerDiscount,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount
@@ -1439,6 +1467,8 @@ class OfferService {
                 discount: offerDiscount,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
@@ -1446,6 +1476,8 @@ class OfferService {
                 discount: offerDiscount,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
               updatedLine!.totalOfferDiscount += offerDiscount
               cartContent.totalOfferDiscount += offerDiscount

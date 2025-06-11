@@ -15,13 +15,16 @@ const tables = {
 }
 
 type BenefitType = 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
+type ConditionType = 'basket_quantity' | 'basket_total' | 'distinct_items'
 
 type OfferDiscount = {
   id: number
   discount: number
   name: string
   benefitType: BenefitType
-  benefitValue: number
+  benefitValue: string
+  conditionType: ConditionType
+  conditionValue: string
 }
 
 type VoucherOfferDiscount = OfferDiscount & {
