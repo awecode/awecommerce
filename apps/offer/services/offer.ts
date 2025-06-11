@@ -799,7 +799,7 @@ class OfferService {
               LEFT JOIN ${brands} ON ${products.brandId} = ${brands.id}
               LEFT JOIN ${categories} ON ${products.categoryId} = ${categories.id}
               LEFT JOIN ${productClasses} ON ${products.productClassId} = ${productClasses.id}
-              WHERE ${products.id} IN (${sql.join(productIds, sql.raw)})
+              WHERE ${products.id} IN ${sql.raw(`(${productIds.join(',')})`)}
               AND EXISTS (
                 SELECT 1 FROM ${offerRanges}
                 WHERE ${offerRanges.id} = ${offerConditions.rangeId}
