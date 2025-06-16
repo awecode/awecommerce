@@ -47,7 +47,7 @@ export const loyaltyPoints = pgTable('loyalty_point', {
   }).defaultNow(),
 })
 
-export const loyaltyLogTypes = pgEnum('loyalty_log_type', ['earned', 'redeemed'])
+export const loyaltyLogTypes = pgEnum('loyalty_log_type', ['earned', 'redeemed', 'unredeemed'])
 
 export const loyaltyLogs = pgTable('loyalty_log', {
   id: serial().primaryKey(),
