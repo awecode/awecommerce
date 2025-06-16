@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, lt, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull, lt, or } from 'drizzle-orm'
 import {
   InsertLoyaltyLogs,
   loyaltyLogs,
@@ -177,6 +177,39 @@ class LoyaltyService {
       type: 'redeemed',
     })
     return pointsToRedeem
+  }
+
+  async unredeemPoints(userId: string, orderId: number, points: number) {
+    const pointsToUnredeem = points
+    let pointsToAddBack = pointsToUnredeem
+    const pointsData = await this.db.query.loyaltyPoints.findMany({
+      where: and(
+        eq(loyaltyPoints.userId, userId),
+        gt(loyaltyPoints.redeemedPoints, '0'),
+      ),  
+      orderBy: desc(loyaltyPoints.createdAt),
+    })
+    for (const point of pointsData) {
+      if (pointsToAddBack <= 0) {
+        break
+      }
+      const redeemedPoints = Number(point.redeemedPoints) 
+      const pointsToUnredeemFromThis = Math.min(pointsToAddBack, redeemedPoints)
+      await this.db
+        .update(loyaltyPoints)
+        .set({
+          redeemedPoints: (redeemedPoints - pointsToUnredeemFromThis).toString(),
+        })
+        .where(eq(loyaltyPoints.id, point.id))
+      pointsToAddBack -= pointsToUnredeemFromThis
+    }
+    await this.createLog({
+      userId,
+      orderId,
+      points: pointsToUnredeem.toString(),
+      type: 'earned',
+    })  
+    return pointsToUnredeem
   }
 
   async getLogs(userId: string, order: 'asc' | 'desc' = 'asc') {
