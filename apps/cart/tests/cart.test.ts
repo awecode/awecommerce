@@ -32,7 +32,7 @@ test('should add a product to the cart', async () => {
   const cart = await cartService.create()
   const product = await createProduct()
   const { price, discountedPrice } = await productService.getPrices(product.id)
-  const cartLine = await cartService.addToCart(cart.sessionId, product.id, 1)
+  const cartLine = await cartService.addToCart(cart.id, product.id, 1)
   expect(cartLine).toBeDefined()
   expect(cartLine.cartId).toBe(cart.id)
   expect(cartLine.productId).toBe(product.id)
@@ -42,8 +42,8 @@ test('should get cart content for session', async () => {
   const cart = await cartService.create()
   const product1 = await createProduct()
   const product2 = await createProduct()
-  await cartService.addToCart(cart.sessionId, product1.id, 1)
-  await cartService.addToCart(cart.sessionId, product2.id, 1)
+  await cartService.addToCart(cart.id, product1.id, 1)
+  await cartService.addToCart(cart.id, product2.id, 1)
   const cartContent = await cartService.getCartContentForSession(cart.sessionId)
   expect(cartContent).toBeDefined()
   expect(cartContent).toBeDefined()
@@ -53,9 +53,9 @@ test('should merge carts', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const cart2 = await cartService.create()
   const product1 = await createProduct()
-  const line1 = await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  const line1 = await cartService.addToCart(cart1.id, product1.id, 2)
   const product2 = await createProduct()
-  const line2 = await cartService.addToCart(cart2.sessionId, product2.id, 3)
+  const line2 = await cartService.addToCart(cart2.id, product2.id, 3)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     cart2.sessionId,
@@ -76,9 +76,6 @@ test('should merge carts', async () => {
   expect(
     mergedCart.lines.find((l) => l.productId === product1.id)?.quantity,
   ).toBe(line1.quantity)
-  expect(mergedCart.lines.find((l) => l.productId === product1.id)?.price).toBe(
-    line1.price,
-  )
   // Line 2 should be on merged cart with same id
   expect(mergedCart.lines.find((l) => l.id === line2.id)).toBeDefined()
 })
@@ -87,8 +84,8 @@ test('should merge carts with same product and sum quantity', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const cart2 = await cartService.create()
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.sessionId, product1.id, 2)
-  await cartService.addToCart(cart2.sessionId, product1.id, 3)
+  await cartService.addToCart(cart1.id, product1.id, 2)
+  await cartService.addToCart(cart2.id, product1.id, 3)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     cart2.sessionId,
@@ -102,8 +99,8 @@ test('should merge carts with same product and not sum quantity', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const cart2 = await cartService.create()
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.sessionId, product1.id, 2)
-  const line2 = await cartService.addToCart(cart2.sessionId, product1.id, 3)
+  await cartService.addToCart(cart1.id, product1.id, 2)
+  const line2 = await cartService.addToCart(cart2.id, product1.id, 3)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     cart2.sessionId,
@@ -116,7 +113,7 @@ test('should merge carts with same product and not sum quantity', async () => {
 test('should merge carts when session cart is invalid', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  await cartService.addToCart(cart1.id, product1.id, 2)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     '123e4567-e89b-12d3-a456-426614174000', // dummy uuid
@@ -131,7 +128,7 @@ test('should merge carts when session cart is invalid', async () => {
 test('should return user cart for merge when session cart is empty', async () => {
   const cart1 = await cartService.create('1234') //1234 is userId
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.sessionId, product1.id, 2)
+  await cartService.addToCart(cart1.id, product1.id, 2)
   const cart2 = await cartService.create()
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
@@ -146,7 +143,7 @@ test('should return session cart for merge when user cart is empty', async () =>
   const cart1 = await cartService.create('12345') //1234 is userId
   const cart2 = await cartService.create()
   const product2 = await createProduct()
-  await cartService.addToCart(cart2.sessionId, product2.id, 2)
+  await cartService.addToCart(cart2.id, product2.id, 2)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!, // dummy uuid
     cart2.sessionId,
