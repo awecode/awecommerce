@@ -179,10 +179,10 @@ class LoyaltyService {
     return pointsToRedeem
   }
 
-  async getLogs(userId: string) {
+  async getLogs(userId: string, order: 'asc' | 'desc' = 'asc') {
     return await this.db.query.loyaltyLogs.findMany({
       where: eq(loyaltyLogs.userId, userId),
-      orderBy: asc(loyaltyLogs.createdAt),
+      orderBy: order === 'asc' ? asc(loyaltyLogs.createdAt) : desc(loyaltyLogs.createdAt),
     })
   }
 }
