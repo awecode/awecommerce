@@ -104,6 +104,7 @@ class CartService {
           with: {
             product: true,
           },
+          orderBy: desc(cartLines.createdAt),
         },
         appliedVoucherOffers: {
           with: {
