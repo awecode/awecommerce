@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ProductService } from '../../product/services/product'
 import {
   Cart,
@@ -104,7 +104,7 @@ class CartService {
           with: {
             product: true,
           },
-          orderBy: desc(cartLines.createdAt),
+          orderBy: asc(cartLines.createdAt),
         },
         appliedVoucherOffers: {
           with: {
