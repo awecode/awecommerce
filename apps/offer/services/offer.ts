@@ -678,65 +678,86 @@ class OfferService {
     }
 
     return await this.db
-      .select({
-        id: offers.id,
-        name: offers.name,
-        description: offers.description,
-        voucherCode: offers.voucherCode,
-        image: offers.image,
-        startDate: offers.startDate,
-        endDate: offers.endDate,
-        isActive: offers.isActive,
-        isFeatured: offers.isFeatured,
-        type: offers.type,
-        metadata: offers.metadata,
-        benefit: {
-          isActive: offerBenefits.isActive,
-          type: offerBenefits.type,
-          value: offerBenefits.value,
-        },
-        condition: {
-          rangeId: offerConditions.rangeId,
-          type: offerConditions.type,
-          value: offerConditions.value,
-        },
-      })
-      .from(offers)
-      .where(
-        and(
-          ...where,
-          eq(offers.isActive, true),
-          or(
-            eq(offers.includeAllUsers, true),
-            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
-              offers.includedUserIds
-            }))`,
-          ),
-          or(isNull(offers.startDate), lte(offers.startDate, now)),
-          or(isNull(offers.endDate), gte(offers.endDate, now)),
-          or(
-            isNull(offers.overallLimit),
-            lt(offers.usageCount, offers.overallLimit),
-          ),
-        ),
+    .select({
+      id: offers.id,
+      name: offers.name,
+      description: offers.description,
+      voucherCode: offers.voucherCode,
+      image: offers.image,
+      startDate: offers.startDate,
+      endDate: offers.endDate,
+      isActive: offers.isActive,
+      isFeatured: offers.isFeatured,
+      type: offers.type,
+      metadata: offers.metadata,
+      benefit: {
+        isActive: offerBenefits.isActive,
+        type: offerBenefits.type,
+        value: offerBenefits.value,
+      },
+      condition: {
+        rangeId: offerConditions.rangeId,
+        type: offerConditions.type,
+        value: offerConditions.value,
+      },
+      productIds: sql<number[]>`
+      ARRAY(
+        SELECT DISTINCT ${products.id}
+        FROM ${products}
+        LEFT JOIN ${offerRangeIncludedProducts} ON ${products.id} = ${offerRangeIncludedProducts.productId}
+        LEFT JOIN ${offerRangeIncludedBrands} ON ${products.brandId} = ${offerRangeIncludedBrands.brandId} AND ${offerRangeIncludedBrands.rangeId} = ${offerConditions.rangeId}
+        LEFT JOIN ${offerRangeIncludedCategories} ON 
+          (${products.categoryId} = ${offerRangeIncludedCategories.categoryId} OR ${products.subCategoryId} = ${offerRangeIncludedCategories.categoryId})
+          AND ${offerRangeIncludedCategories.rangeId} = ${offerConditions.rangeId}
+        WHERE ${offerRangeIncludedProducts.rangeId} = ${offerConditions.rangeId}
+          AND (
+            ${offerRanges.includeAllBrands} OR ${offerRangeIncludedBrands.brandId} IS NOT NULL
+          )
+          AND (
+            ${offerRanges.includeAllCategories} OR ${offerRangeIncludedCategories.categoryId} IS NOT NULL
+          )
       )
-      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
-      .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
-      .having(
+    `,
+    })
+    .from(offers)
+    .where(
+      and(
+        ...where,
+        eq(offers.isActive, true),
+        or(
+          eq(offers.includeAllUsers, true),
+          sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
+            offers.includedUserIds
+          }))`,
+        ),
+        or(isNull(offers.startDate), lte(offers.startDate, now)),
+        or(isNull(offers.endDate), gte(offers.endDate, now)),
+        or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
         or(
           isNull(offers.limitPerUser),
           lt(
-            sql`COALESCE((SELECT ${
-              offerUsages.usageCount
-            } FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${
-              offers.id
-            } AND ${offerUsages.userId} = '${sql.raw(userId)}'), 0)`,
+            sql`(
+            SELECT COALESCE(${offerUsages.usageCount}, 0)
+            FROM ${offerUsages}
+            WHERE ${offerUsages.offerId} = ${offers.id}
+              AND ${offerUsages.userId} = ${userId}
+          )`,
             offers.limitPerUser,
           ),
         ),
-      )
-      .groupBy(offers.id, offerBenefits.id, offerConditions.id)
-      .orderBy(desc(offers.priority), desc(offers.createdAt))
+      ),
+    )
+    .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+    .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+    .leftJoin(offerRanges, eq(offerConditions.rangeId, offerRanges.id))
+    .groupBy(
+      offers.id,
+      offerBenefits.id,
+      offerConditions.id,
+      offerRanges.includeAllBrands,
+      offerRanges.includeAllCategories,
+    )
+    .orderBy(desc(offers.priority), desc(offers.createdAt))
   }
 
   async getActiveApplicableUserOffers(userId: string, productIds: number[]){
