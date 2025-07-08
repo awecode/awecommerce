@@ -300,7 +300,7 @@ class ProductService {
         )
       }
     } else {
-      orderBy = desc(products.createdAt)
+      orderBy = desc(products.id)
     }
 
     const subCategories = aliasedTable(categories, 'sub_categories')
