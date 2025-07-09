@@ -81,7 +81,7 @@ class CartService {
       .select()
       .from(carts)
       .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
-      .orderBy(desc(carts.updatedAt))
+      .orderBy(desc(carts.createdAt))
     return result[0]
   }
 
@@ -90,7 +90,7 @@ class CartService {
       .select()
       .from(carts)
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
-      .orderBy(desc(carts.updatedAt))
+      .orderBy(desc(carts.createdAt))
     return result[0]
   }
 
@@ -237,7 +237,7 @@ class CartService {
         },
       },
       where: eq(carts.sessionId, sessionId),
-      orderBy: desc(carts.updatedAt),
+      orderBy: desc(carts.createdAt),
     })
     if (!sessionCart) {
       return userCart
