@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ProductService } from '../../product/services/product'
 import {
-  Cart,
   cartAppliedVoucherOffers,
   CartLine,
   cartLines,

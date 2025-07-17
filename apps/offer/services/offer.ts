@@ -41,6 +41,7 @@ import {
   UpdateOfferBenefit,
   UpdateOfferRange,
 } from '../schemas'
+import { Decimal } from 'decimal.js'
 
 interface OfferRangeListFilter {
   pagination?: {
@@ -1442,20 +1443,21 @@ class OfferService {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount = Number(voucherOffer.benefit.value)
-                if (
-                  updatedLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updatedLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(voucherOffer.benefit.value)
+                
+                let offerDiscount = benefitValue
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
                 updatedLine!.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
@@ -1465,39 +1467,35 @@ class OfferService {
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
                   conditionType: voucherOffer.condition.type,
                   conditionValue: voucherOffer.condition.value,
                 })
-                updatedLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
                 isVoucherApplied = true
               } else if (voucherOffer.benefit.type === 'percentage') {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount =
-                  (Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    Number(voucherOffer.benefit.value)) /
-                  100
-                if (
-                  updatedLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updatedLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(voucherOffer.benefit.value)
+                
+                let offerDiscount = productPrice.mul(benefitValue).div(100)
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
                 updatedLine!.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
@@ -1507,15 +1505,15 @@ class OfferService {
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   voucherCode: voucherOffer.voucherCode,
                   benefitType: voucherOffer.benefit.type,
                   benefitValue: voucherOffer.benefit.value,
                   conditionType: voucherOffer.condition.type,
                   conditionValue: voucherOffer.condition.value,
                 })
-                updatedLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
                 isVoucherApplied = true
               } else {
                 throw new Error('Not implemented')
@@ -1527,24 +1525,23 @@ class OfferService {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount =
-                Number(voucherOffer.benefit.value) * line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(voucherOffer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = benefitValue.mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
@@ -1554,43 +1551,37 @@ class OfferService {
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
                 conditionType: voucherOffer.condition.type,
                 conditionValue: voucherOffer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               isVoucherApplied = true
             } else if (voucherOffer.benefit.type === 'percentage') {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount =
-                ((Number(
-                  (line.product.discountedPrice ?? line.product.price)!,
-                ) *
-                  Number(voucherOffer.benefit.value)) /
-                  100) *
-                line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(voucherOffer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = productPrice.mul(benefitValue).div(100).mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
@@ -1600,15 +1591,15 @@ class OfferService {
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 voucherCode: voucherOffer.voucherCode,
                 benefitType: voucherOffer.benefit.type,
                 benefitValue: voucherOffer.benefit.value,
                 conditionType: voucherOffer.condition.type,
                 conditionValue: voucherOffer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               isVoucherApplied = true
             } else {
               throw new Error('Not implemented')
@@ -1685,20 +1676,21 @@ class OfferService {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount = Number(offer.benefit.value)
-                if (
-                  updatedLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updatedLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(offer.benefit.value)
+                
+                let offerDiscount = benefitValue
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
                 updatedLine!.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
                   conditionType: offer.condition.type,
@@ -1707,37 +1699,33 @@ class OfferService {
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
                   conditionType: offer.condition.type,
                   conditionValue: offer.condition.value,
                 })
-                updatedLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               } else if (offer.benefit.type === 'percentage') {
-                const updateLine = cartContent.lines.find(
+                const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount =
-                  (Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    Number(offer.benefit.value)) /
-                  100
-                if (
-                  updateLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updateLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(offer.benefit.value)
+                
+                let offerDiscount = productPrice.mul(benefitValue).div(100)
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
-                updateLine!.userOfferDiscounts.push({
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
+                updatedLine!.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
                   conditionType: offer.condition.type,
@@ -1746,14 +1734,14 @@ class OfferService {
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
                   benefitType: offer.benefit.type,
                   benefitValue: offer.benefit.value,
                   conditionType: offer.condition.type,
                   conditionValue: offer.condition.value,
                 })
-                updateLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               } else {
                 throw new Error('Not implemented')
               }
@@ -1764,23 +1752,23 @@ class OfferService {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount = Number(offer.benefit.value) * line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(offer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = benefitValue.mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
                 conditionType: offer.condition.type,
@@ -1789,41 +1777,35 @@ class OfferService {
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
                 conditionType: offer.condition.type,
                 conditionValue: offer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
             } else if (offer.benefit.type === 'percentage') {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount =
-                ((Number(
-                  (line.product.discountedPrice ?? line.product.price)!,
-                ) *
-                  Number(offer.benefit.value)) /
-                  100) *
-                line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(offer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = productPrice.mul(benefitValue).div(100).mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
                 conditionType: offer.condition.type,
@@ -1832,14 +1814,14 @@ class OfferService {
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
                 benefitType: offer.benefit.type,
                 benefitValue: offer.benefit.value,
                 conditionType: offer.condition.type,
                 conditionValue: offer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
             } else {
               throw new Error('Not implemented')
             }

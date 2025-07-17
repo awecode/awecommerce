@@ -8,6 +8,7 @@ import {
   UpdateLoyaltySettings,
 } from '../schemas'
 import { Database } from '../../types'
+import { Decimal } from 'decimal.js'
 
 class LoyaltyService {
   private db: Database
@@ -77,11 +78,11 @@ class LoyaltyService {
         lt(loyaltyPoints.redeemedPoints, loyaltyPoints.earnedPoints),
       ),
     })
-    return points.reduce(
-      (acc: number, point: LoyaltyPoints) =>
-        acc + Number(point.earnedPoints) - Number(point.redeemedPoints),
-      0,
-    )
+    return points.reduce<Decimal>(
+      (acc: Decimal, point: LoyaltyPoints) =>
+        acc.add(new Decimal(point.earnedPoints)).sub(new Decimal(point.redeemedPoints!)),
+      new Decimal(0),
+    ).toNumber()
   }
 
   async getTotalRedeemablePointsAndValue(userId: string) {
@@ -127,16 +128,16 @@ class LoyaltyService {
     )
 
     const totalRedeemablePoints = usablePoints.reduce(
-      (acc: number, point: LoyaltyPoints) =>
-        acc + Number(point.earnedPoints) - Number(point.redeemedPoints),
-      0,
+      (acc: Decimal, point: LoyaltyPoints) =>
+        acc.add(new Decimal(point.earnedPoints)).sub(new Decimal(point.redeemedPoints!)),
+      new Decimal(0),
     )
 
     return {
       points,
-      totalRedeemablePoints,
+      totalRedeemablePoints: totalRedeemablePoints.toNumber(),
       totalRedeemableValue: settings.redeemRate
-        ? totalRedeemablePoints * Number(settings.redeemRate)
+        ? totalRedeemablePoints.mul(new Decimal(settings.redeemRate)).toNumber()
         : 0,
     }
   }
@@ -165,7 +166,7 @@ class LoyaltyService {
       await this.db
         .update(loyaltyPoints)
         .set({
-          redeemedPoints: (Number(point.redeemedPoints) + pointsToRedeemFromThis).toString(),
+          redeemedPoints: new Decimal(point.redeemedPoints).add(new Decimal(`${pointsToRedeemFromThis}`)).toString(),
         })
         .where(eq(loyaltyPoints.id, point.id))
       pointsToDeduct -= pointsToRedeemFromThis
