@@ -236,7 +236,7 @@ class OrderService {
 
       .where(and(...where))
       .groupBy(transactions.id, orders.id)
-      .orderBy(asc(transactions.createdAt))
+      .orderBy(desc(transactions.createdAt))
       .limit(size)
       .offset((page - 1) * size)
     const total = Number(
@@ -316,7 +316,7 @@ class OrderService {
       .select(getTableColumns(paymentEvents))
       .from(paymentEvents)
       .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
-      .orderBy(asc(paymentEvents.createdAt))
+      .orderBy(desc(paymentEvents.createdAt))
       .where(and(...where))
       .limit(size)
       .offset((page - 1) * size)
