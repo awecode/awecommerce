@@ -120,7 +120,7 @@ export const transactionStatusEnum = pgEnum('transaction_status', ['Requested', 
 
 export const transactions = pgTable('transaction', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  orderId: integer().references(() => orders.id, { onDelete: 'cascade' }),
   gateway: text().notNull(),
   reference: text(),
   amount: numeric({
