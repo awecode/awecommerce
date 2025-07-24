@@ -545,6 +545,7 @@ class BrandService {
                 .from(products)
                 .leftJoin(brands, eq(products.brandId, brands.id))
                 .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+                .leftJoin(categories, eq(products.categoryId, categories.id))
                 .where(
                   and(
                     or(
@@ -888,7 +889,6 @@ class CategoryService {
               this.db
                 .select()
                 .from(products)
-                .leftJoin(brands, eq(products.brandId, brands.id))
                 .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
                 .where(
                   and(
