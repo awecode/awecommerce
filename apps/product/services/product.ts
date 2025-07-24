@@ -547,15 +547,20 @@ class BrandService {
                 .leftJoin(categories, eq(products.categoryId, categories.id))
                 .where(
                   and(
-                    or(
-                      eq(products.categoryId, categories.id),
-                      eq(products.subCategoryId, categories.id),
-                    ),
-                    eq(products.isActive, true),
-                    or(
-                      isNull(products.productClassId),
-                      eq(productClasses.isActive, true),
-                    ),
+            eq(products.brandId, brands.id),
+                          or(
+                            isNull(products.categoryId),
+                            eq(categories.isActive, true  ),
+                          )!,
+                          or(
+                          isNull(products.subCategoryId),
+                            eq(categories.isActive, true),
+                          )!,
+                        eq(products.isActive, true),
+                        or(
+                          isNull(products.productClassId),
+                          eq(productClasses.isActive, true),
+                        ),
                   ),
                 ),
             )
