@@ -543,7 +543,6 @@ class BrandService {
               this.db
                 .select()
                 .from(products)
-                .leftJoin(brands, eq(products.brandId, brands.id))
                 .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
                 .leftJoin(categories, eq(products.categoryId, categories.id))
                 .where(
@@ -553,10 +552,6 @@ class BrandService {
                       eq(products.subCategoryId, categories.id),
                     ),
                     eq(products.isActive, true),
-                    or(
-                      isNull(products.brandId),
-                      eq(brands.isActive, true),
-                    ),
                     or(
                       isNull(products.productClassId),
                       eq(productClasses.isActive, true),
@@ -889,6 +884,7 @@ class CategoryService {
               this.db
                 .select()
                 .from(products)
+                .leftJoin(brands, eq(products.brandId, brands.id))
                 .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
                 .where(
                   and(
