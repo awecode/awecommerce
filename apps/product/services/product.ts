@@ -461,6 +461,7 @@ class ProductService {
 interface BrandFilter {
   q?: string
   isActive?: boolean
+  hasActiveProducts?: boolean
   pagination?: PaginationArgs
 }
 class BrandService {
@@ -533,6 +534,55 @@ class BrandService {
 
     if (filter.isActive !== undefined) {
       where.push(eq(brands.isActive, filter.isActive))
+    }
+
+    if(filter?.hasActiveProducts !== undefined) {
+      if (filter.hasActiveProducts) {
+        where.push(
+            exists(
+              this.db
+                .select()
+                .from(products)
+                .leftJoin(brands, eq(products.brandId, brands.id))
+                .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+                .where(
+                  and(
+                    or(
+                      eq(products.categoryId, categories.id),
+                      eq(products.subCategoryId, categories.id),
+                    ),
+                    eq(products.isActive, true),
+                    or(
+                      isNull(products.brandId),
+                      eq(brands.isActive, true),
+                    ),
+                    or(
+                      isNull(products.productClassId),
+                      eq(productClasses.isActive, true),
+                    ),
+                  ),
+                ),
+            )
+          )
+      }
+      else {
+        where.push(
+            notExists(
+              this.db
+                .select()
+                .from(products)
+                .where(
+                  and(
+                    or(
+                      eq(products.categoryId, categories.id),
+                      eq(products.subCategoryId, categories.id),
+                    ),
+                    eq(products.isActive, true),
+                  ),
+                ),
+            )
+          )
+      }
     }
 
     const query = this.db
