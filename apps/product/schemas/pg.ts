@@ -105,10 +105,12 @@ export const productRelations = relations(products, (({one, many})=>({
   category: one(categories, {
     fields: [products.categoryId],
     references: [categories.id],
+    relationName: 'category'
   }),
   subCategory: one(categories, {
     fields: [products.subCategoryId],
     references: [categories.id],
+    relationName: 'subCategory'
   }),
   productClass: one(productClasses, {
     fields: [products.productClassId],
@@ -135,7 +137,8 @@ export const productClassRelations = relations(productClasses, (({many})=>({
 })))
 
 export const categoryRelations = relations(categories, (({many})=>({
-  products: many(products),
+  products: many(products, { relationName: 'category' }),
+  subCategoryProducts: many(products, { relationName: 'subCategory' }),
 })))
 
 export const brandRelations = relations(brands, (({many})=>({
