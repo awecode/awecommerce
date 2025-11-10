@@ -160,6 +160,7 @@ class OrderService {
     orderId: number,
     previousStatus: OrderStatus,
     newStatus: OrderStatus,
+    createdBy?: string,
   ) {
     await this.db
       .update(orders)
@@ -169,6 +170,7 @@ class OrderService {
       orderId: orderId,
       previousStatus: previousStatus,
       newStatus,
+      createdBy,
     })
     await this.createLog(orderId, STATUS_LOG[newStatus])
   }
@@ -358,7 +360,7 @@ class OrderService {
         cancellationRemarks,
       })
       .where(eq(orders.id, orderId))
-    await this.changeStatus(orderId, previousStatus, 'Cancelled')
+    await this.changeStatus(orderId, previousStatus, 'Cancelled', cancelledBy)
   }
 
   async get(orderId: number, userId?: string) {
