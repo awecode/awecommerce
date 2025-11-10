@@ -93,6 +93,7 @@ export const orderLogs = pgTable('order_log', {
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   log: text().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  loggedBy: text(),
 })
 
 export const orderLines = pgTable('order_line', {

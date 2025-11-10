@@ -141,10 +141,11 @@ class OrderService {
     }
   }
 
-  async createLog(orderId: number, log: string) {
+  async createLog(orderId: number, log: string, loggedBy?: string) {
     await this.db.insert(orderLogs).values({
       orderId,
       log,
+      loggedBy,
     })
   }
 
