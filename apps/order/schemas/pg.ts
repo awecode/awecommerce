@@ -85,6 +85,7 @@ export const orderStatusChanges = pgTable('order_status_change', {
   previousStatus: orderStatusEnum().notNull(),
   newStatus: orderStatusEnum().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  createdByUserId: text(),
 })
 
 export const orderLogs = pgTable('order_log', {
