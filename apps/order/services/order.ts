@@ -133,7 +133,7 @@ class OrderService {
         },
       },
     })
-    await this.createLog(order.id, STATUS_LOG.Pending)
+    await this.createLog(order.id, STATUS_LOG.Pending, order.userId)
     return {
       ...order,
       lines,
@@ -141,7 +141,7 @@ class OrderService {
     }
   }
 
-  async createLog(orderId: number, log: string, loggedBy?: string) {
+  async createLog(orderId: number, log: string, loggedBy?: string | null) {
     await this.db.insert(orderLogs).values({
       orderId,
       log,
@@ -173,7 +173,7 @@ class OrderService {
       newStatus,
       createdBy,
     })
-    await this.createLog(orderId, STATUS_LOG[newStatus])
+    await this.createLog(orderId, STATUS_LOG[newStatus], createdBy)
   }
 
   async createTransaction(data: NewTransaction) {
