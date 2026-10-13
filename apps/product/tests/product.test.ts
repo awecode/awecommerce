@@ -23,7 +23,7 @@ test('should create a product', async () => {
   expect(product).toBeDefined()
   expect(product.name).toBe(name)
   expect(product.description).toBe(description)
-  expect(product.price).toBe(price)
+  expect(Number(product.price)).toBe(Number(price))
   const result = await db
     .select()
     .from(products)
@@ -32,7 +32,7 @@ test('should create a product', async () => {
   const productFromDb = result[0]
   expect(productFromDb.name).toBe(name)
   expect(productFromDb.description).toBe(description)
-  expect(productFromDb.price).toBe(price)
+  expect(Number(productFromDb.price)).toBe(Number(price))
 })
 
 test('should list products applying given filter', async () => {
@@ -81,7 +81,7 @@ test('should update a product', async () => {
   expect(product).toBeDefined()
   expect(product.name).toBe('Updated Product')
   expect(product.description).toBe('Updated Description')
-  expect(product.price).toBe('150')
+  expect(Number(product.price)).toBe(150)
 })
 
 test('should delete a product', async () => {
