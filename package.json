@@ -8,6 +8,8 @@
     "build": "unbuild",
     "build:stub": "unbuild --stub",
     "check:dist": "unbuild && node scripts/check-dist.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm typecheck && vitest run && pnpm check:dist",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
