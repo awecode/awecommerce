@@ -211,6 +211,13 @@
       "when": 1791890947811,
       "tag": "0029_right_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791892257082,
+      "tag": "0030_aberrant_vanisher",
+      "breakpoints": true
     }
   ]
 }
