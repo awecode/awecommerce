@@ -3,7 +3,10 @@ import { expect, test, vi } from 'vitest'
 
 import {db} from 'core/db'
 import { CartService } from 'apps/cart/services/cart'
-import { ProductService } from 'apps/product/services/product'
+import {
+  ProductService,
+  ProductVariantService,
+} from 'apps/product/services/product'
 import { OfferService } from 'apps/offer/services/offer'
 import { cartAppliedVoucherOffers, cartLines } from 'apps/cart/schemas'
 import {
@@ -17,6 +20,7 @@ import { eq, sql } from 'drizzle-orm'
 
 const cartService = new CartService(db)
 const productService = new ProductService(db)
+const variantService = new ProductVariantService(db)
 
 
 const createProduct = async () => {
@@ -40,19 +44,18 @@ test('should create a cart', async () => {
 test('should add a product to the cart', async () => {
   const cart = await cartService.create()
   const product = await createProduct()
-  const { price, discountedPrice } = await productService.getPrices(product.id)
-  const cartLine = await cartService.addToCart(cart.id, product.id, 1)
+  const cartLine = await cartService.addToCart(cart.id, product.variants[0].id, 1)
   expect(cartLine).toBeDefined()
   expect(cartLine.cartId).toBe(cart.id)
-  expect(cartLine.productId).toBe(product.id)
+  expect(cartLine.variantId).toBe(product.variants[0].id)
 })
 
 test('should get cart content for session', async () => {
   const cart = await cartService.create()
   const product1 = await createProduct()
   const product2 = await createProduct()
-  await cartService.addToCart(cart.id, product1.id, 1)
-  await cartService.addToCart(cart.id, product2.id, 1)
+  await cartService.addToCart(cart.id, product1.variants[0].id, 1)
+  await cartService.addToCart(cart.id, product2.variants[0].id, 1)
   const cartContent = await cartService.getCartContentForSession(cart.sessionId)
   expect(cartContent).toBeDefined()
   expect(cartContent).toBeDefined()
@@ -62,9 +65,9 @@ test('should merge carts', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const cart2 = await cartService.create()
   const product1 = await createProduct()
-  const line1 = await cartService.addToCart(cart1.id, product1.id, 2)
+  const line1 = await cartService.addToCart(cart1.id, product1.variants[0].id, 2)
   const product2 = await createProduct()
-  const line2 = await cartService.addToCart(cart2.id, product2.id, 3)
+  const line2 = await cartService.addToCart(cart2.id, product2.variants[0].id, 3)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     cart2.sessionId,
@@ -76,14 +79,14 @@ test('should merge carts', async () => {
   expect(mergedCart.lines.find((l) => l.id === line1.id)).toBeUndefined()
   // Product from line 1 should be on merged cart with a different line id
   expect(
-    mergedCart.lines.find((l) => l.productId === product1.id)?.id,
+    mergedCart.lines.find((l) => l.variantId === product1.variants[0].id)?.id,
   ).not.toBe(line1.id)
   // Line 1's product should be on merged cart with same values except line id
   expect(
-    mergedCart.lines.find((l) => l.productId === product1.id),
+    mergedCart.lines.find((l) => l.variantId === product1.variants[0].id),
   ).toBeDefined()
   expect(
-    mergedCart.lines.find((l) => l.productId === product1.id)?.quantity,
+    mergedCart.lines.find((l) => l.variantId === product1.variants[0].id)?.quantity,
   ).toBe(line1.quantity)
   // Line 2 should be on merged cart with same id
   expect(mergedCart.lines.find((l) => l.id === line2.id)).toBeDefined()
@@ -93,8 +96,8 @@ test('should merge carts with same product and sum quantity', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const cart2 = await cartService.create()
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.id, product1.id, 2)
-  await cartService.addToCart(cart2.id, product1.id, 3)
+  await cartService.addToCart(cart1.id, product1.variants[0].id, 2)
+  await cartService.addToCart(cart2.id, product1.variants[0].id, 3)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     cart2.sessionId,
@@ -108,8 +111,8 @@ test('should merge carts with same product and not sum quantity', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const cart2 = await cartService.create()
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.id, product1.id, 2)
-  const line2 = await cartService.addToCart(cart2.id, product1.id, 3)
+  await cartService.addToCart(cart1.id, product1.variants[0].id, 2)
+  const line2 = await cartService.addToCart(cart2.id, product1.variants[0].id, 3)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     cart2.sessionId,
@@ -122,7 +125,7 @@ test('should merge carts with same product and not sum quantity', async () => {
 test('should merge carts when session cart is invalid', async () => {
   const cart1 = await cartService.create('123') //123 is userId
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.id, product1.id, 2)
+  await cartService.addToCart(cart1.id, product1.variants[0].id, 2)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
     '123e4567-e89b-12d3-a456-426614174000', // dummy uuid
@@ -130,14 +133,14 @@ test('should merge carts when session cart is invalid', async () => {
   expect(mergedCart.userId).toBe(cart1.userId)
   expect(mergedCart.sessionId).toBe(cart1.sessionId)
   expect(mergedCart.lines.length).toBe(1)
-  expect(mergedCart.lines[0].productId).toBe(product1.id)
+  expect(mergedCart.lines[0].variantId).toBe(product1.variants[0].id)
   expect(mergedCart.lines[0].quantity).toBe(2)
 })
 
 test('should return user cart for merge when session cart is empty', async () => {
   const cart1 = await cartService.create('1234') //1234 is userId
   const product1 = await createProduct()
-  await cartService.addToCart(cart1.id, product1.id, 2)
+  await cartService.addToCart(cart1.id, product1.variants[0].id, 2)
   const cart2 = await cartService.create()
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!,
@@ -152,7 +155,7 @@ test('should return session cart for merge when user cart is empty', async () =>
   const cart1 = await cartService.create('12345') //1234 is userId
   const cart2 = await cartService.create()
   const product2 = await createProduct()
-  await cartService.addToCart(cart2.id, product2.id, 2)
+  await cartService.addToCart(cart2.id, product2.variants[0].id, 2)
   const mergedCart = await cartService.mergeCarts(
     cart1.userId!, // dummy uuid
     cart2.sessionId,
@@ -160,7 +163,7 @@ test('should return session cart for merge when user cart is empty', async () =>
   expect(mergedCart.userId).toBe(cart1.userId)
   expect(mergedCart.sessionId).toBe(cart2.sessionId)
   expect(mergedCart.lines.length).toBe(1)
-  expect(mergedCart.lines[0].productId).toBe(product2.id)
+  expect(mergedCart.lines[0].variantId).toBe(product2.variants[0].id)
   expect(mergedCart.lines[0].quantity).toBe(2)
 })
 
@@ -212,7 +215,7 @@ const createVoucher = async (voucherCode: string) => {
 const createCartWithVouchers = async (userId: string, voucherCodes: string[]) => {
   const cart = await cartService.create(userId)
   const product = await createProduct()
-  await cartService.addToCart(cart.id, product.id, 1)
+  await cartService.addToCart(cart.id, product.variants[0].id, 1)
   const offerService = new OfferService(db)
   for (const code of voucherCodes) {
     await createVoucher(code)
@@ -281,7 +284,7 @@ test('should reject applying the same voucher twice to a cart, but allow it on a
   ).rejects.toThrow('Voucher code already used in this cart')
 
   const otherCart = await cartService.create(userId)
-  await cartService.addToCart(otherCart.id, (await createProduct()).id, 1)
+  await cartService.addToCart(otherCart.id, (await createProduct()).variants[0].id, 1)
   const otherContent = await cartService.getCartContentForSession(otherCart.sessionId)
   const applied = await offerService.applyVoucherCode(otherContent, undefined, 'TWICE10', userId)
   expect(applied.voucherOfferDiscounts.map((d) => d.voucherCode)).toEqual(['TWICE10'])
@@ -290,8 +293,8 @@ test('should reject applying the same voucher twice to a cart, but allow it on a
 test('should reject adding a product that has no price and no sale price', async () => {
   const cart = await cartService.create()
   const product = await createProduct()
-  await productService.update(product.id, { price: null, discountedPrice: null })
-  await expect(cartService.addToCart(cart.id, product.id, 1)).rejects.toThrow(
+  await variantService.update(product.variants[0].id, { price: null, discountedPrice: null })
+  await expect(cartService.addToCart(cart.id, product.variants[0].id, 1)).rejects.toThrow(
     'Product price not found',
   )
 })
@@ -299,7 +302,44 @@ test('should reject adding a product that has no price and no sale price', async
 test('should add a product that has only a sale price', async () => {
   const cart = await cartService.create()
   const product = await createProduct()
-  await productService.update(product.id, { price: null, discountedPrice: '15' })
-  const line = await cartService.addToCart(cart.id, product.id, 1)
-  expect(line.productId).toBe(product.id)
+  await variantService.update(product.variants[0].id, { price: null, discountedPrice: '15' })
+  const line = await cartService.addToCart(cart.id, product.variants[0].id, 1)
+  expect(line.variantId).toBe(product.variants[0].id)
+})
+
+test('should reject adding an inactive variant', async () => {
+  const cart = await cartService.create()
+  const product = await createProduct()
+  await variantService.markAsInactive(product.variants[0].id)
+  await expect(
+    cartService.addToCart(cart.id, product.variants[0].id, 1),
+  ).rejects.toThrow(`Product variant is not available: ${product.variants[0].id}`)
+})
+
+test('should reject adding a variant that does not exist', async () => {
+  const cart = await cartService.create()
+  await expect(cartService.addToCart(cart.id, 999999, 1)).rejects.toThrow(
+    'Product variant not found: 999999',
+  )
+})
+
+test('should keep two variants of one product as separate lines', async () => {
+  const cart = await cartService.create()
+  const product = await createProduct()
+  const red = await variantService.update(product.variants[0].id, {
+    options: { Color: 'Red' },
+  })
+  const blue = await variantService.create(product.id, {
+    sku: faker.string.uuid(),
+    price: '20',
+    options: { Color: 'Blue' },
+  })
+  await cartService.addToCart(cart.id, red.id, 1)
+  await cartService.addToCart(cart.id, blue.id, 2)
+  const content = await cartService.getCartContentForSession(cart.sessionId)
+  const lines = [...content.lines].sort((a, b) => a.variantId - b.variantId)
+  expect(lines.map((l) => [l.variant.product.id, l.variant.options, l.quantity])).toEqual([
+    [product.id, [{ name: 'Color', value: 'Red' }], 1],
+    [product.id, [{ name: 'Color', value: 'Blue' }], 2],
+  ])
 })

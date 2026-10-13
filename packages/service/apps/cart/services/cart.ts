@@ -1,10 +1,15 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
-import { ProductService } from '../../product/services/product'
+import {
+  optionValuesWithOption,
+  withVariantOptions,
+} from '../../product/services/product'
+import { productVariants } from '../../product/schemas'
 import {
   cartAppliedVoucherOffers,
   CartLine,
   cartLines,
   carts,
+  NewCartLine,
 } from '../schemas'
 import { OfferService } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
@@ -13,6 +18,23 @@ import { priceCart } from './pricing'
 import { LoyaltyService } from '../../loyalty/services/loyalty'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
+
+// Loads a cart line's variant with what pricing and the order snapshot need
+const lineVariant = {
+  variant: {
+    with: {
+      product: true,
+      image: true,
+      optionValues: optionValuesWithOption,
+    },
+  },
+} as const
+
+const withLineVariant = <
+  L extends { variant: Parameters<typeof withVariantOptions>[0] },
+>(
+  line: L,
+) => ({ ...line, variant: withVariantOptions(line.variant) })
 
 class CartService {
   private db: Database
@@ -26,14 +48,21 @@ class CartService {
     return result[0]
   }
 
-  async addToCart(cartId: number, productId: number, quantity: number) {
+  async addToCart(cartId: number, variantId: number, quantity: number) {
     if (quantity < 1) {
       throw new Error('Quantity must be at least 1')
     }
-    const productService = new ProductService(this.db)
-    const { price, discountedPrice } = await productService.getPrices(productId)
-
-    if (!discountedPrice && !price) {
+    const [variant] = await this.db
+      .select()
+      .from(productVariants)
+      .where(eq(productVariants.id, variantId))
+    if (!variant) {
+      throw new Error(`Product variant not found: ${variantId}`)
+    }
+    if (!variant.isActive) {
+      throw new Error(`Product variant is not available: ${variantId}`)
+    }
+    if (!variant.discountedPrice && !variant.price) {
       throw new Error('Product price not found')
     }
 
@@ -41,7 +70,7 @@ class CartService {
       .insert(cartLines)
       .values({
         cartId,
-        productId,
+        variantId,
         quantity,
       })
       .returning()
@@ -143,9 +172,7 @@ class CartService {
     const content = await this.db.query.carts.findFirst({
       with: {
         lines: {
-          with: {
-            product: true,
-          },
+          with: lineVariant,
           orderBy: asc(cartLines.createdAt),
         },
         appliedVoucherOffers: {
@@ -168,7 +195,7 @@ class CartService {
     let cartContent: CartContent = {
       ...rest,
       lines: rest.lines.map((line) => ({
-        ...line,
+        ...withLineVariant(line),
         userOfferDiscounts: [],
         voucherOfferDiscounts: [],
         totalOfferDiscount: 0,
@@ -229,17 +256,7 @@ class CartService {
       const userCart = await tx.query.carts.findFirst({
         with: {
           lines: {
-            with: {
-              product: {
-                columns: {
-                  name: true,
-                  price: true,
-                  stockQuantity: true,
-                  inventoryCost: true,
-                  discountedPrice: true,
-                },
-              },
-            },
+            with: lineVariant,
           },
         },
         where: eq(carts.userId, userId),
@@ -272,74 +289,49 @@ class CartService {
       const sessionCart = await tx.query.carts.findFirst({
         with: {
           lines: {
-            with: {
-              product: {
-                columns: {
-                  name: true,
-                  price: true,
-                  discountedPrice: true,
-                  stockQuantity: true,
-                  inventoryCost: true,
-                },
-              },
-            },
+            with: lineVariant,
           },
         },
         where: eq(carts.sessionId, sessionId),
         orderBy: desc(carts.createdAt),
       })
       if (!sessionCart) {
-        return userCart
+        return { ...userCart, lines: userCart.lines.map(withLineVariant) }
       }
 
-      const lines = []
-      if (userCart.lines?.length && userCart.lines[0]) {
-        for (const userLine of userCart.lines) {
-          if (userLine.productId) {
-            const sessionLine = sessionCart.lines.find(
-              (l: CartLine) => l?.productId === userLine.productId,
-            )
-            if (sessionLine) {
-              lines.push({
-                cartId: sessionCart.id,
-                productId: sessionLine.productId,
-                id: sessionLine.id,
-                quantity: sumProductQuantityOnCartMerge
-                  ? userLine.quantity + sessionLine.quantity
-                  : sessionLine.quantity,
-              })
-            } else {
-              lines.push({
-                id: undefined,
-                cartId: sessionCart.id,
-                productId: userLine.productId,
-                quantity: userLine.quantity,
-              })
-            }
-          }
+      const lines: NewCartLine[] = []
+      for (const userLine of userCart.lines) {
+        const sessionLine = sessionCart.lines.find(
+          (l: CartLine) => l.variantId === userLine.variantId,
+        )
+        if (sessionLine) {
+          lines.push({
+            cartId: sessionCart.id,
+            variantId: sessionLine.variantId,
+            id: sessionLine.id,
+            quantity: sumProductQuantityOnCartMerge
+              ? userLine.quantity + sessionLine.quantity
+              : sessionLine.quantity,
+          })
+        } else {
+          lines.push({
+            cartId: sessionCart.id,
+            variantId: userLine.variantId,
+            quantity: userLine.quantity,
+          })
         }
       }
 
       for (const sessionLine of sessionCart.lines) {
-        if (
-          sessionLine &&
-          !userCart.lines.find(
-            (l: CartLine) => l?.productId === sessionLine.productId,
-          )
-        ) {
-          if (
-            sessionLine.createdAt &&
-            typeof sessionLine.createdAt === 'string'
-          ) {
-            sessionLine.createdAt = sessionLine.createdAt
-          }
-          if (
-            sessionLine.updatedAt &&
-            typeof sessionLine.updatedAt === 'string'
-          ) {
-            sessionLine.updatedAt = sessionLine.updatedAt
-          }
-          lines.push(sessionLine)
+        if (!userCart.lines.find((l: CartLine) => l.variantId === sessionLine.variantId)) {
+          lines.push({
+            id: sessionLine.id,
+            cartId: sessionLine.cartId,
+            variantId: sessionLine.variantId,
+            quantity: sessionLine.quantity,
+            createdAt: sessionLine.createdAt,
+            updatedAt: sessionLine.updatedAt,
+          })
         }
       }
 
@@ -369,24 +361,14 @@ class CartService {
 
       sessionCart.userId = userId
 
-      const insertedLinesWithProduct = await tx.query.cartLines.findMany({
+      const insertedLinesWithVariant = await tx.query.cartLines.findMany({
         where: inArray(cartLines.id, insertedLines.map(l => l.id)),
-        with: {
-          product: {
-            columns: {
-              name: true,
-              price: true,
-              stockQuantity: true,
-              inventoryCost: true,
-              discountedPrice: true,
-            },
-          },
-        },
+        with: lineVariant,
       })
 
       return {
         ...sessionCart,
-        lines: insertedLinesWithProduct
+        lines: insertedLinesWithVariant.map(withLineVariant),
       }
     })
   }

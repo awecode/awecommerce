@@ -1,5 +1,5 @@
 import { offers } from '../../offer/schemas/pg'
-import { products } from '../../product/schemas/pg'
+import { productVariants } from '../../product/schemas/pg'
 import { relations, sql } from 'drizzle-orm'
 import {
   integer,
@@ -42,7 +42,7 @@ export const cartAppliedVoucherOffers = pgTable('cart_applied_offer', {
 export const cartLines = pgTable('cart_line', {
   id: serial().primaryKey(),
   cartId: integer().notNull().references(() => carts.id),
-  productId: integer().notNull().references(() => products.id, {
+  variantId: integer().notNull().references(() => productVariants.id, {
     onDelete: 'cascade',
   }),
   quantity: integer().notNull(),
@@ -71,9 +71,9 @@ export const cartLineRelations = relations(cartLines, ({ one }) => ({
     fields: [cartLines.cartId],
     references: [carts.id],
   }),
-  product: one(products, {
-    fields: [cartLines.productId],
-    references: [products.id],
+  variant: one(productVariants, {
+    fields: [cartLines.variantId],
+    references: [productVariants.id],
   }),
 }))
 

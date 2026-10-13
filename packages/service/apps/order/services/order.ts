@@ -178,6 +178,12 @@ class OrderService {
       if (!content.lines.length) {
         throw new Error('Cannot create an order without lines')
       }
+      const inactiveLine = content.lines.find((line) => !line.variant.isActive)
+      if (inactiveLine) {
+        throw new Error(
+          `Product variant is not available: ${inactiveLine.variant.sku}`,
+        )
+      }
       // Re-applying drops vouchers that ran out, expired or no longer match the
       // cart. Fail instead of placing the order without a discount the
       // customer applied.
@@ -432,12 +438,15 @@ class OrderService {
             'price', ${orderLines.price},
             'tax', ${orderLines.tax},
             'discount', ${orderLines.discount},
+            'productName', ${orderLines.productName},
+            'variantTitle', ${orderLines.variantTitle},
+            'sku', ${orderLines.sku},
+            'imageUrl', ${orderLines.imageUrl},
+            'options', ${orderLines.options},
             'product', json_build_object(
                 'id', ${products.id},
                 'name', ${products.name},
-                'description', ${products.description},
-                'price', ${products.price},
-                'discountedPrice', ${products.discountedPrice}
+                'description', ${products.description}
             )
         ))`.as('lines'),
         },

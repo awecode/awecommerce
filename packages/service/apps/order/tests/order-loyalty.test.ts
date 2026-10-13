@@ -36,14 +36,14 @@ const createProduct = async (price: string, productClassId?: number) => {
 
 // A user with a points balance and a cart
 const setUp = async (
-  items: Array<{ productId: number; quantity: number }>,
+  items: Array<{ variantId: number; quantity: number }>,
   balance = '1000',
 ) => {
   const userId = unique('loyalty-user')
   await db.insert(loyaltyPoints).values({ userId, orderId: 0, earnedPoints: balance })
   const cart = await cartService.create(userId)
   for (const item of items) {
-    await cartService.addToCart(cart.id, item.productId, item.quantity)
+    await cartService.addToCart(cart.id, item.variantId, item.quantity)
   }
   return { userId, cart }
 }
@@ -103,7 +103,7 @@ beforeEach(async () => {
 
 test('should redeem points as a discount that reduces the taxed amount', async () => {
   const product = await createProduct('100')
-  const { userId, cart } = await setUp([{ productId: product.id, quantity: 1 }])
+  const { userId, cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }])
 
   const order = await orderService.createFromCart(cart.id, { redeemPoints: 20 })
 
@@ -127,8 +127,8 @@ test('should spread the points discount across lines with different rates', asyn
   const taxed = await createProduct('100')
   const exempt = await createProduct('100', exemptClass.id)
   const { cart } = await setUp([
-    { productId: taxed.id, quantity: 1 },
-    { productId: exempt.id, quantity: 1 },
+    { variantId: taxed.variants[0].id, quantity: 1 },
+    { variantId: exempt.variants[0].id, quantity: 1 },
   ])
 
   const order = await orderService.createFromCart(cart.id, { redeemPoints: 50 })
@@ -142,7 +142,7 @@ test('should not let points pay for shipping', async () => {
   await new TaxService(db).updateSettings({ taxShipping: true })
   const product = await createProduct('100')
   const method = await new ShippingMethodService(db).create({ name: 'Courier', price: '50' })
-  const { cart } = await setUp([{ productId: product.id, quantity: 1 }])
+  const { cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }])
 
   await expect(
     orderService.createFromCart(cart.id, { shippingMethodId: method.id, redeemPoints: 101 }),
@@ -161,7 +161,7 @@ test('should not let points pay for shipping', async () => {
 test('should apply points after offer discounts', async () => {
   await createVoucher('LOYALTY10', '10')
   const product = await createProduct('100')
-  const { userId, cart } = await setUp([{ productId: product.id, quantity: 1 }])
+  const { userId, cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }])
   const content = await cartService.getCartContentForSession(cart.sessionId)
   await new OfferService(db).applyVoucherCode(content, undefined, 'LOYALTY10', userId)
 
@@ -174,7 +174,7 @@ test('should apply points after offer discounts', async () => {
 
 test('should reject redeeming more points than the balance and write nothing', async () => {
   const product = await createProduct('100')
-  const { userId, cart } = await setUp([{ productId: product.id, quantity: 1 }], '10')
+  const { userId, cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }], '10')
 
   await expect(orderService.createFromCart(cart.id, { redeemPoints: 20 })).rejects.toThrow(
     'Insufficient loyalty points',
@@ -187,13 +187,13 @@ test('should reject redeeming more points than the balance and write nothing', a
 test('should reject redeeming points for guests and when loyalty is disabled', async () => {
   const product = await createProduct('100')
   const guestCart = await cartService.create()
-  await cartService.addToCart(guestCart.id, product.id, 1)
+  await cartService.addToCart(guestCart.id, product.variants[0].id, 1)
   await expect(
     orderService.createFromCart(guestCart.id, { redeemPoints: 10 }),
   ).rejects.toThrow('Guests cannot redeem loyalty points')
 
   await loyaltyService.updateSettings({ isEnabled: false })
-  const { cart } = await setUp([{ productId: product.id, quantity: 1 }])
+  const { cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }])
   await expect(orderService.createFromCart(cart.id, { redeemPoints: 10 })).rejects.toThrow(
     'Loyalty points cannot be redeemed',
   )
@@ -201,7 +201,7 @@ test('should reject redeeming points for guests and when loyalty is disabled', a
 
 test('should preview points in the cart summary without redeeming them', async () => {
   const product = await createProduct('100')
-  const { userId, cart } = await setUp([{ productId: product.id, quantity: 2 }])
+  const { userId, cart } = await setUp([{ variantId: product.variants[0].id, quantity: 2 }])
 
   const summary = await cartService.getCartSummary(cart.sessionId, { redeemPoints: 50 })
   expect(Number(summary.loyaltyDiscount)).toBe(50)
@@ -217,7 +217,7 @@ test('should preview points in the cart summary without redeeming them', async (
 
 test('should give the points back when the order is cancelled', async () => {
   const product = await createProduct('100')
-  const { userId, cart } = await setUp([{ productId: product.id, quantity: 1 }])
+  const { userId, cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }])
   const order = await orderService.createFromCart(cart.id, { redeemPoints: 30 })
   expect(await balance(userId)).toBe(970)
 
@@ -233,7 +233,7 @@ test('should give the points back when the order is cancelled', async () => {
 
 test('should cancel an order without points without touching loyalty', async () => {
   const product = await createProduct('100')
-  const { userId, cart } = await setUp([{ productId: product.id, quantity: 1 }])
+  const { userId, cart } = await setUp([{ variantId: product.variants[0].id, quantity: 1 }])
   const order = await orderService.createFromCart(cart.id)
 
   await orderService.cancel(order.id, 'admin', 'Customer request')

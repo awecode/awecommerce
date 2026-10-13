@@ -21,6 +21,7 @@ import {
   productClasses,
   products,
 } from '../../product/schemas'
+import { minVariantPrice } from '../../product/services/product'
 import {
   NewOfferApplicationLog,
   NewOfferBenefit,
@@ -1180,8 +1181,7 @@ class OfferService {
         name: products.name,
         description: products.description,
         thumbnail: products.thumbnail,
-        price: products.price,
-        discount: products.discountedPrice,
+        minPrice: minVariantPrice,
         isFeatured: products.isFeatured,
       })
       .from(products)
@@ -1380,7 +1380,7 @@ class OfferService {
       return cartContent
     }
 
-    const productIds = cartLines.map((line) => line.productId)
+    const productIds = cartLines.map((line) => line.variant.productId)
 
     const productIdsInOfferRange = await this.getProductIdsInOfferRange(
       voucherOffer.condition.rangeId,
@@ -1394,7 +1394,7 @@ class OfferService {
     }
 
     const cartLinesOfProductsInOfferRange = cartLines.filter((line) =>
-      productIdsInOfferRange.includes(line.productId),
+      productIdsInOfferRange.includes(line.variant.productId),
     )
 
     let isVoucherApplied = false
@@ -1403,7 +1403,7 @@ class OfferService {
       cartLinesOfProductsInOfferRange.every(
         (line) =>
           line.totalOfferDiscount >=
-          Number(line.product.discountedPrice ?? line.product.price) *
+          Number(line.variant.discountedPrice ?? line.variant.price) *
             line.quantity,
       )
     ) {
@@ -1413,7 +1413,7 @@ class OfferService {
     if (voucherOffer.condition.type === 'basket_quantity') {
       const productQuantities = cartLinesOfProductsInOfferRange.reduce(
         (acc: Record<number, number>, line) => {
-          acc[line.productId] = (acc[line.productId] || 0) + line.quantity
+          acc[line.variant.productId] = (acc[line.variant.productId] || 0) + line.quantity
           return acc
         },
         {} as Record<number, number>,
@@ -1431,7 +1431,7 @@ class OfferService {
 
       for (const line of cartLinesOfProductsInOfferRange) {
         if (
-          productQuantities[line.productId] >=
+          productQuantities[line.variant.productId] >=
           Number(voucherOffer.condition.value)
         ) {
           if (voucherOffer.benefit.maxAffectedItems) {
@@ -1444,10 +1444,8 @@ class OfferService {
                 break
               }
               if (voucherOffer.benefit.type === 'fixed_amount') {
-                const updatedLine = cartContent.lines.find(
-                  (l) => l.productId === line.productId,
-                )
-                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const updatedLine = line
+                const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
                 const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
                 const benefitValue = new Decimal(voucherOffer.benefit.value)
                 
@@ -1482,10 +1480,8 @@ class OfferService {
                 cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
                 isVoucherApplied = true
               } else if (voucherOffer.benefit.type === 'percentage') {
-                const updatedLine = cartContent.lines.find(
-                  (l) => l.productId === line.productId,
-                )
-                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const updatedLine = line
+                const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
                 const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
                 const benefitValue = new Decimal(voucherOffer.benefit.value)
                 
@@ -1526,10 +1522,8 @@ class OfferService {
             }
           } else {
             if (voucherOffer.benefit.type === 'fixed_amount') {
-              const updatedLine = cartContent.lines.find(
-                (l) => l.productId === line.productId,
-              )
-              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const updatedLine = line
+              const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
               const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
               const benefitValue = new Decimal(voucherOffer.benefit.value)
               const quantity = new Decimal(line.quantity)
@@ -1566,10 +1560,8 @@ class OfferService {
               cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               isVoucherApplied = true
             } else if (voucherOffer.benefit.type === 'percentage') {
-              const updatedLine = cartContent.lines.find(
-                (l) => l.productId === line.productId,
-              )
-              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const updatedLine = line
+              const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
               const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
               const benefitValue = new Decimal(voucherOffer.benefit.value)
               const quantity = new Decimal(line.quantity)
@@ -1629,21 +1621,21 @@ class OfferService {
     offer: any,
     cartContent: CartContent,
   ): Promise<CartContent> {
-    const productIds = cartContent.lines.map((line) => line.productId)
+    const productIds = cartContent.lines.map((line) => line.variant.productId)
     const productIdsInOfferRange = await this.getProductIdsInOfferRange(
       offer.condition.rangeId,
       productIds,
     )
 
     const cartLinesOfProductsInOfferRange = cartContent.lines.filter((line) =>
-      productIdsInOfferRange.includes(line.productId),
+      productIdsInOfferRange.includes(line.variant.productId),
     )
 
     if (
       cartLinesOfProductsInOfferRange.every(
         (line) =>
           line.totalOfferDiscount >=
-          Number(line.product.discountedPrice ?? line.product.price) *
+          Number(line.variant.discountedPrice ?? line.variant.price) *
             line.quantity,
       )
     ) {
@@ -1657,7 +1649,7 @@ class OfferService {
     if (offer.condition.type === 'basket_quantity') {
       const productQuantities = cartLinesOfProductsInOfferRange.reduce(
         (acc: Record<number, number>, line) => {
-          acc[line.productId] = (acc[line.productId] || 0) + line.quantity
+          acc[line.variant.productId] = (acc[line.variant.productId] || 0) + line.quantity
           return acc
         },
         {} as Record<number, number>,
@@ -1665,7 +1657,7 @@ class OfferService {
 
       for (const line of cartLinesOfProductsInOfferRange) {
         if (
-          productQuantities[line.productId] >= Number(offer.condition.value)
+          productQuantities[line.variant.productId] >= Number(offer.condition.value)
         ) {
           if (offer.benefit.maxAffectedItems) {
             let discountAppliedTo = 0
@@ -1677,10 +1669,8 @@ class OfferService {
                 break
               }
               if (offer.benefit.type === 'fixed_amount') {
-                const updatedLine = cartContent.lines.find(
-                  (l) => l.productId === line.productId,
-                )
-                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const updatedLine = line
+                const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
                 const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
                 const benefitValue = new Decimal(offer.benefit.value)
                 
@@ -1712,10 +1702,8 @@ class OfferService {
                 updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
                 cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               } else if (offer.benefit.type === 'percentage') {
-                const updatedLine = cartContent.lines.find(
-                  (l) => l.productId === line.productId,
-                )
-                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const updatedLine = line
+                const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
                 const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
                 const benefitValue = new Decimal(offer.benefit.value)
                 
@@ -1753,10 +1741,8 @@ class OfferService {
             }
           } else {
             if (offer.benefit.type === 'fixed_amount') {
-              const updatedLine = cartContent.lines.find(
-                (l) => l.productId === line.productId,
-              )
-              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const updatedLine = line
+              const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
               const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
               const benefitValue = new Decimal(offer.benefit.value)
               const quantity = new Decimal(line.quantity)
@@ -1790,10 +1776,8 @@ class OfferService {
               updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
               cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
             } else if (offer.benefit.type === 'percentage') {
-              const updatedLine = cartContent.lines.find(
-                (l) => l.productId === line.productId,
-              )
-              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const updatedLine = line
+              const productPrice = new Decimal(line.variant.discountedPrice ?? line.variant.price!)
               const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
               const benefitValue = new Decimal(offer.benefit.value)
               const quantity = new Decimal(line.quantity)

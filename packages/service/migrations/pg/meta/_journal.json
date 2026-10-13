@@ -57,6 +57,13 @@
       "when": 1791909808011,
       "tag": "0007_order_total_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791918805898,
+      "tag": "0008_product_variants",
+      "breakpoints": true
     }
   ]
 }

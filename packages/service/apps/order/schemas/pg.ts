@@ -8,7 +8,7 @@ import {
 import { carts } from '../../cart/schemas/pg'
 import { pgEnum } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
-import { products } from '../../product/schemas/pg'
+import { products, productVariants } from '../../product/schemas/pg'
 
 export const shippingAddresses = pgTable('shipping_address', {
     id: serial().primaryKey(),
@@ -106,10 +106,14 @@ export const orderLines = pgTable('order_line', {
   id: serial().primaryKey(),
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   productId: integer().notNull().references(() => products.id),
-  // Copied from the product when the order is created, so later product
-  // changes do not alter past orders
+  variantId: integer().notNull().references(() => productVariants.id),
+  // Copied from the product and variant when the order is created, so later
+  // changes to them, their options or images do not alter past orders
   productName: text().notNull(),
-  productSku: text().notNull(),
+  variantTitle: text(),
+  sku: text().notNull(),
+  imageUrl: text(),
+  options: jsonb().notNull().default([]).$type<Array<{ name: string; value: string }>>(),
   price: numeric({
     precision: 100,
     scale: 20,
@@ -183,6 +187,10 @@ export const orderLineRelations = relations(orderLines, ({ one }) => ({
   product: one(products, {
     fields: [orderLines.productId],
     references: [products.id],
+  }),
+  variant: one(productVariants, {
+    fields: [orderLines.variantId],
+    references: [productVariants.id],
   }),
 }))
 

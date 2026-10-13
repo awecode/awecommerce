@@ -80,10 +80,56 @@ const product = await new ProductService(db).create({
 
 const cartService = new CartService(db)
 const cart = await cartService.create('user-1')
-await cartService.addToCart(cart.id, product.id, 2)
+await cartService.addToCart(cart.id, product.variants[0].id, 2)
 
 const order = await new OrderService(db).createFromCart(cart.id)
 ```
+
+### Product variants
+
+Every product is sold through its variants. Creating a product also creates its first variant from `sku`, `price`, `discountedPrice`, `inventoryCost` and `stockQuantity`, so a product without sizes or colors simply has one variant. The variant holds the SKU, prices, stock, `isActive` and an optional image; the product holds everything shared, such as name, description, category and images.
+
+```ts
+import {
+  ProductImageService,
+  ProductOptionService,
+  ProductService,
+  ProductVariantService,
+} from '@awecommerce/service/apps/product/services/product'
+
+const shirt = await new ProductService(db).create({
+  name: 'Shirt',
+  slug: 'shirt',
+  sku: 'SHIRT-RED-M',
+  price: '20',
+})
+const variants = new ProductVariantService(db)
+await variants.update(shirt.variants[0].id, {
+  title: 'Red / M',
+  options: { Color: 'Red', Size: 'M' },
+})
+const [blueImage] = await new ProductImageService(db).setImages(shirt.id, [
+  'https://example.com/shirt-blue.jpg',
+])
+await variants.create(shirt.id, {
+  sku: 'SHIRT-BLUE-M',
+  title: 'Blue / M',
+  price: '22',
+  imageId: blueImage.id,
+  options: { Color: 'Blue', Size: 'M' },
+})
+
+const product = await new ProductService(db).get(shirt.id)
+// product.variants[n].options: [{ name: 'Color', value: 'Blue' }, { name: 'Size', value: 'M' }]
+// product.options: [{ name: 'Color', values: [...] }, { name: 'Size', values: [...] }]
+```
+
+- **Options:** each product has its own options (such as Color) and values (such as Red). Passing `options` to `create` or `update` creates any missing ones and replaces the variant's options. Two variants of a product cannot have the same options, so a product with several variants needs options that tell them apart; this throws `A variant with these options already exists`. `ProductOptionService` lists, renames and deletes options and values; deleting one also removes it from every variant.
+- **Image:** `imageId` must be one of the product's own images (`Image does not belong to the product: <id>`). `setImages` returns the new images and keeps a variant's image when its URL is still in the list. Without an image, the product's `thumbnail` is used.
+- **Active:** `markAsInactive(variantId)` stops a variant from being sold: `addToCart` throws `Product variant is not available: <id>`, and `createFromCart` throws `Product variant is not available: <sku>` if it became inactive while in a cart.
+- **Stock:** `stockQuantity` is stored on the variant but not checked when adding to the cart or ordering.
+- **Listing:** `ProductService.list` returns each product's `minPrice`, the lowest selling price (`discountedPrice`, else `price`) among its active variants. `minPrice`, `maxPrice` and `sortBy` use that price.
+- **Offers:** offers still target products, brands, categories and classes. All variants of a product count towards its quantity conditions, and each cart line gets its own discount from its variant's price.
 
 ### Cart summary
 
@@ -105,7 +151,7 @@ It does not place an order, use up offers, or redeem points (`redeemPoints` only
 
 ### Placing an order
 
-`OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only products and quantities, so an order always uses current prices.
+`OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only variants and quantities, so an order always uses current prices. It throws `Product variant is not available: <sku>` when a variant in the cart is inactive.
 
 ```ts
 import {
@@ -141,7 +187,7 @@ try {
 - **Options:** `shippingMethodId` (its price becomes `shippingCharge`, and its details are kept in `shippingMethod`), `shippingAddress`, `guestUser` (for carts without a user), `metadata`, `redeemPoints` (see below), and `expectedTotal`. The order's user is always the cart's user.
 - **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, minus the loyalty discount, plus shipping, plus tax when prices exclude tax (see [Tax](#tax)). It is stored in the order's `total` column, so orders can be filtered and sorted by it.
 - **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
-- **Order lines:** `price` is the product's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose product has neither is stored with `price` `null` and counts as zero. `productName` and `productSku` are copied onto the line, so renaming or changing a product later does not alter past orders.
+- **Order lines:** each line has `productId` and `variantId`. `price` is the variant's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose variant has neither is stored with `price` `null` and counts as zero. `productName`, `variantTitle`, `sku`, `imageUrl` (the variant's image, else the product's thumbnail) and `options` (such as `[{ name: 'Color', value: 'Red' }, { name: 'Size', value: 'M' }]`) are copied onto the line, so renaming or deleting a product, variant, image or option later does not alter past orders.
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
 - **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
 - **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
@@ -154,7 +200,7 @@ try {
 
 | Import path | Exports |
 |---|---|
-| `@awecommerce/service/apps/product/services/product` | `ProductService`, `BrandService`, `CategoryService`, `ProductClassService`, `ProductImageService`, `RelatedProductService` |
+| `@awecommerce/service/apps/product/services/product` | `ProductService`, `ProductVariantService`, `ProductOptionService`, `BrandService`, `CategoryService`, `ProductClassService`, `ProductImageService`, `RelatedProductService` |
 | `@awecommerce/service/apps/cart/services/cart` | `CartService` |
 | `@awecommerce/service/apps/offer/services/offer` | `OfferService`, `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` |
 | `@awecommerce/service/apps/order/services/order` | `OrderService`, `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError` |

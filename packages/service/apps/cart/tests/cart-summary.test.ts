@@ -32,11 +32,11 @@ const createProduct = async (
   return await productService.create({ name: slug, slug, sku: slug, price, ...options })
 }
 
-const createCart = async (items: Array<{ productId: number; quantity: number }>) => {
+const createCart = async (items: Array<{ variantId: number; quantity: number }>) => {
   const userId = unique('summary-user')
   const cart = await cartService.create(userId)
   for (const item of items) {
-    await cartService.addToCart(cart.id, item.productId, item.quantity)
+    await cartService.addToCart(cart.id, item.variantId, item.quantity)
   }
   return { cart, userId }
 }
@@ -89,7 +89,7 @@ beforeEach(async () => {
 
 test('should show tax per line and the cart totals', async () => {
   const product = await createProduct('100')
-  const { cart } = await createCart([{ productId: product.id, quantity: 2 }])
+  const { cart } = await createCart([{ variantId: product.variants[0].id, quantity: 2 }])
 
   const summary = await cartService.getCartSummary(cart.sessionId)
 
@@ -113,8 +113,8 @@ test('should match the order created from the cart', async () => {
   const onSale = await createProduct('100', { discountedPrice: '80' })
   const reduced = await createProduct('40', { productClassId: reducedClass.id })
   const { cart, userId } = await createCart([
-    { productId: onSale.id, quantity: 1 },
-    { productId: reduced.id, quantity: 3 },
+    { variantId: onSale.variants[0].id, quantity: 1 },
+    { variantId: reduced.variants[0].id, quantity: 3 },
   ])
   await createVoucher('SUMMARY10', '10')
   const content = await cartService.getCartContentForSession(cart.sessionId)
@@ -138,7 +138,7 @@ test('should match the order created from the cart', async () => {
 test('should split tax out without changing the total when prices include tax', async () => {
   await taxService.updateSettings({ pricesIncludeTax: true })
   const product = await createProduct('113')
-  const { cart } = await createCart([{ productId: product.id, quantity: 1 }])
+  const { cart } = await createCart([{ variantId: product.variants[0].id, quantity: 1 }])
 
   const summary = await cartService.getCartSummary(cart.sessionId)
 
@@ -149,7 +149,7 @@ test('should split tax out without changing the total when prices include tax', 
 
 test('should reject an unknown shipping method', async () => {
   const product = await createProduct('10')
-  const { cart } = await createCart([{ productId: product.id, quantity: 1 }])
+  const { cart } = await createCart([{ variantId: product.variants[0].id, quantity: 1 }])
   await expect(
     cartService.getCartSummary(cart.sessionId, { shippingMethodId: 999999 }),
   ).rejects.toThrow('Shipping method not found: 999999')
@@ -157,7 +157,7 @@ test('should reject an unknown shipping method', async () => {
 
 test('should not place an order or use up offers', async () => {
   const product = await createProduct('100')
-  const { cart, userId } = await createCart([{ productId: product.id, quantity: 1 }])
+  const { cart, userId } = await createCart([{ variantId: product.variants[0].id, quantity: 1 }])
   const voucher = await createVoucher('SUMMARYONLY', '10')
   const content = await cartService.getCartContentForSession(cart.sessionId)
   await new OfferService(db).applyVoucherCode(content, undefined, 'SUMMARYONLY', userId)

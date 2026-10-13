@@ -51,7 +51,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     })
     const cartService = new CartService(db)
     const cart = await cartService.create(slug)
-    await cartService.addToCart(cart.id, product.id, 1)
+    await cartService.addToCart(cart.id, product.variants[0].id, 1)
 
     const results = await Promise.allSettled(
       Array.from({ length: CONCURRENCY }, () =>
@@ -111,7 +111,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     const cartService = new CartService(db)
     const placeOrder = async (userId: string) => {
       const cart = await cartService.create(userId)
-      await cartService.addToCart(cart.id, product.id, 1)
+      await cartService.addToCart(cart.id, product.variants[0].id, 1)
       const content = await cartService.getCartContentForSession(cart.sessionId)
       await new OfferService(db).applyVoucherCode(content, undefined, slug, userId)
       return await new OrderService(db).createFromCart(cart.id)
@@ -151,7 +151,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     })
     const cartService = new CartService(db)
     const cart = await cartService.create(slug)
-    await cartService.addToCart(cart.id, product.id, 1)
+    await cartService.addToCart(cart.id, product.variants[0].id, 1)
     const order = await new OrderService(db).createFromCart(cart.id)
 
     const results = await Promise.allSettled(
@@ -227,7 +227,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     const cartIds: number[] = []
     for (const userId of userIds) {
       const cart = await cartService.create(userId)
-      await cartService.addToCart(cart.id, product.id, 1)
+      await cartService.addToCart(cart.id, product.variants[0].id, 1)
       const content = await cartService.getCartContentForSession(cart.sessionId)
       await new OfferService(db).applyVoucherCode(content, undefined, code, userId)
       cartIds.push(cart.id)
@@ -305,7 +305,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     const cartIds: number[] = []
     for (const userId of userIds) {
       const cart = await cartService.create(userId)
-      await cartService.addToCart(cart.id, product.id, 1)
+      await cartService.addToCart(cart.id, product.variants[0].id, 1)
       cartIds.push(cart.id)
     }
 

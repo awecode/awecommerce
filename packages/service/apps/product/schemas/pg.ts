@@ -11,6 +11,7 @@ import {
   text,
   primaryKey,
   jsonb,
+  unique,
 } from 'drizzle-orm/pg-core'
 
 export const brands = pgTable('brand', {
@@ -56,7 +57,6 @@ export const products = pgTable('product', {
   id: serial().primaryKey(),
   name: text().notNull(),
   slug: text().notNull().unique(),
-  sku: text().notNull().unique(),
   description: text(),
   specification: text(),
   brandId: integer().references(() => brands.id),
@@ -64,11 +64,7 @@ export const products = pgTable('product', {
   productClassId: integer().references(() => productClasses.id),
   link: text(),
   thumbnail: text(),
-  price: numeric({ precision: 100, scale: 20 }),
-  discountedPrice: numeric({ precision: 100, scale: 20 }),
-  inventoryCost: numeric({ precision: 100, scale: 20 }),
   status: productStatus().default('Draft'),
-  stockQuantity: integer().default(0),
   isFeatured: boolean().default(false),
   isBestSeller: boolean().default(false),
   isActive: boolean().default(true),
@@ -98,7 +94,59 @@ export const productImages = pgTable('product_image', {
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
 
+// What is bought: a product has one variant per combination of its options,
+// or a single variant without options
+export const productVariants = pgTable('product_variant', {
+  id: serial().primaryKey(),
+  productId: integer().notNull().references(() => products.id, {
+    onDelete: 'cascade',
+  }),
+  sku: text().notNull().unique(),
+  // Short label such as "M / Red"; empty for a product without options
+  title: text(),
+  price: numeric({ precision: 100, scale: 20 }),
+  discountedPrice: numeric({ precision: 100, scale: 20 }),
+  inventoryCost: numeric({ precision: 100, scale: 20 }),
+  stockQuantity: integer().default(0),
+  // One of the product's images, shown when this variant is selected
+  imageId: integer().references(() => productImages.id, {
+    onDelete: 'set null',
+  }),
+  isActive: boolean().notNull().default(true),
+  createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+  updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
+})
+
+// An option of one product, such as Size
+export const productOptions = pgTable('product_option', {
+  id: serial().primaryKey(),
+  productId: integer().notNull().references(() => products.id, {
+    onDelete: 'cascade',
+  }),
+  name: text().notNull(),
+}, (t) => [unique().on(t.productId, t.name)])
+
+// A value of an option, such as M
+export const productOptionValues = pgTable('product_option_value', {
+  id: serial().primaryKey(),
+  optionId: integer().notNull().references(() => productOptions.id, {
+    onDelete: 'cascade',
+  }),
+  value: text().notNull(),
+}, (t) => [unique().on(t.optionId, t.value)])
+
+export const productVariantOptionValues = pgTable('product_variant_option_value', {
+  variantId: integer().notNull().references(() => productVariants.id, {
+    onDelete: 'cascade',
+  }),
+  optionValueId: integer().notNull().references(() => productOptionValues.id, {
+    onDelete: 'cascade',
+  }),
+}, (t) => [primaryKey({ columns: [t.variantId, t.optionValueId] })])
+
 export const productRelations = relations(products, (({one, many})=>({
+  variants: many(productVariants),
+  options: many(productOptions),
   brand: one(brands, {
     fields: [products.brandId],
     references: [brands.id]
@@ -126,6 +174,48 @@ export const productImageRelations = relations(productImages, (({one})=>({
     references: [products.id]
   })
 })))
+
+export const productVariantRelations = relations(productVariants, ({ one, many }) => ({
+  product: one(products, {
+    fields: [productVariants.productId],
+    references: [products.id],
+  }),
+  image: one(productImages, {
+    fields: [productVariants.imageId],
+    references: [productImages.id],
+  }),
+  optionValues: many(productVariantOptionValues),
+}))
+
+export const productOptionRelations = relations(productOptions, ({ one, many }) => ({
+  product: one(products, {
+    fields: [productOptions.productId],
+    references: [products.id],
+  }),
+  values: many(productOptionValues),
+}))
+
+export const productOptionValueRelations = relations(productOptionValues, ({ one, many }) => ({
+  option: one(productOptions, {
+    fields: [productOptionValues.optionId],
+    references: [productOptions.id],
+  }),
+  variants: many(productVariantOptionValues),
+}))
+
+export const productVariantOptionValueRelations = relations(
+  productVariantOptionValues,
+  ({ one }) => ({
+    variant: one(productVariants, {
+      fields: [productVariantOptionValues.variantId],
+      references: [productVariants.id],
+    }),
+    optionValue: one(productOptionValues, {
+      fields: [productVariantOptionValues.optionValueId],
+      references: [productOptionValues.id],
+    }),
+  }),
+)
 
 export const productClassRelations = relations(productClasses, (({many})=>({
   products: many(products)
@@ -174,12 +264,31 @@ type BaseEntity = {
   updatedAt: string
 }
 
-export type Product = typeof products.$inferSelect
-export type NewProduct = Omit<typeof products.$inferInsert, keyof BaseEntity> & {
-  images?: string[]
-  relatedProducts?: number[]
+export type ProductVariant = typeof productVariants.$inferSelect
+// options maps an option name to its value, for example { Size: 'M' }
+export type NewProductVariant = Omit<
+  typeof productVariants.$inferInsert,
+  keyof BaseEntity | 'productId'
+> & {
+  options?: Record<string, string>
 }
-export type UpdateProduct = Partial<NewProduct>
+export type UpdateProductVariant = Partial<NewProductVariant>
+
+// The variant fields create the product's first variant
+type FirstVariantFields = 'sku' | 'price' | 'discountedPrice' | 'inventoryCost' | 'stockQuantity'
+
+export type Product = typeof products.$inferSelect
+export type UpdateProduct = Partial<
+  Omit<typeof products.$inferInsert, keyof BaseEntity> & {
+    images?: string[]
+    relatedProducts?: number[]
+  }
+>
+export type NewProduct = Omit<typeof products.$inferInsert, keyof BaseEntity> &
+  Pick<NewProductVariant, FirstVariantFields> & {
+    images?: string[]
+    relatedProducts?: number[]
+  }
 
 export type NewProductImage = Omit<typeof productImages.$inferInsert, keyof BaseEntity>
 export type ProductImage = typeof productImages.$inferSelect

@@ -27,7 +27,12 @@ const expectedExports = {
   ],
   'apps/order/services/shipping-address': ['ShippingAddressService'],
   'apps/order/services/shipping-method': ['ShippingMethodService'],
-  'apps/product/services/product': ['ProductService', 'CategoryService'],
+  'apps/product/services/product': [
+    'ProductService',
+    'ProductVariantService',
+    'ProductOptionService',
+    'CategoryService',
+  ],
   'apps/cart/schemas': ['carts', 'cartLines'],
   'apps/offer/schemas': ['offers'],
   'apps/order/schemas': ['orders'],

@@ -4,7 +4,10 @@ import { db } from 'core/db'
 import { CartService } from 'apps/cart/services/cart'
 import { OfferService } from 'apps/offer/services/offer'
 import { OrderService } from 'apps/order/services/order'
-import { ProductService } from 'apps/product/services/product'
+import {
+  ProductService,
+  ProductVariantService,
+} from 'apps/product/services/product'
 import {
   offerBenefits,
   offerConditions,
@@ -17,6 +20,7 @@ const cartService = new CartService(db)
 const offerService = new OfferService(db)
 const orderService = new OrderService(db)
 const productService = new ProductService(db)
+const variantService = new ProductVariantService(db)
 
 let productCount = 0
 
@@ -100,9 +104,9 @@ const createVoucher = async (options: {
   return offer
 }
 
-const cartFor = async (userId: string, productId: number, quantity: number) => {
+const cartFor = async (userId: string, variantId: number, quantity: number) => {
   const cart = await cartService.create(userId)
-  await cartService.addToCart(cart.id, productId, quantity)
+  await cartService.addToCart(cart.id, variantId, quantity)
   const content = await cartService.getCartContentForSession(cart.sessionId)
   return content
 }
@@ -115,7 +119,7 @@ test('should discount a percentage of the sale price, not the list price', async
     benefitType: 'percentage',
     benefitValue: '10',
   })
-  const content = await cartFor(userId, product.id, 2)
+  const content = await cartFor(userId, product.variants[0].id, 2)
 
   const applied = await offerService.applyVoucherCode(content, undefined, 'SALE10', userId)
 
@@ -131,7 +135,7 @@ test('should multiply a fixed voucher by quantity', async () => {
     benefitType: 'fixed_amount',
     benefitValue: '10',
   })
-  const content = await cartFor(userId, product.id, 3)
+  const content = await cartFor(userId, product.variants[0].id, 3)
 
   const applied = await offerService.applyVoucherCode(content, undefined, 'FIXED10', userId)
 
@@ -146,7 +150,7 @@ test('should cap a voucher at the selling price', async () => {
     benefitType: 'fixed_amount',
     benefitValue: '100',
   })
-  const content = await cartFor(userId, product.id, 1)
+  const content = await cartFor(userId, product.variants[0].id, 1)
 
   const applied = await offerService.applyVoucherCode(content, undefined, 'FIXED100', userId)
 
@@ -166,7 +170,7 @@ test('should only fill the room left under the selling price', async () => {
     benefitType: 'percentage',
     benefitValue: '50',
   })
-  const content = await cartFor(userId, product.id, 1)
+  const content = await cartFor(userId, product.variants[0].id, 1)
   const first = await offerService.applyVoucherCode(content, undefined, 'STACK30', userId)
 
   const second = await offerService.applyVoucherCode(first, undefined, 'STACK50', userId)
@@ -188,7 +192,7 @@ test('should refuse another voucher once the selling price is fully discounted',
     benefitType: 'fixed_amount',
     benefitValue: '1',
   })
-  const content = await cartFor(userId, product.id, 1)
+  const content = await cartFor(userId, product.variants[0].id, 1)
   const applied = await offerService.applyVoucherCode(content, undefined, 'FULL40', userId)
 
   await expect(
@@ -206,11 +210,44 @@ test('should ignore a product outside the voucher range', async () => {
     benefitValue: '10',
     productIds: [included.id],
   })
-  const content = await cartFor(userId, excluded.id, 1)
+  const content = await cartFor(userId, excluded.variants[0].id, 1)
 
   await expect(
     offerService.applyVoucherCode(content, undefined, 'RANGEONLY', userId),
   ).rejects.toThrow('Voucher code is not applicable to any product in the cart')
+})
+
+test('should discount each variant of a product on its own line', async () => {
+  const userId = 'discount-variants-user'
+  const product = await createProduct('100')
+  const large = await variantService.create(product.id, {
+    sku: `${product.slug}-large`,
+    price: '200',
+    discountedPrice: '150',
+    options: { Size: 'L' },
+  })
+  await createVoucher({
+    code: 'VARIANTS10',
+    benefitType: 'percentage',
+    benefitValue: '10',
+    minQuantity: '3',
+    productIds: [product.id],
+  })
+  const cart = await cartService.create(userId)
+  await cartService.addToCart(cart.id, product.variants[0].id, 2)
+  await cartService.addToCart(cart.id, large.id, 1)
+  const content = await cartService.getCartContentForSession(cart.sessionId)
+
+  const applied = await offerService.applyVoucherCode(content, undefined, 'VARIANTS10', userId)
+
+  const discounts = applied.lines
+    .map((line) => [line.variantId, line.totalOfferDiscount])
+    .sort((a, b) => a[0] - b[0])
+  expect(discounts).toEqual([
+    [product.variants[0].id, 20],
+    [large.id, 15],
+  ])
+  expect(applied.totalOfferDiscount).toBe(35)
 })
 
 test('should reject a voucher when the quantity condition is not met', async () => {
@@ -222,7 +259,7 @@ test('should reject a voucher when the quantity condition is not met', async () 
     benefitValue: '10',
     minQuantity: '3',
   })
-  const content = await cartFor(userId, product.id, 2)
+  const content = await cartFor(userId, product.variants[0].id, 2)
 
   await expect(
     offerService.applyVoucherCode(content, undefined, 'QTY3', userId),
@@ -238,7 +275,7 @@ test('should limit a fixed voucher to maxAffectedItems units', async () => {
     benefitValue: '10',
     maxAffectedItems: 2,
   })
-  const content = await cartFor(userId, product.id, 5)
+  const content = await cartFor(userId, product.variants[0].id, 5)
 
   const applied = await offerService.applyVoucherCode(content, undefined, 'MAX2', userId)
 
@@ -261,7 +298,7 @@ test('should reject an expired voucher and a voucher past its usage limit', asyn
     overallLimit: 1,
     usageCount: 1,
   })
-  const content = await cartFor(userId, product.id, 1)
+  const content = await cartFor(userId, product.variants[0].id, 1)
 
   await expect(
     offerService.applyVoucherCode(content, undefined, 'EXPIRED', userId),
@@ -300,7 +337,7 @@ test('should apply a user offer as a percentage of the sale price', async () => 
     conditionId: condition.id,
     benefitId: benefit.id,
   })
-  const content = await cartFor(userId, product.id, 1)
+  const content = await cartFor(userId, product.variants[0].id, 1)
 
   const applied = await cartService.applyUserOffers(content, userId)
 
@@ -316,7 +353,7 @@ test('should not copy a voucher discount onto the order line', async () => {
     benefitType: 'percentage',
     benefitValue: '10',
   })
-  const content = await cartFor(userId, product.id, 1)
+  const content = await cartFor(userId, product.variants[0].id, 1)
   const applied = await offerService.applyVoucherCode(content, undefined, 'ORDER10', userId)
   expect(applied.lines[0].totalOfferDiscount).toBe(10)
 

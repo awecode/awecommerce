@@ -40,14 +40,14 @@ const createProductClass = async (taxRate: string | null) => {
 }
 
 const orderFor = async (
-  items: Array<{ productId: number; quantity: number }>,
+  items: Array<{ variantId: number; quantity: number }>,
   options: Parameters<OrderService['createFromCart']>[1] = {},
   voucherCode?: string,
 ) => {
   const userId = unique('tax-user')
   const cart = await cartService.create(userId)
   for (const item of items) {
-    await cartService.addToCart(cart.id, item.productId, item.quantity)
+    await cartService.addToCart(cart.id, item.variantId, item.quantity)
   }
   if (voucherCode) {
     const content = await cartService.getCartContentForSession(cart.sessionId)
@@ -104,7 +104,7 @@ beforeEach(async () => {
 
 test('should add tax on top of prices at the default rate', async () => {
   const product = await createProduct('100')
-  const order = await orderFor([{ productId: product.id, quantity: 2 }])
+  const order = await orderFor([{ variantId: product.variants[0].id, quantity: 2 }])
 
   expect(Number(order.tax)).toBe(26)
   expect(Number(order.total)).toBe(226)
@@ -122,9 +122,9 @@ test('should use the product class rate, and the default when the class has none
   const defaulted = await createProduct('100', { productClassId: noRateClass.id })
 
   const order = await orderFor([
-    { productId: exempt.id, quantity: 1 },
-    { productId: reduced.id, quantity: 1 },
-    { productId: defaulted.id, quantity: 1 },
+    { variantId: exempt.variants[0].id, quantity: 1 },
+    { variantId: reduced.variants[0].id, quantity: 1 },
+    { variantId: defaulted.variants[0].id, quantity: 1 },
   ])
 
   const byProduct = Object.fromEntries(
@@ -141,7 +141,7 @@ test('should split tax out of tax-inclusive prices without changing the total', 
   await taxService.updateSettings({ pricesIncludeTax: true })
   const product = await createProduct('113')
 
-  const order = await orderFor([{ productId: product.id, quantity: 1 }])
+  const order = await orderFor([{ variantId: product.variants[0].id, quantity: 1 }])
 
   expect(Number(order.tax)).toBe(13)
   expect(Number(order.total)).toBe(113)
@@ -152,7 +152,7 @@ test('should tax the price after the sale price and offer discounts', async () =
   // Sale price 80, then 10% off: 72 is what the customer pays before tax
   const product = await createProduct('100', { discountedPrice: '80' })
 
-  const order = await orderFor([{ productId: product.id, quantity: 1 }], {}, 'TAX10')
+  const order = await orderFor([{ variantId: product.variants[0].id, quantity: 1 }], {}, 'TAX10')
 
   expect(Number(order.discount)).toBe(8)
   expect(Number(order.tax)).toBe(9.36)
@@ -163,14 +163,14 @@ test('should tax shipping at the default rate only when enabled', async () => {
   const product = await createProduct('100')
   const method = await new ShippingMethodService(db).create({ name: 'Courier', price: '50' })
 
-  const untaxed = await orderFor([{ productId: product.id, quantity: 1 }], {
+  const untaxed = await orderFor([{ variantId: product.variants[0].id, quantity: 1 }], {
     shippingMethodId: method.id,
   })
   expect(Number(untaxed.tax)).toBe(13)
   expect(Number(untaxed.total)).toBe(163)
 
   await taxService.updateSettings({ taxShipping: true })
-  const taxed = await orderFor([{ productId: product.id, quantity: 1 }], {
+  const taxed = await orderFor([{ variantId: product.variants[0].id, quantity: 1 }], {
     shippingMethodId: method.id,
   })
   expect(Number(taxed.tax)).toBe(19.5)
@@ -182,7 +182,7 @@ test('should split tax out of a tax-inclusive shipping price', async () => {
   const product = await createProduct('113')
   const method = await new ShippingMethodService(db).create({ name: 'Inclusive', price: '56.5' })
 
-  const order = await orderFor([{ productId: product.id, quantity: 1 }], {
+  const order = await orderFor([{ variantId: product.variants[0].id, quantity: 1 }], {
     shippingMethodId: method.id,
   })
 
@@ -196,8 +196,8 @@ test('should round tax per line to 2 decimal places before adding up', async () 
   const second = await createProduct('10.05')
 
   const order = await orderFor([
-    { productId: first.id, quantity: 1 },
-    { productId: second.id, quantity: 1 },
+    { variantId: first.variants[0].id, quantity: 1 },
+    { variantId: second.variants[0].id, quantity: 1 },
   ])
 
   expect(Number(order.tax)).toBe(2.62)
@@ -207,9 +207,9 @@ test('should round tax per line to 2 decimal places before adding up', async () 
 test('should include tax in the expected total check', async () => {
   const product = await createProduct('100')
   await expect(
-    orderFor([{ productId: product.id, quantity: 1 }], { expectedTotal: '100' }),
+    orderFor([{ variantId: product.variants[0].id, quantity: 1 }], { expectedTotal: '100' }),
   ).rejects.toThrow('Order total changed: expected 100, got 113')
-  const order = await orderFor([{ productId: product.id, quantity: 1 }], {
+  const order = await orderFor([{ variantId: product.variants[0].id, quantity: 1 }], {
     expectedTotal: '113',
   })
   expect(Number(order.total)).toBe(113)

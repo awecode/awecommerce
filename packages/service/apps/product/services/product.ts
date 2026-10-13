@@ -22,12 +22,19 @@ import {
   NewCategory,
   NewProduct,
   NewProductClass,
+  NewProductVariant,
   Product,
   productClasses,
   productImages,
+  productOptions,
+  productOptionValues,
   productRelatedProducts,
   products,
+  productVariantOptionValues,
+  productVariants,
   productViews,
+  UpdateProduct,
+  UpdateProductVariant,
 } from '../schemas'
 import { orderLines } from '../../order/schemas'
 import { aliasedTable } from 'drizzle-orm'
@@ -59,6 +66,38 @@ interface ProductFilter {
   getFilters?: () => SQL[]
 }
 
+// The lowest selling price among the product's active variants
+const minVariantPrice = sql<string | null>`(
+  SELECT MIN(COALESCE(${productVariants.discountedPrice}, ${productVariants.price}))
+  FROM ${productVariants}
+  WHERE ${productVariants.productId} = ${products.id}
+  AND ${productVariants.isActive} = true
+)`
+
+// Loads a variant's option values with their option, for withVariantOptions
+const optionValuesWithOption = {
+  with: { optionValue: { with: { option: true } } },
+} as const
+
+type VariantWithOptionValues = {
+  optionValues: Array<{
+    optionValue: { value: string; option: { id: number; name: string } }
+  }>
+}
+
+// Replaces a variant's loaded option values with name and value pairs, in the
+// order the product's options were created
+const withVariantOptions = <V extends VariantWithOptionValues>({
+  optionValues,
+  ...variant
+}: V) => ({
+  ...variant,
+  options: optionValues
+    .map(({ optionValue }) => optionValue)
+    .sort((a, b) => a.option.id - b.option.id)
+    .map(({ value, option }) => ({ name: option.name, value })),
+})
+
 class ProductService {
   private db: Database
 
@@ -66,9 +105,19 @@ class ProductService {
     this.db = dbInstance as Database
   }
 
+  // Creates the product with its first variant, made from the variant fields
   async create(product: NewProduct) {
     return await this.db.transaction(async (tx) => {
-      const { images, relatedProducts, ...productData } = product
+      const {
+        images,
+        relatedProducts,
+        sku,
+        price,
+        discountedPrice,
+        inventoryCost,
+        stockQuantity,
+        ...productData
+      } = product
       const result = await tx
         .insert(products)
         .values(productData)
@@ -84,13 +133,33 @@ class ProductService {
           relatedProducts,
         )
       }
-      return result[0]
+      const variant = await new ProductVariantService(tx).create(result[0].id, {
+        sku,
+        price,
+        discountedPrice,
+        inventoryCost,
+        stockQuantity,
+      })
+      return { ...result[0], variants: [variant] }
     })
   }
 
   async get(productId: number) {
     const result = await this.db.query.products.findFirst({
       with: {
+        variants: {
+          with: {
+            image: true,
+            optionValues: optionValuesWithOption,
+          },
+          orderBy: asc(productVariants.id),
+        },
+        options: {
+          with: {
+            values: { orderBy: asc(productOptionValues.id) },
+          },
+          orderBy: asc(productOptions.id),
+        },
         relatedProducts: {
           with: {
             relatedProduct: {
@@ -129,6 +198,7 @@ class ProductService {
     return result
       ? {
           ...result,
+          variants: result.variants.map(withVariantOptions),
           relatedProducts: result.relatedProducts.map(
             (r: any) => r.relatedProduct,
           ),
@@ -145,18 +215,7 @@ class ProductService {
     return result[0]
   }
 
-  async getPrices(productId: number) {
-    const result = await this.db
-      .select({
-        price: products.price,
-        discountedPrice: products.discountedPrice,
-      })
-      .from(products)
-      .where(eq(products.id, productId))
-    return result[0]
-  }
-
-  async update(productId: number, product: Partial<NewProduct>) {
+  async update(productId: number, product: UpdateProduct) {
     return await this.db.transaction(async (tx) => {
       const { images, relatedProducts, ...productData } = product
       const result = await tx
@@ -254,15 +313,11 @@ class ProductService {
       }
 
       if (filter.minPrice) {
-        where.push(
-          sql`COALESCE(${products.discountedPrice}, ${products.price}) >= ${filter.minPrice}`,
-        )
+        where.push(sql`${minVariantPrice} >= ${filter.minPrice}`)
       }
 
       if (filter.maxPrice) {
-        where.push(
-          sql`COALESCE(${products.discountedPrice}, ${products.price}) <= ${filter.maxPrice}`,
-        )
+        where.push(sql`${minVariantPrice} <= ${filter.maxPrice}`)
       }
 
       if (filter.extraFilters) {
@@ -273,11 +328,9 @@ class ProductService {
     let orderBy: SQL | undefined
     if (filter.sortBy) {
       if (filter.sortBy === 'priceAsc') {
-        orderBy = sql`COALESCE(${products.discountedPrice}, ${products.price})`
+        orderBy = sql`${minVariantPrice}`
       } else {
-        orderBy = desc(
-          sql`COALESCE(${products.discountedPrice}, ${products.price})`,
-        )
+        orderBy = desc(minVariantPrice)
       }
     } else {
       orderBy = desc(products.id)
@@ -286,6 +339,7 @@ class ProductService {
     let query = this.db
       .select({
         ...getTableColumns(products),
+        minPrice: minVariantPrice,
         brand: getTableColumns(brands),
         category: getTableColumns(categories),
         productClass: getTableColumns(productClasses),
@@ -948,18 +1002,260 @@ class ProductImageService {
     return result
   }
 
+  // Replaces the product's images. Variants keep their image when its URL is
+  // still in the list.
   async setImages(productId: number, imageUrls: string[]) {
     return await this.db.transaction(async (tx) => {
-      const result = await tx
-        .delete(productImages)
-        .where(eq(productImages.productId, productId))
-      if (imageUrls.length) {
-        await tx
-          .insert(productImages)
-          .values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
+      const variantImages = await tx
+        .select({ id: productVariants.id, imageUrl: productImages.imageUrl })
+        .from(productVariants)
+        .innerJoin(productImages, eq(productVariants.imageId, productImages.id))
+        .where(eq(productVariants.productId, productId))
+      await tx.delete(productImages).where(eq(productImages.productId, productId))
+      if (!imageUrls.length) {
+        return []
+      }
+      const inserted = await tx
+        .insert(productImages)
+        .values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
+        .returning()
+      for (const variant of variantImages) {
+        const image = inserted.find((i) => i.imageUrl === variant.imageUrl)
+        if (image) {
+          await tx
+            .update(productVariants)
+            .set({ imageId: image.id })
+            .where(eq(productVariants.id, variant.id))
+        }
+      }
+      return inserted
+    })
+  }
+}
+
+class ProductVariantService {
+  private db: Database
+
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
+  }
+
+  async create(productId: number, variant: NewProductVariant) {
+    return await this.db.transaction(async (tx) => {
+      const variantService = new ProductVariantService(tx)
+      const { options, ...variantData } = variant
+      await variantService.checkImage(productId, variantData.imageId)
+      const [result] = await tx
+        .insert(productVariants)
+        .values({ ...variantData, productId })
+        .returning()
+      await variantService.setOptions(result, options ?? {})
+      return result
+    })
+  }
+
+  // Variant with its product, image and options as name and value pairs
+  async get(variantId: number) {
+    const result = await this.db.query.productVariants.findFirst({
+      with: {
+        product: true,
+        image: true,
+        optionValues: optionValuesWithOption,
+      },
+      where: eq(productVariants.id, variantId),
+    })
+    return result ? withVariantOptions(result) : null
+  }
+
+  async list(productId: number) {
+    const result = await this.db.query.productVariants.findMany({
+      with: {
+        image: true,
+        optionValues: optionValuesWithOption,
+      },
+      where: eq(productVariants.productId, productId),
+      orderBy: asc(productVariants.id),
+    })
+    return result.map(withVariantOptions)
+  }
+
+  // Passing options replaces all of the variant's options
+  async update(variantId: number, variant: UpdateProductVariant) {
+    return await this.db.transaction(async (tx) => {
+      const variantService = new ProductVariantService(tx)
+      const { options, ...variantData } = variant
+      const [existing] = await tx
+        .select()
+        .from(productVariants)
+        .where(eq(productVariants.id, variantId))
+      if (!existing) {
+        throw new Error(`Product variant not found: ${variantId}`)
+      }
+      await variantService.checkImage(existing.productId, variantData.imageId)
+      const [result] = await tx
+        .update(productVariants)
+        .set({ ...variantData, updatedAt: new Date().toISOString() })
+        .where(eq(productVariants.id, variantId))
+        .returning()
+      if (options) {
+        await variantService.setOptions(result, options)
       }
       return result
     })
+  }
+
+  async delete(variantId: number) {
+    const result = await this.db
+      .delete(productVariants)
+      .where(eq(productVariants.id, variantId))
+      .returning()
+    return result[0]
+  }
+
+  async markAsActive(variantId: number) {
+    return await this.update(variantId, { isActive: true })
+  }
+
+  async markAsInactive(variantId: number) {
+    return await this.update(variantId, { isActive: false })
+  }
+
+  private async checkImage(productId: number, imageId?: number | null) {
+    if (imageId === undefined || imageId === null) {
+      return
+    }
+    const [image] = await this.db
+      .select()
+      .from(productImages)
+      .where(and(eq(productImages.id, imageId), eq(productImages.productId, productId)))
+    if (!image) {
+      throw new Error(`Image does not belong to the product: ${imageId}`)
+    }
+  }
+
+  // Links the variant to the given option values, creating the product's
+  // options and values that do not exist yet. Two variants of a product
+  // cannot have the same options.
+  private async setOptions(
+    variant: { id: number; productId: number },
+    options: Record<string, string>,
+  ) {
+    const optionValueIds: number[] = []
+    for (const [name, value] of Object.entries(options)) {
+      await this.db
+        .insert(productOptions)
+        .values({ productId: variant.productId, name })
+        .onConflictDoNothing()
+      const [option] = await this.db
+        .select()
+        .from(productOptions)
+        .where(
+          and(
+            eq(productOptions.productId, variant.productId),
+            eq(productOptions.name, name),
+          ),
+        )
+      await this.db
+        .insert(productOptionValues)
+        .values({ optionId: option.id, value })
+        .onConflictDoNothing()
+      const [optionValue] = await this.db
+        .select()
+        .from(productOptionValues)
+        .where(
+          and(
+            eq(productOptionValues.optionId, option.id),
+            eq(productOptionValues.value, value),
+          ),
+        )
+      optionValueIds.push(optionValue.id)
+    }
+
+    const otherVariants = await this.db.query.productVariants.findMany({
+      columns: { id: true },
+      with: { optionValues: { columns: { optionValueId: true } } },
+      where: and(
+        eq(productVariants.productId, variant.productId),
+        sql`${productVariants.id} <> ${variant.id}`,
+      ),
+    })
+    const key = (ids: number[]) => [...ids].sort((a, b) => a - b).join(',')
+    if (
+      otherVariants.some(
+        (other) =>
+          key(other.optionValues.map((v) => v.optionValueId)) === key(optionValueIds),
+      )
+    ) {
+      throw new Error('A variant with these options already exists')
+    }
+
+    await this.db
+      .delete(productVariantOptionValues)
+      .where(eq(productVariantOptionValues.variantId, variant.id))
+    if (optionValueIds.length) {
+      await this.db.insert(productVariantOptionValues).values(
+        optionValueIds.map((optionValueId) => ({
+          variantId: variant.id,
+          optionValueId,
+        })),
+      )
+    }
+  }
+}
+
+// Options are created through variants. Renaming or deleting them here does
+// not change orders already placed, which keep their own copy.
+class ProductOptionService {
+  private db: Database
+
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
+  }
+
+  async list(productId: number) {
+    return await this.db.query.productOptions.findMany({
+      with: {
+        values: { orderBy: asc(productOptionValues.id) },
+      },
+      where: eq(productOptions.productId, productId),
+      orderBy: asc(productOptions.id),
+    })
+  }
+
+  async rename(optionId: number, name: string) {
+    const result = await this.db
+      .update(productOptions)
+      .set({ name })
+      .where(eq(productOptions.id, optionId))
+      .returning()
+    return result[0]
+  }
+
+  // Also removes the option from every variant that uses it
+  async delete(optionId: number) {
+    const result = await this.db
+      .delete(productOptions)
+      .where(eq(productOptions.id, optionId))
+      .returning()
+    return result[0]
+  }
+
+  async renameValue(optionValueId: number, value: string) {
+    const result = await this.db
+      .update(productOptionValues)
+      .set({ value })
+      .where(eq(productOptionValues.id, optionValueId))
+      .returning()
+    return result[0]
+  }
+
+  // Also removes the value from every variant that uses it
+  async deleteValue(optionValueId: number) {
+    const result = await this.db
+      .delete(productOptionValues)
+      .where(eq(productOptionValues.id, optionValueId))
+      .returning()
+    return result[0]
   }
 }
 
@@ -992,6 +1288,11 @@ export {
   CategoryService,
   ProductClassService,
   ProductImageService,
+  ProductOptionService,
   ProductService,
+  ProductVariantService,
   RelatedProductService,
+  minVariantPrice,
+  optionValuesWithOption,
+  withVariantOptions,
 }

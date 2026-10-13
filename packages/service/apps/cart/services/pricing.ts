@@ -30,7 +30,7 @@ const priceCart = async (
   const classIds = [
     ...new Set(
       content.lines
-        .map((line) => line.product.productClassId)
+        .map((line) => line.variant.product.productClassId)
         .filter((id): id is number => id !== null),
     ),
   ]
@@ -47,8 +47,8 @@ const priceCart = async (
 
   // What each line costs after its sale price and offer discounts
   const lineAmounts = content.lines.map((line) => {
-    const listPrice = line.product.price
-    const salePrice = line.product.discountedPrice
+    const listPrice = line.variant.price
+    const salePrice = line.variant.discountedPrice
     const price = listPrice ?? salePrice ?? null
     const discount =
       listPrice && salePrice ? new Decimal(listPrice).sub(salePrice) : new Decimal(0)
@@ -83,15 +83,21 @@ const priceCart = async (
     const { price, discount, amount } = lineAmounts[index]
     // Taxed on what the customer pays for the line
     const taxable = amount.sub(loyaltyShares[index])
+    const { variant } = line
+    const { product } = variant
     const taxRate =
-      (line.product.productClassId !== null
-        ? classRates.get(line.product.productClassId)
+      (product.productClassId !== null
+        ? classRates.get(product.productClassId)
         : null) ?? taxSettings.defaultRate
     return {
       cartLineId: line.id,
-      productId: line.productId,
-      productName: line.product.name,
-      productSku: line.product.sku,
+      productId: product.id,
+      variantId: variant.id,
+      productName: product.name,
+      variantTitle: variant.title,
+      sku: variant.sku,
+      imageUrl: variant.image?.imageUrl ?? product.thumbnail,
+      options: variant.options,
       price,
       discount: discount.toString(),
       tax: calculateTax(taxable, taxRate, taxSettings.pricesIncludeTax).toString(),

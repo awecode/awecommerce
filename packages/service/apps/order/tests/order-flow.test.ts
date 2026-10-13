@@ -4,12 +4,16 @@ import { eq } from 'drizzle-orm'
 import { db } from 'core/db'
 import { OrderService } from 'apps/order/services/order'
 import { CartService } from 'apps/cart/services/cart'
-import { ProductService } from 'apps/product/services/product'
+import {
+  ProductService,
+  ProductVariantService,
+} from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
 import { orderLines, orders, orderStatusChanges, paymentEvents } from 'apps/order/schemas'
 
 const orderService = new OrderService(db)
 const productService = new ProductService(db)
+const variantService = new ProductVariantService(db)
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -30,7 +34,7 @@ const createOrder = async (userId: string) => {
   const product = await createProduct()
   const cartService = new CartService(db)
   const cart = await cartService.create(userId)
-  await cartService.addToCart(cart.id, product.id, 2)
+  await cartService.addToCart(cart.id, product.variants[0].id, 2)
   return await orderService.createFromCart(cart.id)
 }
 
@@ -43,7 +47,7 @@ test('should create an order with lines, discount, hash, frozen cart and log', a
   const cartService = new CartService(db)
   const cart = await cartService.create(userId)
   const product = await createProduct('100', '80')
-  await cartService.addToCart(cart.id, product.id, 3)
+  await cartService.addToCart(cart.id, product.variants[0].id, 3)
   const order = await orderService.createFromCart(cart.id)
 
   expect(order.status).toBe('Pending')
@@ -279,10 +283,10 @@ test('should create an order when a product has no price', async () => {
   const cart = await cartService.create(userId)
   const priced = await createProduct('10')
   const unpriced = await createProduct('20')
-  await cartService.addToCart(cart.id, priced.id, 1)
-  await cartService.addToCart(cart.id, unpriced.id, 1)
+  await cartService.addToCart(cart.id, priced.variants[0].id, 1)
+  await cartService.addToCart(cart.id, unpriced.variants[0].id, 1)
   // The price is removed after the product was added to the cart
-  await productService.update(unpriced.id, { price: null })
+  await variantService.update(unpriced.variants[0].id, { price: null })
 
   const order = await orderService.createFromCart(cart.id)
 
@@ -300,8 +304,8 @@ test('should use discountedPrice when the product has no list price', async () =
   const cartService = new CartService(db)
   const cart = await cartService.create(userId)
   const product = await createProduct('100', '80')
-  await cartService.addToCart(cart.id, product.id, 2)
-  await productService.update(product.id, { price: null })
+  await cartService.addToCart(cart.id, product.variants[0].id, 2)
+  await variantService.update(product.variants[0].id, { price: null })
 
   const order = await orderService.createFromCart(cart.id)
 

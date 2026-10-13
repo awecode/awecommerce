@@ -1,4 +1,5 @@
 import { Cart, CartLine } from './cart/schemas'
+import { Product, ProductImage, ProductVariant } from './product/schemas'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import * as cartSchemas from './cart/schemas'
 import * as offerSchemas from './offer/schemas'
@@ -33,18 +34,19 @@ type VoucherOfferDiscount = OfferDiscount & {
   voucherCode: string
 }
 
+export type VariantOption = { name: string; value: string }
+
+// The variant of a cart line, with what pricing and the order snapshot need
+export type CartLineVariant = ProductVariant & {
+  product: Product
+  image: ProductImage | null
+  options: VariantOption[]
+}
+
 export type CartContent = Cart & {
   lines: Array<
     CartLine & {
-      product: {
-        name: string
-        sku: string
-        productClassId: number | null
-        stockQuantity: number | null
-        price: string | null
-        inventoryCost: string | null
-        discountedPrice: string | null
-      }
+      variant: CartLineVariant
       userOfferDiscounts: OfferDiscount[]
       voucherOfferDiscounts: VoucherOfferDiscount[]
       totalOfferDiscount: number
@@ -56,17 +58,7 @@ export type CartContent = Cart & {
 }
 
 export type CartContentWithoutOfferInfo = Cart & {
-  lines: Array<
-    CartLine & {
-      product: {
-        name: string
-        stockQuantity: number | null
-        inventoryCost: string | null
-        price: string | null
-        discountedPrice: string | null
-      }
-    }
-  >
+  lines: Array<CartLine & { variant: CartLineVariant }>
 }
 
 

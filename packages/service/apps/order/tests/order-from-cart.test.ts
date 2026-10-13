@@ -10,7 +10,12 @@ import {
 import { ShippingMethodService } from 'apps/order/services/shipping-method'
 import { CartService } from 'apps/cart/services/cart'
 import { OfferService } from 'apps/offer/services/offer'
-import { ProductService } from 'apps/product/services/product'
+import {
+  ProductImageService,
+  ProductOptionService,
+  ProductService,
+  ProductVariantService,
+} from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
 import { orderLines, orders } from 'apps/order/schemas'
 import {
@@ -24,6 +29,8 @@ import {
 const orderService = new OrderService(db)
 const cartService = new CartService(db)
 const productService = new ProductService(db)
+const variantService = new ProductVariantService(db)
+const optionService = new ProductOptionService(db)
 
 let productCount = 0
 const createProduct = async (price: string | undefined, discountedPrice?: string) => {
@@ -40,11 +47,11 @@ const createProduct = async (price: string | undefined, discountedPrice?: string
 
 const createCart = async (
   userId: string | undefined,
-  items: Array<{ productId: number; quantity: number }>,
+  items: Array<{ variantId: number; quantity: number }>,
 ) => {
   const cart = await cartService.create(userId)
   for (const item of items) {
-    await cartService.addToCart(cart.id, item.productId, item.quantity)
+    await cartService.addToCart(cart.id, item.variantId, item.quantity)
   }
   return cart
 }
@@ -133,8 +140,8 @@ test('should create an order from a cart with prices from the database', async (
   const saleProduct = await createProduct('100', '80')
   const plainProduct = await createProduct('50')
   const cart = await createCart(userId, [
-    { productId: saleProduct.id, quantity: 3 },
-    { productId: plainProduct.id, quantity: 1 },
+    { variantId: saleProduct.variants[0].id, quantity: 3 },
+    { variantId: plainProduct.variants[0].id, quantity: 1 },
   ])
 
   const order = await orderService.createFromCart(cart.id)
@@ -160,9 +167,9 @@ test('should create an order from a cart with prices from the database', async (
 test('should use the current price, not the price when the item was added', async () => {
   const product = await createProduct('100')
   const cart = await createCart('from-cart-price-change-user', [
-    { productId: product.id, quantity: 1 },
+    { variantId: product.variants[0].id, quantity: 1 },
   ])
-  await productService.update(product.id, { price: '120' })
+  await variantService.update(product.variants[0].id, { price: '120' })
 
   const order = await orderService.createFromCart(cart.id)
 
@@ -173,23 +180,113 @@ test('should use the current price, not the price when the item was added', asyn
 test('should keep the product name and sku on the order line', async () => {
   const product = await createProduct('30')
   const cart = await createCart('from-cart-snapshot-user', [
-    { productId: product.id, quantity: 1 },
+    { variantId: product.variants[0].id, quantity: 1 },
   ])
   const order = await orderService.createFromCart(cart.id)
-  await productService.update(product.id, { name: 'Renamed Product', sku: 'RENAMED' })
+  await productService.update(product.id, { name: 'Renamed Product' })
+  await variantService.update(product.variants[0].id, { sku: 'RENAMED' })
 
   const [line] = await db
     .select()
     .from(orderLines)
     .where(eq(orderLines.orderId, order.id))
   expect(line.productName).toBe(product.name)
-  expect(line.productSku).toBe(product.sku)
+  expect(line.sku).toBe(product.variants[0].sku)
+  expect(line.variantId).toBe(product.variants[0].id)
+})
+
+test('should keep the variant title, image and options after they change', async () => {
+  const product = await createProduct('30')
+  const [image] = await new ProductImageService(db).setImages(product.id, [
+    'https://example.com/red.jpg',
+  ])
+  const variant = await variantService.update(product.variants[0].id, {
+    title: 'Red / M',
+    imageId: image.id,
+    options: { Color: 'Red', Size: 'M' },
+  })
+  const cart = await createCart('from-cart-variant-snapshot-user', [
+    { variantId: variant.id, quantity: 1 },
+  ])
+  const order = await orderService.createFromCart(cart.id)
+
+  const [color, size] = await optionService.list(product.id)
+  await optionService.rename(color.id, 'Colour')
+  await optionService.renameValue(color.values[0].id, 'Crimson')
+  await optionService.delete(size.id)
+  await variantService.update(variant.id, { title: 'Crimson', imageId: null })
+  await new ProductImageService(db).setImages(product.id, [])
+
+  const [line] = await db
+    .select()
+    .from(orderLines)
+    .where(eq(orderLines.orderId, order.id))
+  expect(line.variantTitle).toBe('Red / M')
+  expect(line.imageUrl).toBe('https://example.com/red.jpg')
+  expect(line.options).toEqual([
+    { name: 'Color', value: 'Red' },
+    { name: 'Size', value: 'M' },
+  ])
+})
+
+test('should use the product thumbnail when the variant has no image', async () => {
+  const product = await createProduct('30')
+  await productService.update(product.id, { thumbnail: 'https://example.com/thumb.jpg' })
+  const cart = await createCart('from-cart-thumbnail-user', [
+    { variantId: product.variants[0].id, quantity: 1 },
+  ])
+  const order = await orderService.createFromCart(cart.id)
+  expect(order.lines[0].imageUrl).toBe('https://example.com/thumb.jpg')
+  expect(order.lines[0].options).toEqual([])
+})
+
+test('should price each variant of a product on its own line', async () => {
+  const product = await createProduct('100')
+  const small = await variantService.update(product.variants[0].id, {
+    options: { Size: 'S' },
+  })
+  const large = await variantService.create(product.id, {
+    sku: `${product.slug}-L`,
+    price: '150',
+    discountedPrice: '120',
+    options: { Size: 'L' },
+  })
+  const cart = await createCart('from-cart-two-variants-user', [
+    { variantId: small.id, quantity: 1 },
+    { variantId: large.id, quantity: 2 },
+  ])
+
+  const order = await orderService.createFromCart(cart.id)
+
+  const lines = [...order.lines].sort((a, b) => a.variantId - b.variantId)
+  expect(
+    lines.map((l) => [l.productId, l.sku, Number(l.price), Number(l.discount), l.quantity]),
+  ).toEqual([
+    [product.id, small.sku, 100, 0, 1],
+    [product.id, large.sku, 150, 30, 2],
+  ])
+  // 1 x 100 + 2 x 120
+  expect(Number(order.total)).toBe(340)
+})
+
+test('should reject a cart with a variant that became inactive and write nothing', async () => {
+  const product = await createProduct('10')
+  const cart = await createCart('from-cart-inactive-user', [
+    { variantId: product.variants[0].id, quantity: 1 },
+  ])
+  await variantService.markAsInactive(product.variants[0].id)
+
+  await expect(orderService.createFromCart(cart.id)).rejects.toThrow(
+    `Product variant is not available: ${product.variants[0].sku}`,
+  )
+  expect(await ordersForCart(cart.id)).toEqual([])
+  expect(await cartStatus(cart.id)).toBe('Open')
 })
 
 test('should apply voucher discounts and record the applied offers', async () => {
   const userId = 'from-cart-voucher-user'
   const product = await createProduct('200')
-  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
   const voucher = await createVoucher('FROMCART10', '10')
   const content = await cartService.getCartContentForSession(cart.sessionId)
   await new OfferService(db).applyVoucherCode(content, undefined, 'FROMCART10', userId)
@@ -206,7 +303,7 @@ test('should apply voucher discounts and record the applied offers', async () =>
 test('should add the shipping method charge and keep its details', async () => {
   const product = await createProduct('40')
   const cart = await createCart('from-cart-shipping-user', [
-    { productId: product.id, quantity: 2 },
+    { variantId: product.variants[0].id, quantity: 2 },
   ])
   const method = await new ShippingMethodService(db).create({ name: 'Express', price: '15' })
   const shippingAddress = { city: 'Kathmandu', line1: 'Street 1' }
@@ -226,7 +323,7 @@ test('should add the shipping method charge and keep its details', async () => {
 test('should reject an unknown shipping method and write nothing', async () => {
   const product = await createProduct('40')
   const cart = await createCart('from-cart-bad-shipping-user', [
-    { productId: product.id, quantity: 1 },
+    { variantId: product.variants[0].id, quantity: 1 },
   ])
   await expect(
     orderService.createFromCart(cart.id, { shippingMethodId: 999999 }),
@@ -238,7 +335,7 @@ test('should reject an unknown shipping method and write nothing', async () => {
 test('should create the order when the expected total matches', async () => {
   const product = await createProduct('25')
   const cart = await createCart('from-cart-expected-user', [
-    { productId: product.id, quantity: 4 },
+    { variantId: product.variants[0].id, quantity: 4 },
   ])
   const order = await orderService.createFromCart(cart.id, { expectedTotal: '100' })
   expect(Number(order.total)).toBe(100)
@@ -247,9 +344,9 @@ test('should create the order when the expected total matches', async () => {
 test('should reject when the expected total differs and write nothing', async () => {
   const product = await createProduct('25')
   const cart = await createCart('from-cart-mismatch-user', [
-    { productId: product.id, quantity: 4 },
+    { variantId: product.variants[0].id, quantity: 4 },
   ])
-  await productService.update(product.id, { price: '30' })
+  await variantService.update(product.variants[0].id, { price: '30' })
 
   const error = await orderService
     .createFromCart(cart.id, { expectedTotal: 100 })
@@ -265,7 +362,7 @@ test('should reject when the expected total differs and write nothing', async ()
 test('should reject a cart that is not open, so it cannot be ordered twice', async () => {
   const product = await createProduct('10')
   const cart = await createCart('from-cart-twice-user', [
-    { productId: product.id, quantity: 1 },
+    { variantId: product.variants[0].id, quantity: 1 },
   ])
   await orderService.createFromCart(cart.id)
   await expect(orderService.createFromCart(cart.id)).rejects.toThrow(
@@ -287,7 +384,7 @@ test('should reject a missing cart and an empty cart', async () => {
 
 test('should create a guest order with the guest details', async () => {
   const product = await createProduct('10')
-  const cart = await createCart(undefined, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(undefined, [{ variantId: product.variants[0].id, quantity: 1 }])
   const guestUser = { name: 'Guest', email: 'guest@example.com' }
 
   const order = await orderService.createFromCart(cart.id, {
@@ -304,10 +401,10 @@ test('should store a line without any price as null and count it as zero', async
   const priced = await createProduct('10')
   const unpriced = await createProduct('20')
   const cart = await createCart('from-cart-no-price-user', [
-    { productId: priced.id, quantity: 1 },
-    { productId: unpriced.id, quantity: 1 },
+    { variantId: priced.variants[0].id, quantity: 1 },
+    { variantId: unpriced.variants[0].id, quantity: 1 },
   ])
-  await productService.update(unpriced.id, { price: null })
+  await variantService.update(unpriced.variants[0].id, { price: null })
 
   const order = await orderService.createFromCart(cart.id)
 
@@ -320,13 +417,13 @@ test('should record voucher usage so its per-user limit is used up', async () =>
   const userId = 'from-cart-usage-user'
   const product = await createProduct('100')
   const voucher = await createVoucher('ONCE10', '10', { limitPerUser: 1 })
-  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
   await applyVoucher(cart.sessionId, 'ONCE10', userId)
 
   await orderService.createFromCart(cart.id)
 
   expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
-  const nextCart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const nextCart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
   await expect(applyVoucher(nextCart.sessionId, 'ONCE10', userId)).rejects.toThrow(
     'Voucher code usage limit exceeded',
   )
@@ -338,8 +435,8 @@ test('should count an offer once even when it discounts several lines', async ()
   const second = await createProduct('50')
   const voucher = await createVoucher('LINES10', '10')
   const cart = await createCart(userId, [
-    { productId: first.id, quantity: 1 },
-    { productId: second.id, quantity: 2 },
+    { variantId: first.variants[0].id, quantity: 1 },
+    { variantId: second.variants[0].id, quantity: 2 },
   ])
   await applyVoucher(cart.sessionId, 'LINES10', userId)
 
@@ -352,7 +449,7 @@ test('should record usage of user offers', async () => {
   const userId = 'from-cart-user-offer-user'
   const product = await createProduct('100')
   const userOffer = await createUserOffer(userId, '5')
-  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
 
   const order = await orderService.createFromCart(cart.id)
 
@@ -363,7 +460,7 @@ test('should record usage of user offers', async () => {
 test('should count a guest voucher order towards the overall limit only', async () => {
   const product = await createProduct('100')
   const voucher = await createVoucher('GUEST10', '10', { overallLimit: 1 })
-  const cart = await createCart(undefined, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(undefined, [{ variantId: product.variants[0].id, quantity: 1 }])
   await applyVoucher(cart.sessionId, 'GUEST10')
 
   await orderService.createFromCart(cart.id, { guestUser: { email: 'guest@example.com' } })
@@ -373,7 +470,7 @@ test('should count a guest voucher order towards the overall limit only', async 
   expect(
     await db.select().from(offerUsages).where(eq(offerUsages.offerId, voucher.id)),
   ).toEqual([])
-  const nextCart = await createCart(undefined, [{ productId: product.id, quantity: 1 }])
+  const nextCart = await createCart(undefined, [{ variantId: product.variants[0].id, quantity: 1 }])
   await expect(applyVoucher(nextCart.sessionId, 'GUEST10')).rejects.toThrow(
     'Voucher code usage limit exceeded',
   )
@@ -383,7 +480,7 @@ test('should not record usage when the order is not created', async () => {
   const userId = 'from-cart-usage-rollback-user'
   const product = await createProduct('100')
   const voucher = await createVoucher('ROLLBACK10', '10')
-  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
   await applyVoucher(cart.sessionId, 'ROLLBACK10', userId)
 
   // Fails after usage was recorded, so the whole order must roll back
@@ -397,8 +494,8 @@ test('should not record usage when the order is not created', async () => {
   expect(await ordersForCart(cart.id)).toEqual([])
 })
 
-const orderWithVoucher = async (code: string, userId: string | undefined, productId: number) => {
-  const cart = await createCart(userId, [{ productId, quantity: 1 }])
+const orderWithVoucher = async (code: string, userId: string | undefined, variantId: number) => {
+  const cart = await createCart(userId, [{ variantId, quantity: 1 }])
   await applyVoucher(cart.sessionId, code, userId)
   return await orderService.createFromCart(
     cart.id,
@@ -410,33 +507,33 @@ test('should give voucher usage back when an order is cancelled', async () => {
   const userId = 'cancel-usage-user'
   const product = await createProduct('100')
   const voucher = await createVoucher('CANCEL10', '10', { limitPerUser: 1 })
-  const order = await orderWithVoucher('CANCEL10', userId, product.id)
+  const order = await orderWithVoucher('CANCEL10', userId, product.variants[0].id)
 
   await orderService.cancel(order.id, 'admin', 'Customer request')
 
   expect(await usage(voucher.id, userId)).toEqual({ total: 0, user: 0 })
   // The voucher can be used again
-  await orderWithVoucher('CANCEL10', userId, product.id)
+  await orderWithVoucher('CANCEL10', userId, product.variants[0].id)
   expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
 })
 
 test('should give overall usage back when a guest order is cancelled', async () => {
   const product = await createProduct('100')
   const voucher = await createVoucher('GUESTCANCEL', '10', { overallLimit: 1 })
-  const order = await orderWithVoucher('GUESTCANCEL', undefined, product.id)
+  const order = await orderWithVoucher('GUESTCANCEL', undefined, product.variants[0].id)
 
   await orderService.cancel(order.id, 'admin', 'Customer request')
 
   const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
   expect(offer.usageCount).toBe(0)
-  await orderWithVoucher('GUESTCANCEL', undefined, product.id)
+  await orderWithVoucher('GUESTCANCEL', undefined, product.variants[0].id)
 })
 
 test('should reject cancelling an order twice and give usage back only once', async () => {
   const product = await createProduct('100')
   const voucher = await createVoucher('TWICECANCEL', '10')
-  const order = await orderWithVoucher('TWICECANCEL', 'cancel-twice-user', product.id)
-  await orderWithVoucher('TWICECANCEL', 'cancel-twice-other-user', product.id)
+  const order = await orderWithVoucher('TWICECANCEL', 'cancel-twice-user', product.variants[0].id)
+  await orderWithVoucher('TWICECANCEL', 'cancel-twice-other-user', product.variants[0].id)
 
   await orderService.cancel(order.id, 'admin', 'Customer request')
   await expect(
@@ -451,7 +548,7 @@ test('should keep usage when cancelling fails', async () => {
   const userId = 'cancel-rollback-user'
   const product = await createProduct('100')
   const voucher = await createVoucher('CANCELFAIL', '10')
-  const order = await orderWithVoucher('CANCELFAIL', userId, product.id)
+  const order = await orderWithVoucher('CANCELFAIL', userId, product.variants[0].id)
 
   const spy = vi
     // recordStatusChange is private; cancel() calls it after giving usage back
@@ -472,8 +569,8 @@ test('should fail checkout when an applied voucher has been used up meanwhile', 
   const product = await createProduct('100')
   const voucher = await createVoucher('USEDUP10', '10', { limitPerUser: 1 })
   // Applied to two carts while still unused
-  const firstCart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
-  const secondCart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const firstCart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
+  const secondCart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
   await applyVoucher(firstCart.sessionId, 'USEDUP10', userId)
   await applyVoucher(secondCart.sessionId, 'USEDUP10', userId)
   await orderService.createFromCart(firstCart.id)
@@ -492,7 +589,7 @@ test('should fail checkout when an applied voucher has expired', async () => {
   const userId = 'voucher-expired-user'
   const product = await createProduct('100')
   const voucher = await createVoucher('EXPIRED10', '10')
-  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const cart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 1 }])
   await applyVoucher(cart.sessionId, 'EXPIRED10', userId)
   await db
     .update(offers)
@@ -510,7 +607,7 @@ test('should store the total on the order so it can be queried', async () => {
   const userId = 'stored-total-user'
   const product = await createProduct('100')
   const method = await new ShippingMethodService(db).create({ name: 'Stored', price: '15' })
-  const cart = await createCart(userId, [{ productId: product.id, quantity: 2 }])
+  const cart = await createCart(userId, [{ variantId: product.variants[0].id, quantity: 2 }])
 
   const order = await orderService.createFromCart(cart.id, { shippingMethodId: method.id })
 

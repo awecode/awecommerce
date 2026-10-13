@@ -64,7 +64,7 @@ const createCartWithProduct = async (userId: string, slug: string) => {
   })
   const cartService = new CartService(db)
   const cart = await cartService.create(userId)
-  await cartService.addToCart(cart.id, product.id, 1)
+  await cartService.addToCart(cart.id, product.variants[0].id, 1)
   return cart
 }
 
