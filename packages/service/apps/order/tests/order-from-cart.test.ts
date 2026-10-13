@@ -392,3 +392,72 @@ test('should not record usage when the order is not created', async () => {
   expect(await usage(voucher.id, userId)).toEqual({ total: 0, user: 0 })
   expect(await ordersForCart(cart.id)).toEqual([])
 })
+
+const orderWithVoucher = async (code: string, userId: string | undefined, productId: number) => {
+  const cart = await createCart(userId, [{ productId, quantity: 1 }])
+  await applyVoucher(cart.sessionId, code, userId)
+  return await orderService.createFromCart(
+    cart.id,
+    userId ? {} : { guestUser: { email: 'guest@example.com' } },
+  )
+}
+
+test('should give voucher usage back when an order is cancelled', async () => {
+  const userId = 'cancel-usage-user'
+  const product = await createProduct('100')
+  const voucher = await createVoucher('CANCEL10', '10', { limitPerUser: 1 })
+  const order = await orderWithVoucher('CANCEL10', userId, product.id)
+
+  await orderService.cancel(order.id, 'Pending', 'admin', 'Customer request')
+
+  expect(await usage(voucher.id, userId)).toEqual({ total: 0, user: 0 })
+  // The voucher can be used again
+  await orderWithVoucher('CANCEL10', userId, product.id)
+  expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
+})
+
+test('should give overall usage back when a guest order is cancelled', async () => {
+  const product = await createProduct('100')
+  const voucher = await createVoucher('GUESTCANCEL', '10', { overallLimit: 1 })
+  const order = await orderWithVoucher('GUESTCANCEL', undefined, product.id)
+
+  await orderService.cancel(order.id, 'Pending', 'admin', 'Customer request')
+
+  const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
+  expect(offer.usageCount).toBe(0)
+  await orderWithVoucher('GUESTCANCEL', undefined, product.id)
+})
+
+test('should reject cancelling an order twice and give usage back only once', async () => {
+  const product = await createProduct('100')
+  const voucher = await createVoucher('TWICECANCEL', '10')
+  const order = await orderWithVoucher('TWICECANCEL', 'cancel-twice-user', product.id)
+  await orderWithVoucher('TWICECANCEL', 'cancel-twice-other-user', product.id)
+
+  await orderService.cancel(order.id, 'Pending', 'admin', 'Customer request')
+  await expect(
+    orderService.cancel(order.id, 'Cancelled', 'admin', 'Again'),
+  ).rejects.toThrow(`Order is already cancelled: ${order.id}`)
+
+  expect(await usage(voucher.id, 'cancel-twice-user')).toEqual({ total: 1, user: 0 })
+  expect(await usage(voucher.id, 'cancel-twice-other-user')).toEqual({ total: 1, user: 1 })
+})
+
+test('should keep usage when cancelling fails', async () => {
+  const userId = 'cancel-rollback-user'
+  const product = await createProduct('100')
+  const voucher = await createVoucher('CANCELFAIL', '10')
+  const order = await orderWithVoucher('CANCELFAIL', userId, product.id)
+
+  const spy = vi
+    .spyOn(OrderService.prototype, 'changeStatus')
+    .mockRejectedValueOnce(new Error('status change failed'))
+  await expect(
+    orderService.cancel(order.id, 'Pending', 'admin', 'Customer request'),
+  ).rejects.toThrow('status change failed')
+  spy.mockRestore()
+
+  expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
+  const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
+  expect(orderAfter.status).toBe('Pending')
+})

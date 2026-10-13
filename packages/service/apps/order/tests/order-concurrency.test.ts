@@ -1,6 +1,6 @@
 // Runs only against a real Postgres (see loyalty-concurrency.test.ts), because
 // PGlite cannot run transactions at the same time. Use `pnpm test:pg`.
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -11,6 +11,14 @@ import { CartService } from 'apps/cart/services/cart'
 import { ProductService } from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
 import { orders } from 'apps/order/schemas'
+import {
+  offerBenefits,
+  offerConditions,
+  offerRanges,
+  offerUsages,
+  offers,
+} from 'apps/offer/schemas'
+import { OfferService } from 'apps/offer/services/offer'
 
 const url = process.env.TEST_POSTGRES_URL
 const CONCURRENCY = 5
@@ -55,5 +63,77 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     expect(await db.select().from(orders).where(eq(orders.cartId, cart.id))).toHaveLength(1)
     const [cartAfter] = await db.select().from(carts).where(eq(carts.id, cart.id))
     expect(cartAfter.status).toBe('Frozen')
+  })
+
+  test('concurrent cancels of one order cancel it once and give usage back once', async () => {
+    const slug = `concurrent-cancel-${Date.now()}`
+    const product = await new ProductService(db).create({
+      name: slug,
+      slug,
+      sku: slug,
+      price: '100',
+    })
+    const [range] = await db
+      .insert(offerRanges)
+      .values({
+        name: slug,
+        inclusiveFilter: true,
+        includeAllProducts: true,
+        includeAllBrands: true,
+        includeAllCategories: true,
+        includeAllProductClasses: true,
+      })
+      .returning()
+    const [condition] = await db
+      .insert(offerConditions)
+      .values({ rangeId: range.id, type: 'basket_quantity', value: '1' })
+      .returning()
+    const [benefit] = await db
+      .insert(offerBenefits)
+      .values({ name: slug, type: 'percentage', value: '10' })
+      .returning()
+    const [voucher] = await db
+      .insert(offers)
+      .values({
+        name: slug,
+        type: 'voucher',
+        voucherCode: slug,
+        includeAllUsers: true,
+        conditionId: condition.id,
+        benefitId: benefit.id,
+      })
+      .returning()
+
+    const cartService = new CartService(db)
+    const placeOrder = async (userId: string) => {
+      const cart = await cartService.create(userId)
+      await cartService.addToCart(cart.id, product.id, 1)
+      const content = await cartService.getCartContentForSession(cart.sessionId)
+      await new OfferService(db).applyVoucherCode(content, undefined, slug, userId)
+      return await new OrderService(db).createFromCart(cart.id)
+    }
+    const order = await placeOrder(`${slug}-user`)
+    await placeOrder(`${slug}-other-user`)
+
+    const results = await Promise.allSettled(
+      Array.from({ length: CONCURRENCY }, () =>
+        new OrderService(db).cancel(order.id, 'Pending', 'admin', 'reason'),
+      ),
+    )
+
+    const reasons = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => r.reason.message)
+    expect(results.length - reasons.length).toBe(1)
+    expect(reasons).toEqual(
+      Array(CONCURRENCY - 1).fill(`Order is already cancelled: ${order.id}`),
+    )
+    const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
+    expect(offer.usageCount).toBe(1)
+    const [userUsage] = await db
+      .select()
+      .from(offerUsages)
+      .where(and(eq(offerUsages.offerId, voucher.id), eq(offerUsages.userId, `${slug}-user`)))
+    expect(userUsage.usageCount).toBe(0)
   })
 })

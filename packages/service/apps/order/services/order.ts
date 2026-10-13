@@ -460,6 +460,18 @@ class OrderService {
   ) {
     return await this.db.transaction(async (tx) => {
       const orderService = new OrderService(tx)
+      // Locked so the order cannot be cancelled twice at the same time
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .for('update')
+      if (!order) {
+        throw new Error(`Order not found: ${orderId}`)
+      }
+      if (order.status === 'Cancelled') {
+        throw new Error(`Order is already cancelled: ${orderId}`)
+      }
       await tx
         .update(orders)
         .set({
@@ -470,6 +482,12 @@ class OrderService {
           cancellationRemarks,
         })
         .where(eq(orders.id, orderId))
+      // Gives back the offer usage recorded when the order was created
+      const offerService = new OfferService(tx)
+      const offerIds = new Set((order.offers ?? []).map((offer) => offer.id as number))
+      for (const offerId of offerIds) {
+        await offerService.decreaseUsage(offerId, order.userId)
+      }
       await orderService.changeStatus(orderId, previousStatus, 'Cancelled', cancelledBy)
     })
   }

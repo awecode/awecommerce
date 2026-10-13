@@ -1875,8 +1875,18 @@ class OfferService {
     })
   }
 
-  async decreaseUsage(offerId: number, userId: string) {
+  // Without a userId (guest orders) only the offer's overall count goes down
+  async decreaseUsage(offerId: number, userId?: string | null) {
     return await this.db.transaction(async (tx) => {
+      if (!userId) {
+        await tx
+          .update(offers)
+          .set({
+            usageCount: sql`${offers.usageCount} - 1`,
+          })
+          .where(and(eq(offers.id, offerId), gt(offers.usageCount, 0)))
+        return
+      }
       const [offerUsage] = await tx
         .update(offerUsages)
         .set({
