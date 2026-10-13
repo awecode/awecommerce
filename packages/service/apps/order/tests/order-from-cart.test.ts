@@ -1,5 +1,5 @@
-import { beforeAll, expect, test } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { beforeAll, expect, test, vi } from 'vitest'
+import { and, eq } from 'drizzle-orm'
 
 import { db } from 'core/db'
 import { OrderService, OrderTotalMismatchError } from 'apps/order/services/order'
@@ -13,6 +13,7 @@ import {
   offerBenefits,
   offerConditions,
   offerRanges,
+  offerUsages,
   offers,
 } from 'apps/offer/schemas'
 
@@ -44,7 +45,11 @@ const createCart = async (
   return cart
 }
 
-const createVoucher = async (voucherCode: string, percentage: string) => {
+const createVoucher = async (
+  voucherCode: string,
+  percentage: string,
+  limits: { limitPerUser?: number; overallLimit?: number } = {},
+) => {
   const [range] = await db
     .insert(offerRanges)
     .values({
@@ -73,9 +78,40 @@ const createVoucher = async (voucherCode: string, percentage: string) => {
       includeAllUsers: true,
       conditionId: condition.id,
       benefitId: benefit.id,
+      ...limits,
     })
     .returning()
   return offer
+}
+
+// A user offer for one user only, so it does not apply to other tests' orders
+const createUserOffer = async (userId: string, percentage: string) => {
+  const voucher = await createVoucher(`USER-${userId}`, percentage)
+  const [offer] = await db
+    .update(offers)
+    .set({
+      type: 'user',
+      voucherCode: null,
+      includeAllUsers: false,
+      includedUserIds: [userId],
+    })
+    .where(eq(offers.id, voucher.id))
+    .returning()
+  return offer
+}
+
+const applyVoucher = async (cartSessionId: string, code: string, userId?: string) => {
+  const content = await cartService.getCartContentForSession(cartSessionId)
+  await new OfferService(db).applyVoucherCode(content, undefined, code, userId)
+}
+
+const usage = async (offerId: number, userId: string) => {
+  const [offer] = await db.select().from(offers).where(eq(offers.id, offerId))
+  const [userUsage] = await db
+    .select()
+    .from(offerUsages)
+    .where(and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)))
+  return { total: offer.usageCount, user: userUsage?.usageCount ?? 0 }
 }
 
 const cartStatus = async (cartId: number) =>
@@ -274,4 +310,85 @@ test('should store a line without any price as null and count it as zero', async
   const line = order.lines.find((l) => l.productId === unpriced.id)!
   expect(line.price).toBeNull()
   expect(Number(order.total)).toBe(10)
+})
+
+test('should record voucher usage so its per-user limit is used up', async () => {
+  const userId = 'from-cart-usage-user'
+  const product = await createProduct('100')
+  const voucher = await createVoucher('ONCE10', '10', { limitPerUser: 1 })
+  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  await applyVoucher(cart.sessionId, 'ONCE10', userId)
+
+  await orderService.createFromCart(cart.id)
+
+  expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
+  const nextCart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  await expect(applyVoucher(nextCart.sessionId, 'ONCE10', userId)).rejects.toThrow(
+    'Voucher code usage limit exceeded',
+  )
+})
+
+test('should count an offer once even when it discounts several lines', async () => {
+  const userId = 'from-cart-usage-lines-user'
+  const first = await createProduct('100')
+  const second = await createProduct('50')
+  const voucher = await createVoucher('LINES10', '10')
+  const cart = await createCart(userId, [
+    { productId: first.id, quantity: 1 },
+    { productId: second.id, quantity: 2 },
+  ])
+  await applyVoucher(cart.sessionId, 'LINES10', userId)
+
+  await orderService.createFromCart(cart.id)
+
+  expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
+})
+
+test('should record usage of user offers', async () => {
+  const userId = 'from-cart-user-offer-user'
+  const product = await createProduct('100')
+  const userOffer = await createUserOffer(userId, '5')
+  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+
+  const order = await orderService.createFromCart(cart.id)
+
+  expect(order.offers!.map((o) => o.id)).toContain(userOffer.id)
+  expect(await usage(userOffer.id, userId)).toEqual({ total: 1, user: 1 })
+})
+
+test('should count a guest voucher order towards the overall limit only', async () => {
+  const product = await createProduct('100')
+  const voucher = await createVoucher('GUEST10', '10', { overallLimit: 1 })
+  const cart = await createCart(undefined, [{ productId: product.id, quantity: 1 }])
+  await applyVoucher(cart.sessionId, 'GUEST10')
+
+  await orderService.createFromCart(cart.id, { guestUser: { email: 'guest@example.com' } })
+
+  const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
+  expect(offer.usageCount).toBe(1)
+  expect(
+    await db.select().from(offerUsages).where(eq(offerUsages.offerId, voucher.id)),
+  ).toEqual([])
+  const nextCart = await createCart(undefined, [{ productId: product.id, quantity: 1 }])
+  await expect(applyVoucher(nextCart.sessionId, 'GUEST10')).rejects.toThrow(
+    'Voucher code usage limit exceeded',
+  )
+})
+
+test('should not record usage when the order is not created', async () => {
+  const userId = 'from-cart-usage-rollback-user'
+  const product = await createProduct('100')
+  const voucher = await createVoucher('ROLLBACK10', '10')
+  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  await applyVoucher(cart.sessionId, 'ROLLBACK10', userId)
+
+  // Fails after usage was recorded, so the whole order must roll back
+  const spy = vi
+    .spyOn(OrderService.prototype, 'createLog')
+    .mockRejectedValueOnce(new Error('log failed'))
+  await expect(orderService.createFromCart(cart.id)).rejects.toThrow('log failed')
+  spy.mockRestore()
+
+  expect(await usage(voucher.id, userId)).toEqual({ total: 0, user: 0 })
+  expect(await ordersForCart(cart.id)).toEqual([])
 })

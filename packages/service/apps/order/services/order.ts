@@ -14,6 +14,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { carts } from '../../cart/schemas'
 import { CartService } from '../../cart/services/cart'
+import { OfferService } from '../../offer/services/offer'
 import {
   NewOrder,
   NewPaymentEvent,
@@ -167,6 +168,10 @@ class OrderService {
           quantity: line.quantity,
         }
       })
+      const appliedOffers = [
+        ...content.userOfferDiscounts,
+        ...content.voucherOfferDiscounts,
+      ]
       const offerDiscount = new Decimal(content.totalOfferDiscount)
       const shippingCharge = new Decimal(shippingMethod?.price ?? 0)
       // A line without any price counts as zero
@@ -189,7 +194,7 @@ class OrderService {
           ...orderData,
           userId: cart.userId,
           cartId: cart.id,
-          offers: [...content.userOfferDiscounts, ...content.voucherOfferDiscounts],
+          offers: appliedOffers,
           discount: offerDiscount.toString(),
           shippingCharge: shippingCharge.toString(),
           ...(shippingMethod
@@ -208,6 +213,11 @@ class OrderService {
         .update(carts)
         .set({ status: 'Frozen' })
         .where(eq(carts.id, cart.id))
+      // Uses up the applied offers' per-user and overall limits
+      await new OfferService(tx).increaseUsageMultiple(
+        appliedOffers.map((offer) => offer.id),
+        cart.userId,
+      )
       await tx
         .insert(orderLines)
         .values(lineValues.map((line) => ({ ...line, orderId: order.id })))

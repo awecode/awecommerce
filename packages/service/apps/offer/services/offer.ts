@@ -1841,27 +1841,30 @@ class OfferService {
     return await this.increaseUsageMultiple([offerId], userId)
   }
 
-  async increaseUsageMultiple(offerIds: number[], userId: string) {
+  // Without a userId (guest orders) only the offers' overall count goes up
+  async increaseUsageMultiple(offerIds: number[], userId?: string | null) {
     const uniqueOfferIds = [...new Set(offerIds)]
     if (!uniqueOfferIds.length) {
       return
     }
     return await this.db.transaction(async (tx) => {
-      await tx
-        .insert(offerUsages)
-        .values(
-          uniqueOfferIds.map((offerId) => ({
-            offerId,
-            userId,
-            usageCount: 1,
-          })),
-        )
-        .onConflictDoUpdate({
-          target: [offerUsages.offerId, offerUsages.userId],
-          set: {
-            usageCount: sql`${offerUsages.usageCount} + 1`,
-          },
-        })
+      if (userId) {
+        await tx
+          .insert(offerUsages)
+          .values(
+            uniqueOfferIds.map((offerId) => ({
+              offerId,
+              userId,
+              usageCount: 1,
+            })),
+          )
+          .onConflictDoUpdate({
+            target: [offerUsages.offerId, offerUsages.userId],
+            set: {
+              usageCount: sql`${offerUsages.usageCount} + 1`,
+            },
+          })
+      }
 
       await tx
         .update(offers)

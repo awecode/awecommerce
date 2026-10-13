@@ -111,7 +111,7 @@ try {
 - **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, plus shipping. Orders do not store it; `createFromCart` returns it as `total`. Tax and loyalty discounts are not included.
 - **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
 - **Order lines:** `price` is the product's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose product has neither is stored with `price` `null` and counts as zero. `productName` and `productSku` are copied onto the line, so renaming or changing a product later does not alter past orders.
-- **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`.
+- **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
 - **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
 - **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
 
