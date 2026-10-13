@@ -18,8 +18,6 @@ const productService = new ProductService(db)
 
 const allowedUser = "o'brien"
 const injectedUserId = "x' = 'x' OR 'a"
-// PGlite double-encodes jsonb params under drizzle 0.38, so cast explicitly.
-const includedUserIds = sql`${JSON.stringify([allowedUser])}::text::jsonb`
 
 let productId: number
 let userOfferId: number
@@ -63,7 +61,7 @@ beforeAll(async () => {
     .values({
       name: 'User Offer',
       type: 'user',
-      includedUserIds: includedUserIds,
+      includedUserIds: [allowedUser],
       conditionId: condition.id,
       benefitId: benefit.id,
     })
@@ -75,7 +73,7 @@ beforeAll(async () => {
       name: 'Voucher Offer',
       type: 'voucher',
       voucherCode: 'VOUCHER',
-      includedUserIds: includedUserIds,
+      includedUserIds: [allowedUser],
       conditionId: condition.id,
       benefitId: benefit.id,
     })
@@ -177,4 +175,14 @@ test('should increase usage for multiple offers', async () => {
   expect(await getUsageCounts(usedOfferId, 'usage-user')).toEqual({ total: 2, user: 2 })
   expect(await getUsageCounts(newOfferId, 'usage-user')).toEqual({ total: 1, user: 1 })
   await expect(offerService.increaseUsageMultiple([], 'usage-user')).resolves.not.toThrow()
+})
+
+test('should store jsonb arrays as arrays', async () => {
+  const [row] = await db
+    .select({ type: sql<string>`jsonb_typeof(${offers.includedUserIds})` })
+    .from(offers)
+    .where(eq(offers.id, userOfferId))
+  expect(row.type).toBe('array')
+  const [offer] = await db.select().from(offers).where(eq(offers.id, userOfferId))
+  expect(offer.includedUserIds).toEqual([allowedUser])
 })

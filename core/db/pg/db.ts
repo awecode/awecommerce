@@ -1,4 +1,4 @@
-import { PGlite } from '@electric-sql/pglite'
+import { PGlite, types } from '@electric-sql/pglite'
 import { type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
@@ -21,9 +21,15 @@ let db: PgDatabase
 
 const initializeDb = () => {
   if (process.env.NODE_ENV === 'test') {
+    // Drizzle already JSON-encodes json/jsonb values, so stop PGlite from
+    // encoding them a second time (which would store arrays as strings).
+    const passEncodedJson = (value: unknown) =>
+      typeof value === 'string' ? value : JSON.stringify(value)
     client = new PGlite({
       extensions: { uuid_ossp }
     }) as PGliteWithEnd
+    client.serializers[types.JSON] = passEncodedJson
+    client.serializers[types.JSONB] = passEncodedJson
 
     db = drizzlePglite(client,{
       schema: tables
