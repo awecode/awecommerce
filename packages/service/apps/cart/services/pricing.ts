@@ -12,6 +12,8 @@ const priceCart = async (
   db: Database,
   content: CartContent,
   shippingMethodId?: number,
+  // Value of redeemed loyalty points. Reduces the products only, not shipping.
+  loyaltyDiscount: Decimal.Value = 0,
 ) => {
   let shippingMethod: typeof shippingMethods.$inferSelect | undefined
   if (shippingMethodId !== undefined) {
@@ -43,17 +45,44 @@ const priceCart = async (
       : [],
   )
 
-  const lines = content.lines.map((line) => {
+  // What each line costs after its sale price and offer discounts
+  const lineAmounts = content.lines.map((line) => {
     const listPrice = line.product.price
     const salePrice = line.product.discountedPrice
     const price = listPrice ?? salePrice ?? null
     const discount =
       listPrice && salePrice ? new Decimal(listPrice).sub(salePrice) : new Decimal(0)
-    // Taxed on what the customer pays for the line, after its offer discounts
-    const taxable = Decimal.max(
+    const amount = Decimal.max(
       new Decimal(price ?? 0).sub(discount).mul(line.quantity).sub(line.totalOfferDiscount),
       0,
     )
+    return { price, discount, amount }
+  })
+
+  // Spread the loyalty discount across lines in proportion to their amounts,
+  // so each line is taxed at its own rate on what is left. The last line with
+  // an amount takes the remainder, so the shares add up exactly.
+  const loyalty = new Decimal(loyaltyDiscount)
+  const productsTotal = lineAmounts.reduce((sum, line) => sum.add(line.amount), new Decimal(0))
+  if (loyalty.gt(productsTotal)) {
+    throw new Error("Points are worth more than the order's products")
+  }
+  const lastIndex = lineAmounts.map((line) => line.amount.gt(0)).lastIndexOf(true)
+  let loyaltyLeft = loyalty
+  const loyaltyShares = lineAmounts.map((line, index) => {
+    if (loyalty.isZero() || line.amount.isZero()) {
+      return new Decimal(0)
+    }
+    const share =
+      index === lastIndex ? loyaltyLeft : loyalty.mul(line.amount).div(productsTotal)
+    loyaltyLeft = loyaltyLeft.sub(share)
+    return share
+  })
+
+  const lines = content.lines.map((line, index) => {
+    const { price, discount, amount } = lineAmounts[index]
+    // Taxed on what the customer pays for the line
+    const taxable = amount.sub(loyaltyShares[index])
     const taxRate =
       (line.product.productClassId !== null
         ? classRates.get(line.product.productClassId)
@@ -86,6 +115,7 @@ const priceCart = async (
   // Tax-inclusive prices already contain the tax
   const total = subtotal
     .sub(offerDiscount)
+    .sub(loyalty)
     .add(shippingCharge)
     .add(taxSettings.pricesIncludeTax ? 0 : tax)
 
@@ -95,6 +125,7 @@ const priceCart = async (
     pricesIncludeTax: taxSettings.pricesIncludeTax,
     subtotal: subtotal.toString(),
     offerDiscount: offerDiscount.toString(),
+    loyaltyDiscount: loyalty.toString(),
     shippingCharge: shippingCharge.toString(),
     tax: tax.toString(),
     total: total.toString(),

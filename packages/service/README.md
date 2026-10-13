@@ -87,7 +87,7 @@ const order = await new OrderService(db).createFromCart(cart.id)
 
 ### Cart summary
 
-`CartService.getCartSummary(sessionId, { shippingMethodId? })` returns the cart content with offers and vouchers applied, each line's `tax` and `taxRate`, and the cart's `subtotal`, `totalOfferDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
+`CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax` and `taxRate`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
 
 ```ts
 const summary = await new CartService(db).getCartSummary(cart.sessionId, {
@@ -101,7 +101,7 @@ const order = await new OrderService(db).createFromCart(cart.id, {
 })
 ```
 
-It does not place an order or use up offers. Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied.
+It does not place an order, use up offers, or redeem points (`redeemPoints` only previews their value, with the same checks as checkout). Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied.
 
 ### Placing an order
 
@@ -138,16 +138,17 @@ try {
 }
 ```
 
-- **Options:** `shippingMethodId` (its price becomes `shippingCharge`, and its details are kept in `shippingMethod`), `shippingAddress`, `guestUser` (for carts without a user), `metadata`, and `expectedTotal`. The order's user is always the cart's user.
-- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, plus shipping, plus tax when prices exclude tax (see [Tax](#tax)). Orders do not store it; `createFromCart` returns it as `total`. Loyalty discounts are not included.
+- **Options:** `shippingMethodId` (its price becomes `shippingCharge`, and its details are kept in `shippingMethod`), `shippingAddress`, `guestUser` (for carts without a user), `metadata`, `redeemPoints` (see below), and `expectedTotal`. The order's user is always the cart's user.
+- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, minus the loyalty discount, plus shipping, plus tax when prices exclude tax (see [Tax](#tax)). Orders do not store it; `createFromCart` returns it as `total`.
 - **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
 - **Order lines:** `price` is the product's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose product has neither is stored with `price` `null` and counts as zero. `productName` and `productSku` are copied onto the line, so renaming or changing a product later does not alter past orders.
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
 - **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
 - **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
+- **Loyalty points:** `redeemPoints` redeems that many of the user's points. Their value (`points × redeemRate`) is stored as `loyaltyDiscount` and reduces the products, not shipping, before tax: it is spread across the lines in proportion to their amounts, and each line is taxed on what is left. The points are taken from the balance in the same transaction. It throws `Guests cannot redeem loyalty points`, `Loyalty points cannot be redeemed` (loyalty disabled or no `redeemRate`), `Insufficient loyalty points`, and `Points are worth more than the order's products` (after offer discounts); nothing is written in any of these cases.
 - **Offer limits at checkout:** offers are checked again while the order is created, with the offers locked, so simultaneous checkouts can never use an offer beyond its `overallLimit` or `limitPerUser`. If a user offer ran out in the meantime, `createFromCart` throws `OfferLimitReachedError` (with `offerId` and `offerName`) and writes nothing. If a voucher applied to the cart can no longer be applied (it ran out, expired, was deactivated, or no longer matches the cart's products), `createFromCart` throws `VoucherNoLongerValidError` (with `offerId` and `voucherCode`) and writes nothing; the cart keeps its vouchers, so reload it with `getCartContentForSession(sessionId, true)` to drop the invalid one and show the new total.
 - **Status changes:** `changeStatus(orderId, newStatus, changedBy?)` records the order's current status as the previous status in its history. It throws `Order not found: <id>`, `Order is cancelled: <id>` (cancelled orders cannot change), `Order is already <status>: <id>`, and `Use cancel() to cancel an order` for `'Cancelled'`.
-- **Cancelling:** `cancel(orderId, cancelledBy, reason, remarks?)` records the order's current status as the previous status in its history, and gives back the usage of the order's offers, so their limits can be used again (guest orders give back only the overall count). It throws `Order is already cancelled: <id>` for an order that is already cancelled, including when two cancels run at the same moment, so usage is never given back twice.
+- **Cancelling:** `cancel(orderId, cancelledBy, reason, remarks?)` records the order's current status as the previous status in its history, and gives back the usage of the order's offers, so their limits can be used again (guest orders give back only the overall count), and gives back any loyalty points redeemed for the order. It throws `Order is already cancelled: <id>` for an order that is already cancelled, including when two cancels run at the same moment, so usage is never given back twice.
 
 ### Services and import paths
 

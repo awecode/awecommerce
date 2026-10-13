@@ -17,6 +17,7 @@ import { CartService } from '../../cart/services/cart'
 import { priceCart } from '../../cart/services/pricing'
 import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
+import { LoyaltyService } from '../../loyalty/services/loyalty'
 import {
   NewOrder,
   NewPaymentEvent,
@@ -36,6 +37,9 @@ type CreateFromCartOptions = {
   shippingAddress?: NewOrder['shippingAddress']
   metadata?: NewOrder['metadata']
   shippingMethodId?: number
+  // Loyalty points to redeem. Their value reduces the products (not shipping)
+  // before tax, and the points are taken from the user's balance.
+  redeemPoints?: number
   // The total the customer was shown. If the computed total differs, the
   // order is not created and OrderTotalMismatchError is thrown.
   expectedTotal?: string | number
@@ -139,7 +143,7 @@ class OrderService {
   // Creates an order from an open cart. Prices, offer discounts and shipping
   // are read from the database here, never taken from the caller.
   async createFromCart(cartId: number, options: CreateFromCartOptions = {}) {
-    const { shippingMethodId, expectedTotal, ...orderData } = options
+    const { shippingMethodId, expectedTotal, redeemPoints, ...orderData } = options
     return await this.db.transaction(async (tx) => {
       const orderService = new OrderService(tx)
       // Locked so the same cart cannot be ordered twice at the same time
@@ -188,7 +192,11 @@ class OrderService {
         )
       }
 
-      const pricing = await priceCart(tx, content, shippingMethodId)
+      const loyaltyDiscount =
+        redeemPoints !== undefined
+          ? await new LoyaltyService(tx).redemptionValue(cart.userId, redeemPoints)
+          : 0
+      const pricing = await priceCart(tx, content, shippingMethodId, loyaltyDiscount)
       const { shippingMethod } = pricing
       const appliedOffers = [
         ...content.userOfferDiscounts,
@@ -214,6 +222,7 @@ class OrderService {
           cartId: cart.id,
           offers: appliedOffers,
           discount: pricing.offerDiscount,
+          loyaltyDiscount: pricing.loyaltyDiscount,
           shippingCharge: pricing.shippingCharge,
           tax: pricing.tax,
           ...(shippingMethod
@@ -232,6 +241,9 @@ class OrderService {
         .update(carts)
         .set({ status: 'Frozen' })
         .where(eq(carts.id, cart.id))
+      if (redeemPoints !== undefined) {
+        await new LoyaltyService(tx).redeemPoints(cart.userId!, order.id, redeemPoints)
+      }
       // Uses up the applied offers' per-user and overall limits
       await new OfferService(tx).increaseUsageMultiple(
         appliedOffers.map((offer) => offer.id),
@@ -580,6 +592,10 @@ class OrderService {
       const offerIds = new Set((order.offers ?? []).map((offer) => offer.id as number))
       for (const offerId of offerIds) {
         await offerService.decreaseUsage(offerId, order.userId)
+      }
+      // Gives back loyalty points redeemed for the order
+      if (order.userId) {
+        await new LoyaltyService(tx).unredeemOrderPoints(order.userId, orderId)
       }
       await orderService.recordStatusChange(orderId, order.status, 'Cancelled', cancelledBy)
     })

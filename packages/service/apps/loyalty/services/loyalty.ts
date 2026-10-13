@@ -221,6 +221,51 @@ class LoyaltyService {
     })
   }
 
+  // Points still redeemed for an order: redeemed minus already given back
+  private async redeemedPointsForOrder(userId: string, orderId: number) {
+    const orderLogs = await this.db.query.loyaltyLogs.findMany({
+      where: and(
+        eq(loyaltyLogs.userId, userId),
+        eq(loyaltyLogs.orderId, orderId),
+      ),
+    })
+    return orderLogs.reduce((acc, log) => {
+      if (log.type === 'redeemed') return acc.add(new Decimal(log.points))
+      if (log.type === 'unredeemed') return acc.sub(new Decimal(log.points))
+      return acc
+    }, new Decimal(0))
+  }
+
+  // Checks that a user can redeem the points now and returns their value
+  async redemptionValue(userId: string | null, points: number) {
+    if (!userId) {
+      throw new Error('Guests cannot redeem loyalty points')
+    }
+    if (!(points > 0)) {
+      throw new Error('Points must be greater than zero')
+    }
+    const settings = await this.getSettings()
+    if (!settings.isEnabled || !settings.redeemRate) {
+      throw new Error('Loyalty points cannot be redeemed')
+    }
+    if (new Decimal(await this.getTotalRedeemablePoints(userId)).lt(points)) {
+      throw new Error('Insufficient loyalty points')
+    }
+    return new Decimal(points).mul(settings.redeemRate)
+  }
+
+  // Gives back the points still redeemed for an order, if any
+  async unredeemOrderPoints(userId: string, orderId: number) {
+    return await this.db.transaction(async (tx) => {
+      const loyaltyService = new LoyaltyService(tx)
+      await loyaltyService.lockUserPoints(userId)
+      const points = await loyaltyService.redeemedPointsForOrder(userId, orderId)
+      if (points.gt(0)) {
+        await loyaltyService.unredeemPoints(userId, orderId, points.toNumber())
+      }
+    })
+  }
+
   async unredeemPoints(userId: string, orderId: number, points: number) {
     return await this.db.transaction(async (tx) => {
       const loyaltyService = new LoyaltyService(tx)
@@ -228,17 +273,10 @@ class LoyaltyService {
         throw new Error('Points must be greater than zero')
       }
       await loyaltyService.lockUserPoints(userId)
-      const orderLogs = await tx.query.loyaltyLogs.findMany({
-        where: and(
-          eq(loyaltyLogs.userId, userId),
-          eq(loyaltyLogs.orderId, orderId),
-        ),
-      })
-      const unredeemablePoints = orderLogs.reduce((acc, log) => {
-        if (log.type === 'redeemed') return acc.add(new Decimal(log.points))
-        if (log.type === 'unredeemed') return acc.sub(new Decimal(log.points))
-        return acc
-      }, new Decimal(0))
+      const unredeemablePoints = await loyaltyService.redeemedPointsForOrder(
+        userId,
+        orderId,
+      )
       if (unredeemablePoints.lt(points)) {
         throw new Error(
           'Cannot unredeem more points than were redeemed for this order',

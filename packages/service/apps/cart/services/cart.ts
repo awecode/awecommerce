@@ -10,6 +10,7 @@ import { OfferService } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
 import { CartContent, CartContentWithoutOfferInfo, Database } from '../../types'
 import { priceCart } from './pricing'
+import { LoyaltyService } from '../../loyalty/services/loyalty'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -102,10 +103,23 @@ class CartService {
   // include shipping and its tax.
   async getCartSummary(
     sessionId: string,
-    options: { shippingMethodId?: number } = {},
+    options: { shippingMethodId?: number; redeemPoints?: number } = {},
   ) {
     const content = await this.getCartContentForSession(sessionId, true)
-    const pricing = await priceCart(this.db, content, options.shippingMethodId)
+    // Previews the points' value; they are only redeemed at checkout
+    const loyaltyDiscount =
+      options.redeemPoints !== undefined
+        ? await new LoyaltyService(this.db).redemptionValue(
+            content.userId,
+            options.redeemPoints,
+          )
+        : 0
+    const pricing = await priceCart(
+      this.db,
+      content,
+      options.shippingMethodId,
+      loyaltyDiscount,
+    )
     return {
       ...content,
       lines: content.lines.map((line, index) => ({
@@ -114,6 +128,7 @@ class CartService {
         taxRate: pricing.lines[index].taxRate,
       })),
       subtotal: pricing.subtotal,
+      loyaltyDiscount: pricing.loyaltyDiscount,
       shippingCharge: pricing.shippingCharge,
       tax: pricing.tax,
       total: pricing.total,
