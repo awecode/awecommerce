@@ -8,6 +8,7 @@
     "build": "unbuild",
     "build:stub": "unbuild --stub",
     "check:dist": "unbuild && node scripts/check-dist.mjs",
+    "test:pg": "node scripts/test-pg.mjs",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm typecheck && vitest run && pnpm check:dist",
     "generate": "drizzle-kit generate",
