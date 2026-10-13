@@ -16,6 +16,7 @@ export type PgDatabase =
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
 let client: PGliteWithEnd
+let pool: Pool
 let db: PgDatabase
 
 const initializeDb = () => {
@@ -32,7 +33,7 @@ const initializeDb = () => {
     if (!postgresUrl) {
       throw new Error('POSTGRES_URL is not set')
     }
-    const pool = new Pool({
+    pool = new Pool({
       connectionString: postgresUrl,
     })
     db = drizzle(pool,{
@@ -53,4 +54,13 @@ const getClient = () => {
   return client
 }
 
-export { initializeDb, getClient }
+const closeDb = async () => {
+  if (pool) {
+    await pool.end()
+  }
+  if (client) {
+    await client.end()
+  }
+}
+
+export { initializeDb, getClient, closeDb }
