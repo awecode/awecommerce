@@ -107,6 +107,9 @@ class OrderService {
       >
     >,
   ) {
+    if (!cartLines.length) {
+      throw new Error('Cannot create an order without lines')
+    }
     return await this.db.transaction(async (tx) => {
       const orderService = new OrderService(tx)
       const [order] = await tx.insert(orders).values(data).returning()

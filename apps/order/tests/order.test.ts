@@ -99,3 +99,11 @@ test('should roll back cancel when the status change fails', async () => {
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.status).toBe('Pending')
 })
+
+test('should reject creating an order without lines', async () => {
+  const userId = 'order-empty-user'
+  await expect(orderService.create({ userId }, [])).rejects.toThrow(
+    'Cannot create an order without lines',
+  )
+  expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
+})
