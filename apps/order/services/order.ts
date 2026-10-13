@@ -24,6 +24,7 @@ import {
   transactions,
 } from '../schemas'
 import { products } from '../../product/schemas'
+import { Database } from '../../types'
 
 type Extend<T, U> = T & U
 
@@ -47,6 +48,7 @@ type OrderListFilter = {
   userId?: string
   createdAt?: string
   paymentStatus?: OrderPaymentStatus
+  extraFilters?: SQL[]
   pagination?: {
     page: number
     size: number
@@ -67,8 +69,10 @@ const STATUS_LOG: { [key in OrderStatus]: string } = {
 }
 
 class OrderService {
-  constructor(private db: any) {
-    this.db = db
+  private db: Database
+
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   generateHash(orderId: string): string {
@@ -90,18 +94,20 @@ class OrderService {
         CartLine,
         {
           product: {
-            price: number
-            discountedPrice?: number
+            price: string
+            discountedPrice?: string
           }
         }
       >
     >,
   ) {
     const [order] = await this.db.insert(orders).values(data).returning()
-    await this.db
-      .update(carts)
-      .set({ status: 'Frozen' })
-      .where(eq(carts.id, data.cartId))
+    if(data.cartId) {
+      await this.db
+        .update(carts)
+        .set({ status: 'Frozen' })
+        .where(eq(carts.id, data.cartId))
+    }
     await this.db
       .insert(orderLines)
       .values(
@@ -110,8 +116,8 @@ class OrderService {
           productId: line.productId,
           price: line.product.price,
           discount: line.product.discountedPrice
-            ? line.product.price - line.product.discountedPrice
-            : 0,
+            ? (Number(line.product.price) - Number(line.product.discountedPrice)).toString()
+            : '0',
           quantity: line.quantity,
         })),
       )
@@ -120,12 +126,14 @@ class OrderService {
       where: eq(orderLines.orderId, order.id),
       with: {
         product: {
-          name: true,
-          thumbnail: true,
+          columns: {
+            name: true,
+            thumbnail: true,
+          },
         },
       },
     })
-    await this.createLog(order.id, STATUS_LOG.Pending)
+    await this.createLog(order.id, STATUS_LOG.Pending, order.userId)
     return {
       ...order,
       lines,
@@ -133,10 +141,11 @@ class OrderService {
     }
   }
 
-  async createLog(orderId: number, log: string) {
+  async createLog(orderId: number, log: string, loggedBy?: string | null) {
     await this.db.insert(orderLogs).values({
       orderId,
       log,
+      loggedBy,
     })
   }
 
@@ -152,6 +161,7 @@ class OrderService {
     orderId: number,
     previousStatus: OrderStatus,
     newStatus: OrderStatus,
+    createdBy?: string,
   ) {
     await this.db
       .update(orders)
@@ -161,8 +171,9 @@ class OrderService {
       orderId: orderId,
       previousStatus: previousStatus,
       newStatus,
+      createdBy,
     })
-    await this.createLog(orderId, STATUS_LOG[newStatus])
+    await this.createLog(orderId, STATUS_LOG[newStatus], createdBy)
   }
 
   async createTransaction(data: NewTransaction) {
@@ -173,7 +184,7 @@ class OrderService {
     return transaction
   }
 
-  async updateTransactionStatus(transactionId: number, newStatus: string) {
+  async updateTransactionStatus(transactionId: number, newStatus: "Refunded" | "Requested" | "Success" | "Failed" | "Error" | "Disproved" ) {
     await this.db
       .update(transactions)
       .set({ status: newStatus })
@@ -183,7 +194,7 @@ class OrderService {
   async listTransactions(filters: {
     orderId?: number
     userId?: string
-    status?: string
+    status?: "Refunded" | "Requested" | "Success" | "Failed" | "Error" | "Disproved" 
     pagination: {
       page: number
       size: number
@@ -228,7 +239,7 @@ class OrderService {
 
       .where(and(...where))
       .groupBy(transactions.id, orders.id)
-      .orderBy(asc(transactions.createdAt))
+      .orderBy(desc(transactions.createdAt))
       .limit(size)
       .offset((page - 1) * size)
     const total = Number(
@@ -308,14 +319,14 @@ class OrderService {
       .select(getTableColumns(paymentEvents))
       .from(paymentEvents)
       .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
-      .orderBy(asc(paymentEvents.createdAt))
+      .orderBy(desc(paymentEvents.createdAt))
       .where(and(...where))
       .limit(size)
       .offset((page - 1) * size)
     const total = Number(
       (
         await this.db
-          .select(sql<number>`count(*)`)
+          .select({ count: sql<number>`count(*)` })
           .from(paymentEvents)
           .leftJoin(orders, eq(orders.id, paymentEvents.orderId))
           .where(and(...where))
@@ -345,13 +356,12 @@ class OrderService {
       .set({
         status: 'Cancelled',
         cancelledBy,
-        cancelledAt: new Date(),
+        cancelledAt: new Date().toISOString(),
         cancellationReason,
         cancellationRemarks,
       })
       .where(eq(orders.id, orderId))
-    await this.changeStatus(orderId, previousStatus, 'Cancelled')
-    await this.createLog(orderId, STATUS_LOG.Cancelled)
+    await this.changeStatus(orderId, previousStatus, 'Cancelled', cancelledBy)
   }
 
   async get(orderId: number, userId?: string) {
@@ -440,7 +450,12 @@ class OrderService {
       where.push(eq(orders.paymentStatus, filters.paymentStatus))
     }
 
-    const query = {
+    if (filters?.extraFilters) {
+      where.push(...filters.extraFilters)
+    }
+
+    if (!filters?.pagination) {
+      return await this.db.query.orders.findMany( {
       with: {
         lines: {
           with: {
@@ -449,15 +464,19 @@ class OrderService {
         },
       },
       where: and(...where),
-    }
-
-    if (!filters?.pagination) {
-      return await this.db.query.orders.findMany(query)
+    })
     }
 
     const { page, size } = filters.pagination
     const results = await this.db.query.orders.findMany({
-      ...query,
+      with: {
+        lines: {
+          with: {
+            product: true,
+          },
+        },
+      },
+      where: and(...where),
       orderBy: desc(orders.createdAt),
       offset: (page - 1) * size,
       limit: size,

@@ -204,6 +204,13 @@
       "when": 1748587635952,
       "tag": "0028_friendly_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791890947811,
+      "tag": "0029_right_blade",
+      "breakpoints": true
     }
   ]
 }

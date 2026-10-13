@@ -1,7 +1,6 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { ProductService } from '../../product/services/product'
 import {
-  Cart,
   cartAppliedVoucherOffers,
   CartLine,
   cartLines,
@@ -9,19 +8,15 @@ import {
 } from '../schemas'
 import { OfferService } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
-import { CartContent } from '../types'
+import { CartContent, CartContentWithoutOfferInfo, Database } from '../../types'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
-type Extend<T, U> = T & U
-
-
-
 class CartService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async create(userId?: string) {
@@ -85,7 +80,7 @@ class CartService {
       .select()
       .from(carts)
       .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
-      .orderBy(desc(carts.updatedAt))
+      .orderBy(desc(carts.createdAt))
     return result[0]
   }
 
@@ -94,7 +89,7 @@ class CartService {
       .select()
       .from(carts)
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
-      .orderBy(desc(carts.updatedAt))
+      .orderBy(desc(carts.createdAt))
     return result[0]
   }
 
@@ -108,6 +103,7 @@ class CartService {
           with: {
             product: true,
           },
+          orderBy: asc(cartLines.createdAt),
         },
         appliedVoucherOffers: {
           with: {
@@ -122,11 +118,13 @@ class CartService {
       },
       where: eq(carts.sessionId, sessionId),
     })
-    const appliedVoucherOffers = content.appliedVoucherOffers || []
+    if(!content) {
+      throw new Error(`Cart not found for session: ${sessionId}`)
+    }
+    const {appliedVoucherOffers, ...rest} = content
     let cartContent: CartContent = {
-      ...content,
-      appliedVoucherOffers: undefined,
-      lines: content.lines.map((line) => ({
+      ...rest,
+      lines: rest.lines.map((line) => ({
         ...line,
         userOfferDiscounts: [],
         voucherOfferDiscounts: [],
@@ -167,7 +165,7 @@ class CartService {
     userId: string,
     sessionId: string,
     sumProductQuantityOnCartMerge: boolean = SUM_PRODUCT_QUANTITY_ON_CART_MERGE,
-  ): Promise<CartContent> {
+  ): Promise<CartContentWithoutOfferInfo> {
     // const userCart = await this.db
     //   .select({
     //     cart: carts,
@@ -180,7 +178,19 @@ class CartService {
     //   .orderBy(desc(carts.updatedAt));
     const userCart = await this.db.query.carts.findFirst({
       with: {
-        lines: true,
+        lines: {
+          with: {
+            product: {
+              columns: {
+                name: true,
+                price: true,
+                stockQuantity: true,
+                inventoryCost: true,
+                discountedPrice: true,
+              },
+            },
+          },
+        },
       },
       where: eq(carts.userId, userId),
       orderBy: desc(carts.updatedAt),
@@ -197,7 +207,7 @@ class CartService {
           lines: [],
         }
       }
-      return await this.getCartContentForSession(result[0].sessionId)
+      return await this.getCartContentForSession(result[0].sessionId) as CartContentWithoutOfferInfo
     }
     // const sessionCart = await this.db
     //   .select({
@@ -211,10 +221,22 @@ class CartService {
     //   .orderBy(desc(carts.updatedAt));
     const sessionCart = await this.db.query.carts.findFirst({
       with: {
-        lines: true,
+        lines: {
+          with: {
+            product: {
+              columns: {
+                name: true,
+                price: true,
+                discountedPrice: true,
+                stockQuantity: true,
+                inventoryCost: true,
+              },
+            },
+          },
+        },
       },
       where: eq(carts.sessionId, sessionId),
-      orderBy: desc(carts.updatedAt),
+      orderBy: desc(carts.createdAt),
     })
     if (!sessionCart) {
       return userCart
@@ -259,13 +281,13 @@ class CartService {
           sessionLine.createdAt &&
           typeof sessionLine.createdAt === 'string'
         ) {
-          sessionLine.createdAt = new Date(sessionLine.createdAt)
+          sessionLine.createdAt = sessionLine.createdAt
         }
         if (
           sessionLine.updatedAt &&
           typeof sessionLine.updatedAt === 'string'
         ) {
-          sessionLine.updatedAt = new Date(sessionLine.updatedAt)
+          sessionLine.updatedAt = sessionLine.updatedAt
         }
         lines.push(sessionLine)
       }
@@ -280,7 +302,6 @@ class CartService {
           target: cartLines.id,
           set: {
             quantity: sql`excluded.quantity`,
-            price: sql`excluded.price`,
           },
         })
         .returning()
@@ -298,9 +319,24 @@ class CartService {
 
     sessionCart.userId = userId
 
+    const insertedLinesWithProduct = await this.db.query.cartLines.findMany({
+      where: inArray(cartLines.id, insertedLines.map(l => l.id)),
+      with: {
+        product: {
+          columns: {
+            name: true,
+            price: true,
+            stockQuantity: true,
+            inventoryCost: true,
+            discountedPrice: true,
+          },
+        },
+      },
+    })
+
     return {
       ...sessionCart,
-      lines: insertedLines,
+      lines: insertedLinesWithProduct
     }
   }
 
@@ -316,16 +352,33 @@ class CartService {
   }
 
   async unapplyVoucherCode(sessionId: string, voucherCode: string) {
-    await this.db
-      .delete(cartAppliedVoucherOffers)
-      .leftJoin(carts, eq(cartAppliedVoucherOffers.cartId, carts.id))
-      .leftJoin(offers, eq(cartAppliedVoucherOffers.offerId, offers.id))
+    const rowsToDelete = await this.db
+      .select({
+        cartId: cartAppliedVoucherOffers.cartId,
+        offerId: cartAppliedVoucherOffers.offerId,
+      })
+      .from(cartAppliedVoucherOffers)
+      .innerJoin(carts, eq(cartAppliedVoucherOffers.cartId, carts.id))
+      .innerJoin(offers, eq(cartAppliedVoucherOffers.offerId, offers.id))
       .where(
         and(
           eq(carts.sessionId, sessionId),
           eq(offers.voucherCode, voucherCode),
         ),
-      )
+      );
+
+    if (!rowsToDelete.length) {
+      return
+    }
+
+    await this.db
+      .delete(cartAppliedVoucherOffers)
+      .where(
+        and(
+          inArray(cartAppliedVoucherOffers.offerId, rowsToDelete.map(r => r.offerId)),
+          eq(cartAppliedVoucherOffers.cartId, rowsToDelete[0].cartId),
+        ),
+      );
   }
 
   async resetAppliedVoucherOffers(cartId: number) {
@@ -337,9 +390,9 @@ class CartService {
   async applyUserOffers(cartContent: CartContent, userId: string) {
     const offerService = new OfferService(this.db)
     let offers = await offerService.getActiveUserOffers(userId)
-    offers = offers.filter((offer) => offer.benefit.isActive)
+    offers = offers.filter((offer) => offer.benefit?.isActive)
     offers = offers.filter(
-      (offer) => offer.condition.type === 'basket_quantity',
+      (offer) => offer.condition?.type === 'basket_quantity',
     )
     // TODO: Implement other offer types
     for (const offer of offers) {

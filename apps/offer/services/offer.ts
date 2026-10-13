@@ -1,4 +1,4 @@
-import { CartContent } from '../../cart/types'
+import { CartContent, Database } from '../../types'
 import {
   and,
   desc,
@@ -41,6 +41,7 @@ import {
   UpdateOfferBenefit,
   UpdateOfferRange,
 } from '../schemas'
+import { Decimal } from 'decimal.js'
 
 interface OfferRangeListFilter {
   pagination?: {
@@ -52,10 +53,10 @@ interface OfferRangeListFilter {
 }
 
 class OfferRangeService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: NewOfferRange) {
@@ -367,10 +368,10 @@ interface OfferBenefitListFilter {
 }
 
 class OfferBenefitService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: NewOfferBenefit) {
@@ -445,23 +446,25 @@ class OfferBenefitService {
   }
 }
 
+type OfferConditionType = 'basket_quantity' | 'basket_total' | 'distinct_items'
+
 interface OfferConditionListFilter {
   pagination?: {
     page: number
     size: number
   }
-  type?: 'basket_quantity' | 'basket_total' | 'distinct_items'
+  type?: OfferConditionType
   range?: number
 }
 
 class OfferConditionService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
-  async create(data: { rangeId: number; type: string; value: number }) {
+  async create(data: { rangeId: number; type: OfferConditionType; value: string }) {
     const [offerCondition] = await this.db
       .insert(offerConditions)
       .values(data)
@@ -475,7 +478,7 @@ class OfferConditionService {
     })
   }
 
-  async update(id: number, data: { type?: string; value?: number }) {
+  async update(id: number, data: { type?: OfferConditionType; value?: string }) {
     const [offerCondition] = await this.db
       .update(offerConditions)
       .set({ ...data, updatedAt: new Date().toISOString() })
@@ -534,7 +537,7 @@ interface OfferListFilter {
     size: number
   }
   q?: string
-  type?: 'site' | 'product' | 'service'
+  type?: 'site' | 'voucher' | 'user'
   condition?: number
   benefit?: number
   isActive?: boolean
@@ -547,10 +550,10 @@ interface ActiveUserOfferListFilter {
 }
 
 class OfferService {
-  private db: any
+  private db: Database
 
-  constructor(db: any) {
-    this.db = db
+  constructor(dbInstance: any) {
+    this.db = dbInstance as Database
   }
 
   async create(data: any) {
@@ -676,6 +679,101 @@ class OfferService {
     }
 
     return await this.db
+    .select({
+      id: offers.id,
+      name: offers.name,
+      description: offers.description,
+      voucherCode: offers.voucherCode,
+      image: offers.image,
+      startDate: offers.startDate,
+      endDate: offers.endDate,
+      isActive: offers.isActive,
+      isFeatured: offers.isFeatured,
+      type: offers.type,
+      metadata: offers.metadata,
+      benefit: {
+        isActive: offerBenefits.isActive,
+        type: offerBenefits.type,
+        value: offerBenefits.value,
+      },
+      condition: {
+        rangeId: offerConditions.rangeId,
+        type: offerConditions.type,
+        value: offerConditions.value,
+      },
+      productIds: sql<number[]>`
+      ARRAY(
+        SELECT DISTINCT ${products.id}
+        FROM ${products}
+        LEFT JOIN ${offerRangeIncludedProducts} ON ${products.id} = ${offerRangeIncludedProducts.productId}
+        LEFT JOIN ${offerRangeIncludedBrands} ON ${products.brandId} = ${offerRangeIncludedBrands.brandId} AND ${offerRangeIncludedBrands.rangeId} = ${offerConditions.rangeId}
+        LEFT JOIN ${offerRangeIncludedCategories} ON 
+          ${products.categoryId} = ${offerRangeIncludedCategories.categoryId}
+          AND ${offerRangeIncludedCategories.rangeId} = ${offerConditions.rangeId}
+        WHERE ${offerRangeIncludedProducts.rangeId} = ${offerConditions.rangeId}
+          AND (
+            ${offerRanges.includeAllBrands} OR ${offerRangeIncludedBrands.brandId} IS NOT NULL
+          )
+          AND (
+            ${offerRanges.includeAllCategories} OR ${offerRangeIncludedCategories.categoryId} IS NOT NULL
+          )
+      )
+    `,
+    })
+    .from(offers)
+    .where(
+      and(
+        ...where,
+        eq(offers.isActive, true),
+        or(
+          eq(offers.includeAllUsers, true),
+          sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
+            offers.includedUserIds
+          }))`,
+        ),
+        or(isNull(offers.startDate), lte(offers.startDate, now)),
+        or(isNull(offers.endDate), gte(offers.endDate, now)),
+        or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+        or(
+          isNull(offers.limitPerUser),
+          lt(
+            sql`COALESCE((
+            SELECT ${offerUsages.usageCount}
+            FROM ${offerUsages}
+            WHERE ${offerUsages.offerId} = ${offers.id}
+              AND ${offerUsages.userId} = ${userId}
+          ), 0)`,
+            offers.limitPerUser,
+          ),
+        ),
+      ),
+    )
+    .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+    .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+    .leftJoin(offerRanges, eq(offerConditions.rangeId, offerRanges.id))
+    .groupBy(
+      offers.id,
+      offerBenefits.id,
+      offerConditions.id,
+      offerRanges.includeAllBrands,
+      offerRanges.includeAllCategories,
+    )
+    .orderBy(desc(offers.priority), desc(offers.createdAt))
+  }
+
+  async getActiveApplicableUserOffers(userId: string, productIds: number[]){
+    const now = new Date().toISOString()
+
+    const userUsage = this.db
+      .select({
+        offerId: offerUsages.offerId,
+        usageCount: offerUsages.usageCount,
+      })
+      .from(offerUsages)
+      .where(eq(offerUsages.userId, userId))
+      .as('user_usage');
+
+    return await this.db
       .select({
         id: offers.id,
         name: offers.name,
@@ -700,15 +798,16 @@ class OfferService {
         },
       })
       .from(offers)
+      .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+      .leftJoin(userUsage, eq(userUsage.offerId, offers.id))
       .where(
         and(
-          ...where,
+          eq(offers.type, 'user'),
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
-            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
-              offers.includedUserIds
-            }))`,
+            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
           ),
           or(isNull(offers.startDate), lte(offers.startDate, now)),
           or(isNull(offers.endDate), gte(offers.endDate, now)),
@@ -716,26 +815,292 @@ class OfferService {
             isNull(offers.overallLimit),
             lt(offers.usageCount, offers.overallLimit),
           ),
-        ),
-      )
-      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
-      .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
-      .having(
-        or(
-          isNull(offers.limitPerUser),
-          lt(
-            sql`COALESCE((SELECT ${
-              offerUsages.usageCount
-            } FROM ${offerUsages} WHERE ${offerUsages.offerId} = ${
-              offers.id
-            } AND ${offerUsages.userId} = '${sql.raw(userId)}'), 0)`,
-            offers.limitPerUser,
+          or(
+            isNull(offers.limitPerUser),
+            sql`COALESCE(${userUsage.usageCount}, 0) < ${offers.limitPerUser}`,
           ),
-        ),
+          sql`
+            EXISTS (
+              SELECT 1 FROM ${products}
+              LEFT JOIN ${brands} ON ${products.brandId} = ${brands.id}
+              LEFT JOIN ${categories} ON ${products.categoryId} = ${categories.id}
+              LEFT JOIN ${productClasses} ON ${products.productClassId} = ${productClasses.id}
+              WHERE ${inArray(products.id, productIds)}
+              AND EXISTS (
+                SELECT 1 FROM ${offerRanges}
+                WHERE ${offerRanges.id} = ${offerConditions.rangeId}
+                AND ${offerRanges.isActive} = true
+                AND (
+                  (${offerRanges.inclusiveFilter} = true AND (
+                    (${offerRanges.includeAllProducts} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedProducts}
+                      WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
+                      AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedProducts}
+                      WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
+                      AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllBrands} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedBrands}
+                      WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
+                      AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedBrands}
+                      WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
+                      AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllCategories} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedCategories}
+                      WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
+                      AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedCategories}
+                      WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
+                      AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedProductClasses}
+                      WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
+                      AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedProductClasses}
+                      WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
+                      AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
+                    )
+                  ))
+                  OR
+                  (${offerRanges.inclusiveFilter} = false AND (
+                    (
+                      (${offerRanges.includeAllProducts} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedProducts}
+                        WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
+                        AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedProducts}
+                        WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
+                        AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllBrands} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedBrands}
+                        WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
+                        AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedBrands}
+                        WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
+                        AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllCategories} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedCategories}
+                        WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
+                        AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedCategories}
+                        WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
+                        AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllProductClasses} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedProductClasses}
+                        WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
+                        AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedProductClasses}
+                        WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
+                        AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                  ))
+                )
+              )
+            )
+          `
+        )
       )
-      .groupBy(offers.id, offerBenefits.id, offerConditions.id)
-      .orderBy(desc(offers.priority), desc(offers.createdAt))
+      .orderBy(desc(offers.priority), desc(offers.createdAt));
   }
+
+  async getActiveApplicableVoucherOffers(userId: string, productIds: number[]) {
+    const now = new Date().toISOString();
+
+    const userUsage = this.db
+      .select({
+        offerId: offerUsages.offerId,
+        usageCount: offerUsages.usageCount,
+      })
+      .from(offerUsages)
+      .where(eq(offerUsages.userId, userId))
+      .as('user_usage');
+
+    return await this.db
+      .select({
+        id: offers.id,
+        name: offers.name,
+        description: offers.description,
+        voucherCode: offers.voucherCode,
+        image: offers.image,
+        startDate: offers.startDate,
+        endDate: offers.endDate,
+        isActive: offers.isActive,
+        isFeatured: offers.isFeatured,
+        type: offers.type,
+        metadata: offers.metadata,
+        condition: {
+          type: offerConditions.type,
+          value: offerConditions.value,
+        },
+        benefit: {
+          isActive: offerBenefits.isActive,
+          type: offerBenefits.type,
+          value: offerBenefits.value,
+        },
+      })
+      .from(offers)
+      .leftJoin(offerConditions, eq(offers.conditionId, offerConditions.id))
+      .leftJoin(offerBenefits, eq(offers.benefitId, offerBenefits.id))
+      .leftJoin(userUsage, eq(userUsage.offerId, offers.id))
+      .where(
+        and(
+          eq(offers.type, 'voucher'),
+          eq(offers.isActive, true),
+          or(
+            eq(offers.includeAllUsers, true),
+            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
+          ),
+          or(isNull(offers.startDate), lte(offers.startDate, now)),
+          or(isNull(offers.endDate), gte(offers.endDate, now)),
+          or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+          or(
+            isNull(offers.limitPerUser),
+            sql`COALESCE(${userUsage.usageCount}, 0) < ${offers.limitPerUser}`,
+          ),
+          sql`
+            EXISTS (
+              SELECT 1 FROM ${products}
+              LEFT JOIN ${brands} ON ${products.brandId} = ${brands.id}
+              LEFT JOIN ${categories} ON ${products.categoryId} = ${categories.id}
+              LEFT JOIN ${productClasses} ON ${products.productClassId} = ${productClasses.id}
+              WHERE ${inArray(products.id, productIds)}
+              AND EXISTS (
+                SELECT 1 FROM ${offerRanges}
+                WHERE ${offerRanges.id} = ${offerConditions.rangeId}
+                AND ${offerRanges.isActive} = true
+                AND (
+                  (${offerRanges.inclusiveFilter} = true AND (
+                    (${offerRanges.includeAllProducts} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedProducts}
+                      WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
+                      AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedProducts}
+                      WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
+                      AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllBrands} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedBrands}
+                      WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
+                      AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedBrands}
+                      WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
+                      AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllCategories} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedCategories}
+                      WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
+                      AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedCategories}
+                      WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
+                      AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
+                    )
+                    AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
+                      SELECT 1 FROM ${offerRangeIncludedProductClasses}
+                      WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
+                      AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
+                    ))
+                    AND NOT EXISTS (
+                      SELECT 1 FROM ${offerRangeExcludedProductClasses}
+                      WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
+                      AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
+                    )
+                  ))
+                  OR
+                  (${offerRanges.inclusiveFilter} = false AND (
+                    (
+                      (${offerRanges.includeAllProducts} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedProducts}
+                        WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
+                        AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedProducts}
+                        WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
+                        AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllBrands} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedBrands}
+                        WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
+                        AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedBrands}
+                        WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
+                        AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllCategories} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedCategories}
+                        WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
+                        AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedCategories}
+                        WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
+                        AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                    OR (
+                      (${offerRanges.includeAllProductClasses} = true OR EXISTS (
+                        SELECT 1 FROM ${offerRangeIncludedProductClasses}
+                        WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
+                        AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
+                      ))
+                      AND NOT EXISTS (
+                        SELECT 1 FROM ${offerRangeExcludedProductClasses}
+                        WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
+                        AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
+                      )
+                    )
+                  ))
+                )
+              )
+            )
+          `
+        )
+      )
+      .orderBy(desc(offers.priority), desc(offers.createdAt));
+}
+
 
   async getActiveUserOfferDetails(userId: string, offerId: number) {
     const now = new Date().toISOString()
@@ -986,7 +1351,7 @@ class OfferService {
         ),
       })
       if (
-        userUsageCount &&
+        userUsageCount && userUsageCount.usageCount &&
         userUsageCount.usageCount >= voucherOffer.limitPerUser
       ) {
         throw new Error('Voucher code usage limit exceeded')
@@ -1042,11 +1407,11 @@ class OfferService {
 
     if (voucherOffer.condition.type === 'basket_quantity') {
       const productQuantities = cartLinesOfProductsInOfferRange.reduce(
-        (acc, line) => {
+        (acc: Record<number, number>, line) => {
           acc[line.productId] = (acc[line.productId] || 0) + line.quantity
           return acc
         },
-        {},
+        {} as Record<number, number>,
       )
 
       if (
@@ -1077,60 +1442,77 @@ class OfferService {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount = Number(voucherOffer.benefit.value)
-                if (
-                  updatedLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updatedLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(voucherOffer.benefit.value)
+                
+                let offerDiscount = benefitValue
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
                 updatedLine!.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  voucherCode: voucherOffer.voucherCode,
+                  benefitType: voucherOffer.benefit.type,
+                  benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  voucherCode: voucherOffer.voucherCode,
+                  benefitType: voucherOffer.benefit.type,
+                  benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
-                updatedLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
                 isVoucherApplied = true
               } else if (voucherOffer.benefit.type === 'percentage') {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount =
-                  (Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    Number(voucherOffer.benefit.value)) /
-                  100
-                if (
-                  updatedLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updatedLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(voucherOffer.benefit.value)
+                
+                let offerDiscount = productPrice.mul(benefitValue).div(100)
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
                 updatedLine!.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  voucherCode: voucherOffer.voucherCode,
+                  benefitType: voucherOffer.benefit.type,
+                  benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
                 cartContent.voucherOfferDiscounts.push({
                   id: voucherOffer.id,
                   name: voucherOffer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  voucherCode: voucherOffer.voucherCode,
+                  benefitType: voucherOffer.benefit.type,
+                  benefitValue: voucherOffer.benefit.value,
+                  conditionType: voucherOffer.condition.type,
+                  conditionValue: voucherOffer.condition.value,
                 })
-                updatedLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
                 isVoucherApplied = true
               } else {
                 throw new Error('Not implemented')
@@ -1142,68 +1524,81 @@ class OfferService {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount =
-                Number(voucherOffer.benefit.value) * line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(voucherOffer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = benefitValue.mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                voucherCode: voucherOffer.voucherCode,
+                benefitType: voucherOffer.benefit.type,
+                benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                voucherCode: voucherOffer.voucherCode,
+                benefitType: voucherOffer.benefit.type,
+                benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               isVoucherApplied = true
             } else if (voucherOffer.benefit.type === 'percentage') {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount =
-                ((Number(
-                  (line.product.discountedPrice ?? line.product.price)!,
-                ) *
-                  Number(voucherOffer.benefit.value)) /
-                  100) *
-                line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(voucherOffer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = productPrice.mul(benefitValue).div(100).mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                voucherCode: voucherOffer.voucherCode,
+                benefitType: voucherOffer.benefit.type,
+                benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
               cartContent.voucherOfferDiscounts.push({
                 id: voucherOffer.id,
                 name: voucherOffer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                voucherCode: voucherOffer.voucherCode,
+                benefitType: voucherOffer.benefit.type,
+                benefitValue: voucherOffer.benefit.value,
+                conditionType: voucherOffer.condition.type,
+                conditionValue: voucherOffer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               isVoucherApplied = true
             } else {
               throw new Error('Not implemented')
@@ -1256,11 +1651,11 @@ class OfferService {
 
     if (offer.condition.type === 'basket_quantity') {
       const productQuantities = cartLinesOfProductsInOfferRange.reduce(
-        (acc, line) => {
+        (acc: Record<number, number>, line) => {
           acc[line.productId] = (acc[line.productId] || 0) + line.quantity
           return acc
         },
-        {},
+        {} as Record<number, number>,
       )
 
       for (const line of cartLinesOfProductsInOfferRange) {
@@ -1280,59 +1675,72 @@ class OfferService {
                 const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount = Number(offer.benefit.value)
-                if (
-                  updatedLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updatedLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(offer.benefit.value)
+                
+                let offerDiscount = benefitValue
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
                 updatedLine!.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  benefitType: offer.benefit.type,
+                  benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  benefitType: offer.benefit.type,
+                  benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
-                updatedLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               } else if (offer.benefit.type === 'percentage') {
-                const updateLine = cartContent.lines.find(
+                const updatedLine = cartContent.lines.find(
                   (l) => l.productId === line.productId,
                 )
-                let offerDiscount =
-                  (Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    Number(offer.benefit.value)) /
-                  100
-                if (
-                  updateLine!.totalOfferDiscount + offerDiscount >
-                  Number((line.product.discountedPrice ?? line.product.price)!)
-                ) {
-                  offerDiscount =
-                    Number(
-                      (line.product.discountedPrice ?? line.product.price)!,
-                    ) - updateLine!.totalOfferDiscount
+                const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+                const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+                const benefitValue = new Decimal(offer.benefit.value)
+                
+                let offerDiscount = productPrice.mul(benefitValue).div(100)
+                if (currentTotalDiscount.add(offerDiscount).gt(productPrice)) {
+                  offerDiscount = productPrice.sub(currentTotalDiscount)
                 }
-                updateLine!.userOfferDiscounts.push({
+                
+                const offerDiscountNumber = offerDiscount.toNumber()
+                
+                updatedLine!.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  benefitType: offer.benefit.type,
+                  benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
                 cartContent.userOfferDiscounts.push({
                   id: offer.id,
                   name: offer.name,
-                  discount: offerDiscount,
+                  discount: offerDiscountNumber,
+                  benefitType: offer.benefit.type,
+                  benefitValue: offer.benefit.value,
+                  conditionType: offer.condition.type,
+                  conditionValue: offer.condition.value,
                 })
-                updateLine!.totalOfferDiscount += offerDiscount
-                cartContent.totalOfferDiscount += offerDiscount
+                updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+                cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
               } else {
                 throw new Error('Not implemented')
               }
@@ -1343,66 +1751,76 @@ class OfferService {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount = Number(offer.benefit.value) * line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(offer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = benefitValue.mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                benefitType: offer.benefit.type,
+                benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                benefitType: offer.benefit.type,
+                benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
             } else if (offer.benefit.type === 'percentage') {
               const updatedLine = cartContent.lines.find(
                 (l) => l.productId === line.productId,
               )
-              let offerDiscount =
-                ((Number(
-                  (line.product.discountedPrice ?? line.product.price)!,
-                ) *
-                  Number(offer.benefit.value)) /
-                  100) *
-                line.quantity
-              if (
-                updatedLine!.totalOfferDiscount + offerDiscount >
-                Number((line.product.discountedPrice ?? line.product.price)!) *
-                  line.quantity
-              ) {
-                offerDiscount =
-                  Number(
-                    (line.product.discountedPrice ?? line.product.price)!,
-                  ) *
-                    line.quantity -
-                  updatedLine!.totalOfferDiscount
+              const productPrice = new Decimal(line.product.discountedPrice ?? line.product.price!)
+              const currentTotalDiscount = new Decimal(`${updatedLine!.totalOfferDiscount}`)
+              const benefitValue = new Decimal(offer.benefit.value)
+              const quantity = new Decimal(line.quantity)
+              
+              let offerDiscount = productPrice.mul(benefitValue).div(100).mul(quantity)
+              const maxPossibleDiscount = productPrice.mul(quantity)
+              if (currentTotalDiscount.add(offerDiscount).gt(maxPossibleDiscount)) {
+                offerDiscount = maxPossibleDiscount.sub(currentTotalDiscount)
               }
+              
+              const offerDiscountNumber = offerDiscount.toNumber()
+              
               updatedLine!.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                benefitType: offer.benefit.type,
+                benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
               cartContent.userOfferDiscounts.push({
                 id: offer.id,
                 name: offer.name,
-                discount: offerDiscount,
+                discount: offerDiscountNumber,
+                benefitType: offer.benefit.type,
+                benefitValue: offer.benefit.value,
+                conditionType: offer.condition.type,
+                conditionValue: offer.condition.value,
               })
-              updatedLine!.totalOfferDiscount += offerDiscount
-              cartContent.totalOfferDiscount += offerDiscount
+              updatedLine!.totalOfferDiscount = currentTotalDiscount.add(offerDiscount).toNumber()
+              cartContent.totalOfferDiscount = new Decimal(`${cartContent.totalOfferDiscount}`).add(offerDiscount).toNumber()
             } else {
               throw new Error('Not implemented')
             }

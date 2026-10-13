@@ -19,6 +19,7 @@ export const brands = pgTable('brand', {
   slug: text().notNull().unique(),
   logo: text(),
   description: text(),
+  order: integer().default(1),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),

@@ -1,11 +1,15 @@
 import {
   and,
+  asc,
   desc,
   eq,
+  exists,
   getTableColumns,
   ilike,
+  inArray,
   isNotNull,
   isNull,
+  notExists,
   or,
   SQL,
   sql,
@@ -27,6 +31,7 @@ import {
 } from '../schemas'
 import { orderLines } from '../../order/schemas'
 import { aliasedTable } from 'drizzle-orm'
+import { Database } from '../../types'
 
 type PaginationArgs = {
   page: number
@@ -55,10 +60,10 @@ interface ProductFilter {
 }
 
 class ProductService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async create(product: NewProduct) {
@@ -271,15 +276,15 @@ class ProductService {
         )
       }
     } else {
-      orderBy = desc(products.createdAt)
+      orderBy = desc(products.id)
     }
 
     let query = this.db
       .select({
-        ...products,
-        brand: brands,
-        category: categories,
-        productClass: productClasses,
+        ...getTableColumns(products),
+        brand: getTableColumns(brands),
+        category: getTableColumns(categories),
+        productClass: getTableColumns(productClasses),
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
@@ -427,13 +432,14 @@ class ProductService {
 interface BrandFilter {
   q?: string
   isActive?: boolean
+  hasActiveProducts?: boolean
   pagination?: PaginationArgs
 }
 class BrandService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async create(brand: NewBrand) {
@@ -501,11 +507,53 @@ class BrandService {
       where.push(eq(brands.isActive, filter.isActive))
     }
 
+    if (filter?.hasActiveProducts !== undefined) {
+      if (filter.hasActiveProducts) {
+        where.push(
+          exists(
+            this.db
+              .select()
+              .from(products)
+              .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+              .leftJoin(categories, eq(products.categoryId, categories.id))
+              .where(
+                and(
+                  eq(products.brandId, brands.id),
+                  eq(products.isActive, true),
+                  or(isNull(products.categoryId), eq(categories.isActive, true)),
+                  or(
+                    isNull(products.productClassId),
+                    eq(productClasses.isActive, true),
+                  ),
+                ),
+              ),
+          ),
+        )
+      } else {
+        where.push(
+          notExists(
+            this.db
+              .select()
+              .from(products)
+              .where(
+                and(
+                  eq(products.brandId, brands.id),
+                  eq(products.isActive, true),
+                ),
+              ),
+          ),
+        )
+      }
+    }
+
     const query = this.db
       .select()
       .from(brands)
       .where(and(...where))
-      .orderBy(desc(brands.createdAt))
+      .orderBy(
+        asc(brands.order),
+        desc(brands.createdAt)
+      )
 
     if (!filter.pagination) {
       return await query
@@ -551,10 +599,10 @@ interface ProductClassFilter {
 }
 
 class ProductClassService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async create(productClass: NewProductClass) {
@@ -675,14 +723,17 @@ interface CategoryFilter {
   isActive?: boolean
   parentIds?: number[]
   isRootCategory?: boolean
+  hasProducts?: boolean
+  hasActiveProducts?: boolean
+  hasActiveProductWithBrands?: number[]
   pagination?: PaginationArgs
 }
 
 class CategoryService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async create(category: NewCategory) {
@@ -752,6 +803,60 @@ class CategoryService {
           ilike(categories.name, `%${filter.q}%`),
         )!,
       )
+    }
+
+    if (filter?.hasProducts !== undefined) {
+      const productsInCategory = this.db
+        .select()
+        .from(products)
+        .where(eq(products.categoryId, categories.id))
+      where.push(
+        filter.hasProducts
+          ? exists(productsInCategory)
+          : notExists(productsInCategory),
+      )
+    }
+
+    if (filter?.hasActiveProducts !== undefined) {
+      if (filter.hasActiveProducts) {
+        where.push(
+          exists(
+            this.db
+              .select()
+              .from(products)
+              .leftJoin(brands, eq(products.brandId, brands.id))
+              .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+              .where(
+                and(
+                  eq(products.categoryId, categories.id),
+                  eq(products.isActive, true),
+                  or(isNull(products.brandId), eq(brands.isActive, true)),
+                  or(
+                    isNull(products.productClassId),
+                    eq(productClasses.isActive, true),
+                  ),
+                  filter.hasActiveProductWithBrands
+                    ? inArray(products.brandId, filter.hasActiveProductWithBrands)
+                    : undefined,
+                ),
+              ),
+          ),
+        )
+      } else {
+        where.push(
+          notExists(
+            this.db
+              .select()
+              .from(products)
+              .where(
+                and(
+                  eq(products.categoryId, categories.id),
+                  eq(products.isActive, true),
+                ),
+              ),
+          ),
+        )
+      }
     }
 
     if (filter?.isRootCategory !== undefined) {
@@ -826,10 +931,10 @@ class CategoryService {
 }
 
 class ProductImageService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async getImages(productId: number) {
@@ -854,10 +959,10 @@ class ProductImageService {
 }
 
 class RelatedProductService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async setRelatedProducts(productId: number, relatedProductIds: number[]) {

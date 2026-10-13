@@ -23,7 +23,7 @@ export const shippingAddresses = pgTable('shipping_address', {
     postalCode: text(),
     instructions: text(),
     isDefault: boolean().notNull().default(false),
-    metadata: jsonb(),
+    metadata: jsonb().$type<Record<string, any> | null>(),
     createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
@@ -36,7 +36,7 @@ export const shippingMethods = pgTable('shipping_method', {
     precision: 100,
     scale: 20,
   }).notNull(),
-  metadata: jsonb(),
+  metadata: jsonb().$type<Record<string, any> | null>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })
@@ -47,13 +47,13 @@ export const paymentStatusEnum = pgEnum('payment_status', ['Pending', 'Paid', 'R
 export const orders = pgTable('order', {
   id: serial().primaryKey(),
   userId: text(),
-  guestUser: jsonb(),
+  guestUser: jsonb().$type<Record<string, any> | null>(),
   cartId: integer().references(() => carts.id),
   status: orderStatusEnum().notNull().default('Pending'),
   paymentStatus: paymentStatusEnum().notNull().default('Pending'),
-  shippingAddress: jsonb().default({}),
-  shippingMethod: jsonb().default({}),
-  offers: jsonb().default([]),
+  shippingAddress: jsonb().default({}).$type<Record<string, any>>(),
+  shippingMethod: jsonb().default({}).$type<Record<string, any>>(),
+  offers: jsonb().default([]).$type<Array<Record<string, any>>>(),
   discount: numeric({
     precision: 100,
     scale: 20,
@@ -70,7 +70,7 @@ export const orders = pgTable('order', {
     precision: 100,
     scale: 20,
   }).notNull().default('0'),
-  metadata: jsonb(),
+  metadata: jsonb().$type<Record<string, any> | null>(),
   cancelledBy: text(),
   cancelledAt: timestamp({ mode: 'string', withTimezone: true }),
   cancellationReason: text(),
@@ -85,6 +85,7 @@ export const orderStatusChanges = pgTable('order_status_change', {
   previousStatus: orderStatusEnum().notNull(),
   newStatus: orderStatusEnum().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  createdBy: text(),
 })
 
 export const orderLogs = pgTable('order_log', {
@@ -92,6 +93,7 @@ export const orderLogs = pgTable('order_log', {
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   log: text().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
+  loggedBy: text(),
 })
 
 export const orderLines = pgTable('order_line', {
@@ -120,7 +122,7 @@ export const transactionStatusEnum = pgEnum('transaction_status', ['Requested', 
 
 export const transactions = pgTable('transaction', {
   id: serial().primaryKey(),
-  orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  orderId: integer().references(() => orders.id, { onDelete: 'cascade' }),
   gateway: text().notNull(),
   reference: text(),
   amount: numeric({
@@ -128,7 +130,7 @@ export const transactions = pgTable('transaction', {
     scale: 20,
   }).notNull(),
   status: transactionStatusEnum().notNull().default('Requested'),
-  metadata: jsonb(),
+  metadata: jsonb().$type<Record<string, any> | null>(),
   lastRequestedAt: timestamp({ mode: 'string', withTimezone: true }),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
@@ -145,7 +147,7 @@ export const paymentEvents = pgTable('payment_event', {
   }).notNull(),
   type: paymentEventTypes().notNull().default('Paid'),
   reference: text(),
-  metadata: jsonb(),
+  metadata: jsonb().$type<Record<string, any> | null>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
 })

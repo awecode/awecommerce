@@ -69,7 +69,7 @@ test('should unmark a product as best seller', async () => {
 test('should get a product', async () => {
   const product = await productService.get(1)
   expect(product).toBeDefined()
-  expect(product.id).toBe(1)
+  expect(product!.id).toBe(1)
 })
 
 test('should update a product', async () => {

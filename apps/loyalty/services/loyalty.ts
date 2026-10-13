@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, lt, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, isNull, lt, or } from 'drizzle-orm'
 import {
   InsertLoyaltyLogs,
   loyaltyLogs,
@@ -7,12 +7,14 @@ import {
   loyaltySettings,
   UpdateLoyaltySettings,
 } from '../schemas'
+import { Database } from '../../types'
+import { Decimal } from 'decimal.js'
 
 class LoyaltyService {
-  private db: any
+  private db: Database
 
   constructor(dbInstance: any) {
-    this.db = dbInstance
+    this.db = dbInstance as Database
   }
 
   async getSettings() {
@@ -22,7 +24,8 @@ class LoyaltyService {
       },
     })
     if (!setting) {
-      setting = await this.db.insert(loyaltySettings).values({}).returning()
+      const newSetting = await this.db.insert(loyaltySettings).values({}).returning()
+      setting = newSetting[0]
     }
     return setting
   }
@@ -49,7 +52,7 @@ class LoyaltyService {
     await this.db.insert(loyaltyPoints).values({
       userId,
       orderId,
-      earnedPoints,
+      earnedPoints: earnedPoints.toString(),
     })
     await this.createLog({
       userId,
@@ -75,11 +78,11 @@ class LoyaltyService {
         lt(loyaltyPoints.redeemedPoints, loyaltyPoints.earnedPoints),
       ),
     })
-    return points.reduce(
-      (acc: number, point: LoyaltyPoints) =>
-        acc + Number(point.earnedPoints) - Number(point.redeemedPoints),
-      0,
-    )
+    return points.reduce<Decimal>(
+      (acc: Decimal, point: LoyaltyPoints) =>
+        acc.add(new Decimal(point.earnedPoints)).sub(new Decimal(point.redeemedPoints!)),
+      new Decimal(0),
+    ).toNumber()
   }
 
   async getTotalRedeemablePointsAndValue(userId: string) {
@@ -94,14 +97,14 @@ class LoyaltyService {
   }
 
   async getUserLoyaltyPoints(userId: string) {
-    let points = await this.db.query.loyaltyPoints.findMany({
+    const availablePoints = await this.db.query.loyaltyPoints.findMany({
       where: eq(loyaltyPoints.userId, userId),
       orderBy: desc(loyaltyPoints.createdAt),
     })
 
     const settings = await this.getSettings()
 
-    points = points.map((point: LoyaltyPoints) => ({
+    const points = availablePoints.map((point) => ({
       ...point,
       pointsWorth: settings.redeemRate
         ? Number(point.earnedPoints) * Number(settings.redeemRate)
@@ -125,16 +128,16 @@ class LoyaltyService {
     )
 
     const totalRedeemablePoints = usablePoints.reduce(
-      (acc: number, point: LoyaltyPoints) =>
-        acc + Number(point.earnedPoints) - Number(point.redeemedPoints),
-      0,
+      (acc: Decimal, point: LoyaltyPoints) =>
+        acc.add(new Decimal(point.earnedPoints)).sub(new Decimal(point.redeemedPoints!)),
+      new Decimal(0),
     )
 
     return {
       points,
-      totalRedeemablePoints,
+      totalRedeemablePoints: totalRedeemablePoints.toNumber(),
       totalRedeemableValue: settings.redeemRate
-        ? totalRedeemablePoints * Number(settings.redeemRate)
+        ? totalRedeemablePoints.mul(new Decimal(settings.redeemRate)).toNumber()
         : 0,
     }
   }
@@ -163,7 +166,7 @@ class LoyaltyService {
       await this.db
         .update(loyaltyPoints)
         .set({
-          redeemedPoints: Number(point.redeemedPoints) + pointsToRedeemFromThis,
+          redeemedPoints: new Decimal(point.redeemedPoints).add(new Decimal(`${pointsToRedeemFromThis}`)).toString(),
         })
         .where(eq(loyaltyPoints.id, point.id))
       pointsToDeduct -= pointsToRedeemFromThis
@@ -177,10 +180,43 @@ class LoyaltyService {
     return pointsToRedeem
   }
 
-  async getLogs(userId: string) {
+  async unredeemPoints(userId: string, orderId: number, points: number) {
+    const pointsToUnredeem = points
+    let pointsToAddBack = pointsToUnredeem
+    const pointsData = await this.db.query.loyaltyPoints.findMany({
+      where: and(
+        eq(loyaltyPoints.userId, userId),
+        gt(loyaltyPoints.redeemedPoints, '0'),
+      ),  
+      orderBy: desc(loyaltyPoints.createdAt),
+    })
+    for (const point of pointsData) {
+      if (pointsToAddBack <= 0) {
+        break
+      }
+      const redeemedPoints = Number(point.redeemedPoints) 
+      const pointsToUnredeemFromThis = Math.min(pointsToAddBack, redeemedPoints)
+      await this.db
+        .update(loyaltyPoints)
+        .set({
+          redeemedPoints: (redeemedPoints - pointsToUnredeemFromThis).toString(),
+        })
+        .where(eq(loyaltyPoints.id, point.id))
+      pointsToAddBack -= pointsToUnredeemFromThis
+    }
+    await this.createLog({
+      userId,
+      orderId,
+      points: pointsToUnredeem.toString(),
+      type: 'earned',
+    })  
+    return pointsToUnredeem
+  }
+
+  async getLogs(userId: string, order: 'asc' | 'desc' = 'asc') {
     return await this.db.query.loyaltyLogs.findMany({
       where: eq(loyaltyLogs.userId, userId),
-      orderBy: asc(loyaltyLogs.createdAt),
+      orderBy: order === 'asc' ? asc(loyaltyLogs.createdAt) : desc(loyaltyLogs.createdAt),
     })
   }
 }

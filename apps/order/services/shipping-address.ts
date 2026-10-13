@@ -1,11 +1,12 @@
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { NewShippingAddress, shippingAddresses, UpdateShippingAddress } from '../schemas';
+import { Database } from '../../types';
 
 class ShippingAddressService {
-  private db: any;
+  private db: Database;
 
   constructor(dbInstance: any) {
-    this.db = dbInstance;
+    this.db = dbInstance as Database;
   }
 
   async create(data: NewShippingAddress) {
