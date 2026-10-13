@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  packages/service:
     dependencies:
       decimal.js:
         specifier: ^10.6.0

@@ -1,0 +1,115 @@
+{
+  "name": "@awecommerce/service",
+  "version": "0.1.0",
+  "description": "Headless e-commerce library for Node.js and PostgreSQL",
+  "scripts": {
+    "test": "vitest",
+    "coverage": "vitest run --coverage",
+    "prepare": "tsdown",
+    "build": "tsdown",
+    "check:dist": "tsdown && node scripts/check-dist.mjs",
+    "test:pg": "node scripts/test-pg.mjs",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm typecheck && node scripts/test-pg.mjs --if-available && pnpm check:dist",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx --env-file=./.env core/db/pg/migrate.ts",
+    "seed:product": "tsx --env-file=./.env apps/product/seed.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "exports": {
+    "./apps/cart/schemas": {
+      "import": {
+        "types": "./dist/apps/cart/schemas/index.d.ts",
+        "default": "./dist/apps/cart/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/cart/schemas/index.d.ts",
+        "default": "./dist/apps/cart/schemas/index.cjs"
+      }
+    },
+    "./apps/loyalty/schemas": {
+      "import": {
+        "types": "./dist/apps/loyalty/schemas/index.d.ts",
+        "default": "./dist/apps/loyalty/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/loyalty/schemas/index.d.ts",
+        "default": "./dist/apps/loyalty/schemas/index.cjs"
+      }
+    },
+    "./apps/offer/schemas": {
+      "import": {
+        "types": "./dist/apps/offer/schemas/index.d.ts",
+        "default": "./dist/apps/offer/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/offer/schemas/index.d.ts",
+        "default": "./dist/apps/offer/schemas/index.cjs"
+      }
+    },
+    "./apps/order/schemas": {
+      "import": {
+        "types": "./dist/apps/order/schemas/index.d.ts",
+        "default": "./dist/apps/order/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/order/schemas/index.d.ts",
+        "default": "./dist/apps/order/schemas/index.cjs"
+      }
+    },
+    "./apps/product/schemas": {
+      "import": {
+        "types": "./dist/apps/product/schemas/index.d.ts",
+        "default": "./dist/apps/product/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/product/schemas/index.d.ts",
+        "default": "./dist/apps/product/schemas/index.cjs"
+      }
+    },
+    "./core/db": {
+      "import": {
+        "types": "./dist/core/db/index.d.ts",
+        "default": "./dist/core/db/index.mjs"
+      },
+      "require": {
+        "types": "./dist/core/db/index.d.ts",
+        "default": "./dist/core/db/index.cjs"
+      }
+    },
+    "./*": {
+      "import": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.mjs"
+      },
+      "require": {
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.cjs"
+      }
+    }
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
+    "typescript": "^7.0.2"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.9",
+    "@faker-js/faker": "^10.6.0",
+    "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "^5.0.4",
+    "drizzle-kit": "^0.31.11",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}
