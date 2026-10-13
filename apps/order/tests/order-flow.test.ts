@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from 'vitest'
+import { beforeAll, expect, test, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 
 import { db } from 'core/db'
@@ -6,7 +6,7 @@ import { OrderService } from 'apps/order/services/order'
 import { CartService } from 'apps/cart/services/cart'
 import { ProductService } from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
-import { orderLines, orders, orderStatusChanges } from 'apps/order/schemas'
+import { orderLines, orders, orderStatusChanges, paymentEvents } from 'apps/order/schemas'
 
 const orderService = new OrderService(db)
 const productService = new ProductService(db)
@@ -269,4 +269,21 @@ test('should report orders containing a product and delete orders with their lin
     await db.select().from(orderLines).where(eq(orderLines.orderId, order.id)),
   ).toEqual([])
   expect(await orderService.hasOrderWithProductId(productId)).toBe(false)
+})
+
+test('should roll back a payment event when updating the payment status fails', async () => {
+  const order = await createOrder('flow-payment-rollback-user')
+  const spy = vi
+    .spyOn(OrderService.prototype, 'changePaymentStatus')
+    .mockRejectedValueOnce(new Error('status update failed'))
+  await expect(
+    orderService.createPaymentEvent({ orderId: order.id, amount: '200', type: 'Paid' }),
+  ).rejects.toThrow('status update failed')
+  spy.mockRestore()
+
+  expect(
+    await db.select().from(paymentEvents).where(eq(paymentEvents.orderId, order.id)),
+  ).toEqual([])
+  const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
+  expect(orderAfter.paymentStatus).toBe('Pending')
 })

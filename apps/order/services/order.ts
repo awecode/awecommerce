@@ -297,11 +297,14 @@ class OrderService {
   }
 
   async createPaymentEvent(paymentEvent: NewPaymentEvent) {
-    await this.db.insert(paymentEvents).values(paymentEvent)
-    await this.changePaymentStatus(
-      paymentEvent.orderId,
-      paymentEvent.type === 'Paid' ? 'Paid' : 'Refunded',
-    )
+    return await this.db.transaction(async (tx) => {
+      const orderService = new OrderService(tx)
+      await tx.insert(paymentEvents).values(paymentEvent)
+      await orderService.changePaymentStatus(
+        paymentEvent.orderId,
+        paymentEvent.type === 'Paid' ? 'Paid' : 'Refunded',
+      )
+    })
   }
 
   async getLastPaymentEvent(orderId: number) {
