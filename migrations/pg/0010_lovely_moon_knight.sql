@@ -1,1 +1,0 @@
-ALTER TABLE "brand" ADD COLUMN "logo" varchar(256);

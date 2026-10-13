@@ -1,1 +1,0 @@
-ALTER TABLE "order_line" ADD CONSTRAINT "order_line_productId_product_id_fk" FOREIGN KEY ("productId") REFERENCES "public"."product"("id") ON DELETE no action ON UPDATE no action;
