@@ -82,7 +82,7 @@ class OrderService {
     }
     const hash = createHmac('sha256', secret)
     hash.update(orderId)
-    return hash.digest('base64')
+    return hash.digest('base64url')
   }
 
   checkHash(orderId: string, hash: string): boolean {

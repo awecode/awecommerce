@@ -107,3 +107,11 @@ test('should reject creating an order without lines', async () => {
   )
   expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
 })
+
+test('should generate URL-safe hashes', () => {
+  for (let id = 1; id <= 200; id++) {
+    const hash = orderService.generateHash(id.toString())
+    expect(hash).toMatch(/^[A-Za-z0-9_-]+$/)
+    expect(orderService.checkHash(id.toString(), hash)).toBe(true)
+  }
+})
