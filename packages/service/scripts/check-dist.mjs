@@ -18,7 +18,7 @@ const expectedExports = {
   'apps/cart/services/cart': ['CartService'],
   'apps/loyalty/services/loyalty': ['LoyaltyService'],
   'apps/offer/services/offer': ['OfferService', 'OfferRangeService'],
-  'apps/order/services/order': ['OrderService', 'OrderTotalMismatchError'],
+  'apps/order/services/order': ['OrderService', 'OrderTotalMismatchError', 'OfferLimitReachedError'],
   'apps/order/services/shipping-address': ['ShippingAddressService'],
   'apps/order/services/shipping-method': ['ShippingMethodService'],
   'apps/product/services/product': ['ProductService', 'CategoryService'],

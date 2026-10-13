@@ -1,12 +1,12 @@
 // Runs only against a real Postgres (see loyalty-concurrency.test.ts), because
 // PGlite cannot run transactions at the same time. Use `pnpm test:pg`.
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
 import * as tables from 'core/db/pg/schema'
-import { OrderService } from 'apps/order/services/order'
+import { OfferLimitReachedError, OrderService } from 'apps/order/services/order'
 import { CartService } from 'apps/cart/services/cart'
 import { ProductService } from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
@@ -170,5 +170,143 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     expect(history.map((c) => [c.previousStatus, c.newStatus])).toEqual([
       ['Pending', 'Confirmed'],
     ])
+  })
+
+  // A 10% voucher on everything, with the given limits
+  const createLimitedVoucher = async (
+    code: string,
+    limits: { overallLimit?: number; limitPerUser?: number },
+  ) => {
+    const [range] = await db
+      .insert(offerRanges)
+      .values({
+        name: code,
+        inclusiveFilter: true,
+        includeAllProducts: true,
+        includeAllBrands: true,
+        includeAllCategories: true,
+        includeAllProductClasses: true,
+      })
+      .returning()
+    const [condition] = await db
+      .insert(offerConditions)
+      .values({ rangeId: range.id, type: 'basket_quantity', value: '1' })
+      .returning()
+    const [benefit] = await db
+      .insert(offerBenefits)
+      .values({ name: code, type: 'percentage', value: '10' })
+      .returning()
+    const [voucher] = await db
+      .insert(offers)
+      .values({
+        name: code,
+        type: 'voucher',
+        voucherCode: code,
+        includeAllUsers: true,
+        conditionId: condition.id,
+        benefitId: benefit.id,
+        ...limits,
+      })
+      .returning()
+    return voucher
+  }
+
+  // Carts that all have the voucher applied, before anyone checks out
+  const cartsWithVoucher = async (code: string, userIds: string[]) => {
+    const product = await new ProductService(db).create({
+      name: code,
+      slug: code,
+      sku: code,
+      price: '100',
+    })
+    const cartService = new CartService(db)
+    const cartIds: number[] = []
+    for (const userId of userIds) {
+      const cart = await cartService.create(userId)
+      await cartService.addToCart(cart.id, product.id, 1)
+      const content = await cartService.getCartContentForSession(cart.sessionId)
+      await new OfferService(db).applyVoucherCode(content, undefined, code, userId)
+      cartIds.push(cart.id)
+    }
+    return cartIds
+  }
+
+  const checkOutAll = async (cartIds: number[]) => {
+    const results = await Promise.allSettled(
+      cartIds.map((cartId) => new OrderService(db).createFromCart(cartId)),
+    )
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === 'rejected',
+    )
+    for (const { reason } of rejected) {
+      expect(reason).toBeInstanceOf(OfferLimitReachedError)
+    }
+    return rejected.length
+  }
+
+  const ordersUsingOffer = async (cartIds: number[], offerId: number) =>
+    (await db.select().from(orders).where(inArray(orders.cartId, cartIds))).filter(
+      (order) => (order.offers ?? []).some((offer) => offer.id === offerId),
+    ).length
+
+  test('concurrent checkouts never use a voucher beyond its overall limit', async () => {
+    const code = `OVERALL-${Date.now()}`
+    const voucher = await createLimitedVoucher(code, { overallLimit: 1 })
+    const userIds = Array.from({ length: CONCURRENCY }, (_, i) => `${code}-user-${i}`)
+    const cartIds = await cartsWithVoucher(code, userIds)
+
+    await checkOutAll(cartIds)
+
+    const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
+    expect(offer.usageCount).toBe(1)
+    expect(await ordersUsingOffer(cartIds, voucher.id)).toBe(1)
+  })
+
+  test('concurrent checkouts by one user never exceed the per-user limit', async () => {
+    const code = `PERUSER-${Date.now()}`
+    const userId = `${code}-user`
+    const voucher = await createLimitedVoucher(code, { limitPerUser: 1 })
+    const cartIds = await cartsWithVoucher(code, Array(CONCURRENCY).fill(userId))
+
+    await checkOutAll(cartIds)
+
+    const [usage] = await db
+      .select()
+      .from(offerUsages)
+      .where(and(eq(offerUsages.offerId, voucher.id), eq(offerUsages.userId, userId)))
+    expect(usage.usageCount).toBe(1)
+    expect(await ordersUsingOffer(cartIds, voucher.id)).toBe(1)
+  })
+
+  test('concurrent checkouts never use a user offer beyond its overall limit', async () => {
+    const code = `USEROFFER-${Date.now()}`
+    const userIds = Array.from({ length: CONCURRENCY }, (_, i) => `${code}-user-${i}`)
+    const voucher = await createLimitedVoucher(code, { overallLimit: 1 })
+    // Turn it into a user offer for exactly these users
+    await db
+      .update(offers)
+      .set({ type: 'user', voucherCode: null, includeAllUsers: false, includedUserIds: userIds })
+      .where(eq(offers.id, voucher.id))
+    const product = await new ProductService(db).create({
+      name: code,
+      slug: code,
+      sku: code,
+      price: '100',
+    })
+    const cartService = new CartService(db)
+    const cartIds: number[] = []
+    for (const userId of userIds) {
+      const cart = await cartService.create(userId)
+      await cartService.addToCart(cart.id, product.id, 1)
+      cartIds.push(cart.id)
+    }
+
+    const rejected = await checkOutAll(cartIds)
+
+    const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
+    expect(offer.usageCount).toBe(1)
+    expect(await ordersUsingOffer(cartIds, voucher.id)).toBe(1)
+    // The orders that lost the race were rejected, not placed without the offer
+    expect(rejected).toBe(CONCURRENCY - 1)
   })
 })

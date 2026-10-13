@@ -12,8 +12,9 @@ import {
 } from 'drizzle-orm'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
-import { carts } from '../../cart/schemas'
+import { cartAppliedVoucherOffers, carts } from '../../cart/schemas'
 import { CartService } from '../../cart/services/cart'
+import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
 import {
   NewOrder,
@@ -38,6 +39,16 @@ type CreateFromCartOptions = {
   // The total the customer was shown. If the computed total differs, the
   // order is not created and OrderTotalMismatchError is thrown.
   expectedTotal?: string | number
+}
+
+class OfferLimitReachedError extends Error {
+  constructor(
+    public offerId: number,
+    public offerName: string,
+  ) {
+    super(`Offer usage limit reached: ${offerName}`)
+    this.name = 'OfferLimitReachedError'
+  }
 }
 
 class OrderTotalMismatchError extends Error {
@@ -134,6 +145,18 @@ class OrderService {
         throw new Error(`Cart is not open: ${cartId}`)
       }
 
+      // Lock the cart's vouchers before they are re-applied below. Re-applying
+      // inserts rows that reference them, which takes a shared lock on each
+      // voucher; locking them afterwards would deadlock concurrent checkouts.
+      const cartVouchers = await tx
+        .select({ offerId: cartAppliedVoucherOffers.offerId })
+        .from(cartAppliedVoucherOffers)
+        .where(eq(cartAppliedVoucherOffers.cartId, cart.id))
+      await this.lockOffers(
+        tx,
+        cartVouchers.map((voucher) => voucher.offerId),
+      )
+
       const content = await new CartService(tx).getCartContentForSession(
         cart.sessionId,
         true,
@@ -172,6 +195,11 @@ class OrderService {
         ...content.userOfferDiscounts,
         ...content.voucherOfferDiscounts,
       ]
+      await this.checkOfferLimits(
+        tx,
+        appliedOffers.map((offer) => offer.id),
+        cart.userId,
+      )
       const offerDiscount = new Decimal(content.totalOfferDiscount)
       const shippingCharge = new Decimal(shippingMethod?.price ?? 0)
       // A line without any price counts as zero
@@ -286,6 +314,50 @@ class OrderService {
         changedBy,
       )
     })
+  }
+
+  // Locks offer rows in id order, so concurrent checkouts wait for each other
+  // instead of deadlocking
+  private async lockOffers(tx: Database, offerIds: number[]) {
+    const uniqueOfferIds = [...new Set(offerIds)]
+    if (!uniqueOfferIds.length) {
+      return []
+    }
+    return await tx
+      .select()
+      .from(offers)
+      .where(inArray(offers.id, uniqueOfferIds))
+      .orderBy(asc(offers.id))
+      .for('update')
+  }
+
+  // Checks the applied offers' limits again, under lock. The cart checked them
+  // when the offers were applied, but concurrent checkouts can use them up
+  // before this order records its usage.
+  private async checkOfferLimits(
+    tx: Database,
+    offerIds: number[],
+    userId: string | null,
+  ) {
+    for (const offer of await this.lockOffers(tx, offerIds)) {
+      if (
+        offer.overallLimit !== null &&
+        (offer.usageCount ?? 0) >= offer.overallLimit
+      ) {
+        throw new OfferLimitReachedError(offer.id, offer.name)
+      }
+      if (offer.limitPerUser !== null && userId) {
+        const [usage] = await tx
+          .select()
+          .from(offerUsages)
+          .where(
+            and(eq(offerUsages.offerId, offer.id), eq(offerUsages.userId, userId)),
+          )
+        if ((usage?.usageCount ?? 0) >= offer.limitPerUser) {
+          throw new OfferLimitReachedError(offer.id, offer.name)
+        }
+      }
+    }
   }
 
   // Writes the new status, its history row and the log. Callers must lock the
@@ -663,4 +735,4 @@ class OrderService {
   }
 }
 
-export { OrderService, OrderTotalMismatchError }
+export { OfferLimitReachedError, OrderService, OrderTotalMismatchError }

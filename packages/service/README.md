@@ -90,7 +90,11 @@ const order = await new OrderService(db).createFromCart(cart.id)
 `OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only products and quantities, so an order always uses current prices.
 
 ```ts
-import { OrderService, OrderTotalMismatchError } from '@awecommerce/service/apps/order/services/order'
+import {
+  OfferLimitReachedError,
+  OrderService,
+  OrderTotalMismatchError,
+} from '@awecommerce/service/apps/order/services/order'
 
 try {
   const order = await new OrderService(db).createFromCart(cart.id, {
@@ -104,6 +108,10 @@ try {
     // Prices changed since the customer saw the total: show
     // error.actualTotal and ask them to confirm
   }
+  if (error instanceof OfferLimitReachedError) {
+    // Another order used up error.offerName while this one was being placed:
+    // tell the customer and reload the cart
+  }
 }
 ```
 
@@ -114,6 +122,7 @@ try {
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
 - **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
 - **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
+- **Offer limits at checkout:** offers are checked again while the order is created, with the offers locked, so simultaneous checkouts can never use an offer beyond its `overallLimit` or `limitPerUser`. If a user offer ran out in the meantime, `createFromCart` throws `OfferLimitReachedError` (with `offerId` and `offerName`) and writes nothing. A voucher that ran out is dropped while the cart's vouchers are re-applied at checkout, so the order is placed without it; pass `expectedTotal` to get an `OrderTotalMismatchError` instead of a silently higher total.
 - **Status changes:** `changeStatus(orderId, newStatus, changedBy?)` records the order's current status as the previous status in its history. It throws `Order not found: <id>`, `Order is cancelled: <id>` (cancelled orders cannot change), `Order is already <status>: <id>`, and `Use cancel() to cancel an order` for `'Cancelled'`.
 - **Cancelling:** `cancel(orderId, cancelledBy, reason, remarks?)` records the order's current status as the previous status in its history, and gives back the usage of the order's offers, so their limits can be used again (guest orders give back only the overall count). It throws `Order is already cancelled: <id>` for an order that is already cancelled, including when two cancels run at the same moment, so usage is never given back twice.
 
@@ -124,7 +133,7 @@ try {
 | `@awecommerce/service/apps/product/services/product` | `ProductService`, `BrandService`, `CategoryService`, `ProductClassService`, `ProductImageService`, `RelatedProductService` |
 | `@awecommerce/service/apps/cart/services/cart` | `CartService` |
 | `@awecommerce/service/apps/offer/services/offer` | `OfferService`, `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` |
-| `@awecommerce/service/apps/order/services/order` | `OrderService`, `OrderTotalMismatchError` |
+| `@awecommerce/service/apps/order/services/order` | `OrderService`, `OrderTotalMismatchError`, `OfferLimitReachedError` |
 | `@awecommerce/service/apps/order/services/shipping-address` | `ShippingAddressService` |
 | `@awecommerce/service/apps/order/services/shipping-method` | `ShippingMethodService` |
 | `@awecommerce/service/apps/loyalty/services/loyalty` | `LoyaltyService` |
