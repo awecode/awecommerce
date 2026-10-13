@@ -10,7 +10,7 @@ import {
   sql,
   SQL,
 } from 'drizzle-orm'
-import { createHash } from 'node:crypto'
+import { createHmac, timingSafeEqual } from 'node:crypto'
 import { CartLine, carts } from '../../cart/schemas'
 import {
   NewOrder,
@@ -76,15 +76,21 @@ class OrderService {
   }
 
   generateHash(orderId: string): string {
-    console.log(orderId)
-    const hash = createHash('sha256')
+    const secret = process.env.ORDER_HASH_SECRET
+    if (!secret) {
+      throw new Error('ORDER_HASH_SECRET is not set')
+    }
+    const hash = createHmac('sha256', secret)
     hash.update(orderId)
     return hash.digest('base64')
   }
 
   checkHash(orderId: string, hash: string): boolean {
-    const newHash = this.generateHash(orderId)
-    return newHash === hash
+    const expected = Buffer.from(this.generateHash(orderId))
+    const actual = Buffer.from(hash)
+    return (
+      expected.length === actual.length && timingSafeEqual(expected, actual)
+    )
   }
 
   async create(
