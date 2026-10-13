@@ -727,7 +727,7 @@ class OfferService {
         eq(offers.isActive, true),
         or(
           eq(offers.includeAllUsers, true),
-          sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
+          sql`${userId} IN (SELECT jsonb_array_elements_text(${
             offers.includedUserIds
           }))`,
         ),
@@ -807,7 +807,7 @@ class OfferService {
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
-            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
+            sql`${userId} IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
           ),
           or(isNull(offers.startDate), lte(offers.startDate, now)),
           or(isNull(offers.endDate), gte(offers.endDate, now)),
@@ -978,7 +978,7 @@ class OfferService {
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
-            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
+            sql`${userId} IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
           ),
           or(isNull(offers.startDate), lte(offers.startDate, now)),
           or(isNull(offers.endDate), gte(offers.endDate, now)),
@@ -1135,7 +1135,7 @@ class OfferService {
           eq(offers.isActive, true),
           or(
             eq(offers.includeAllUsers, true),
-            sql`'${sql.raw(userId)}' IN (SELECT jsonb_array_elements_text(${
+            sql`${userId} IN (SELECT jsonb_array_elements_text(${
               offers.includedUserIds
             }))`,
           ),
