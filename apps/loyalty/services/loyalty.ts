@@ -10,6 +10,9 @@ import {
 import { Database } from '../../types'
 import { Decimal } from 'decimal.js'
 
+// Loyalty settings are a single row with this id
+const SETTINGS_ID = 1
+
 class LoyaltyService {
   private db: Database
 
@@ -18,28 +21,35 @@ class LoyaltyService {
   }
 
   async getSettings() {
-    let setting = await this.db.query.loyaltySettings.findFirst({
-      columns: {
-        id: false,
-      },
-    })
-    if (!setting) {
-      const newSetting = await this.db.insert(loyaltySettings).values({}).returning()
-      setting = newSetting[0]
+    const findSetting = () =>
+      this.db.query.loyaltySettings.findFirst({
+        columns: {
+          id: false,
+        },
+        where: eq(loyaltySettings.id, SETTINGS_ID),
+      })
+    const setting = await findSetting()
+    if (setting) {
+      return setting
     }
-    return setting
+    await this.db
+      .insert(loyaltySettings)
+      .values({ id: SETTINGS_ID })
+      .onConflictDoNothing()
+    return (await findSetting())!
   }
 
   async updateSettings(data: UpdateLoyaltySettings) {
-    return await this.db.transaction(async (tx) => {
-      const [setting] = await tx
-        .update(loyaltySettings)
-        .set(data)
-        .returning()
-      if (!setting) {
-        await tx.insert(loyaltySettings).values(data).returning()
-      }
-    })
+    if (!Object.keys(data).length) {
+      return
+    }
+    await this.db
+      .insert(loyaltySettings)
+      .values({ ...data, id: SETTINGS_ID })
+      .onConflictDoUpdate({
+        target: loyaltySettings.id,
+        set: data,
+      })
   }
 
   async addLoyaltyPoint(userId: string, orderId: number, price: number, roundOff = false) {
