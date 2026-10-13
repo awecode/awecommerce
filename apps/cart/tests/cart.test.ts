@@ -286,3 +286,20 @@ test('should reject applying the same voucher twice to a cart, but allow it on a
   const applied = await offerService.applyVoucherCode(otherContent, undefined, 'TWICE10', userId)
   expect(applied.voucherOfferDiscounts.map((d) => d.voucherCode)).toEqual(['TWICE10'])
 })
+
+test('should reject adding a product that has no price and no sale price', async () => {
+  const cart = await cartService.create()
+  const product = await createProduct()
+  await productService.update(product.id, { price: null, discountedPrice: null })
+  await expect(cartService.addToCart(cart.id, product.id, 1)).rejects.toThrow(
+    'Product price not found',
+  )
+})
+
+test('should add a product that has only a sale price', async () => {
+  const cart = await cartService.create()
+  const product = await createProduct()
+  await productService.update(product.id, { price: null, discountedPrice: '15' })
+  const line = await cartService.addToCart(cart.id, product.id, 1)
+  expect(line.productId).toBe(product.id)
+})
