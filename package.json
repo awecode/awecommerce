@@ -12,9 +12,7 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm typecheck && node scripts/test-pg.mjs --if-available && pnpm check:dist",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
-    "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
-    "migrate:pglite": "tsx --env-file=./.env core/db/pg/migrate-pglite.ts",
+    "migrate": "tsx --env-file=./.env core/db/pg/migrate.ts",
     "seed:product": "tsx --env-file=./.env apps/product/seed.ts"
   },
   "keywords": [],
