@@ -68,11 +68,14 @@ class CartService {
   }
 
   async clearCart(cartId: number) {
-    await this.db
-      .delete(cartLines)
-      .where(eq(cartLines.cartId, cartId))
-      .returning()
-    await this.resetAppliedVoucherOffers(cartId)
+    return await this.db.transaction(async (tx) => {
+      const cartService = new CartService(tx)
+      await tx
+        .delete(cartLines)
+        .where(eq(cartLines.cartId, cartId))
+        .returning()
+      await cartService.resetAppliedVoucherOffers(cartId)
+    })
   }
 
   async getCartForSession(sessionId: string) {
@@ -141,22 +144,27 @@ class CartService {
           cartContent.userId,
         )
       }
-      await this.resetAppliedVoucherOffers(cartContent.id)
-      if (appliedVoucherOffers.length) {
-        const offerService = new OfferService(this.db)
+      cartContent = await this.db.transaction(async (tx) => {
+        let content = cartContent
+        await new CartService(tx).resetAppliedVoucherOffers(content.id)
         for (const appliedOffer of appliedVoucherOffers) {
           try {
-            cartContent = await offerService.applyVoucherCode(
-              cartContent,
-              appliedOffer.offer,
-              undefined,
-              cartContent.userId || undefined,
+            // A savepoint per voucher, so a database error while applying one
+            // does not abort the transaction and drop the others
+            content = await tx.transaction((savepoint) =>
+              new OfferService(savepoint).applyVoucherCode(
+                content,
+                appliedOffer.offer,
+                undefined,
+                content.userId || undefined,
+              ),
             )
           } catch (e) {
             console.error(e)
           }
         }
-      }
+        return content
+      })
     }
     return cartContent
   }
