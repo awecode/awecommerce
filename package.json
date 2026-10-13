@@ -105,6 +105,7 @@
     "@electric-sql/pglite": "^0.5.9",
     "@faker-js/faker": "^10.6.0",
     "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "^5.0.4",
     "drizzle-kit": "^0.31.11",
     "tsdown": "^0.23.1",
     "tsx": "^4.23.15",
