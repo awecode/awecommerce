@@ -1,5 +1,5 @@
-import { offers } from '../../offer/schemas'
-import { products } from '../../product/schemas'
+import { offers } from '../../offer/schemas/pg'
+import { products } from '../../product/schemas/pg'
 import { relations, sql } from 'drizzle-orm'
 import {
   integer,

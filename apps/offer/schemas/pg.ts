@@ -1,11 +1,11 @@
 import { relations } from 'drizzle-orm'
-import { orders } from '../../order/schemas'
+import { orders } from '../../order/schemas/pg'
 import {
   brands,
   categories,
   productClasses,
   products,
-} from '../../product/schemas'
+} from '../../product/schemas/pg'
 import {
   pgEnum,
   timestamp,

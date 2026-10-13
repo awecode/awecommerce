@@ -4,8 +4,7 @@ import { expect, test, vi } from 'vitest'
 import {db} from 'core/db'
 import { CartService } from 'apps/cart/services/cart'
 import { ProductService } from 'apps/product/services/product'
-// Same path the cart service uses, so spies affect the instance it calls
-import { OfferService } from '../../offer/services/offer'
+import { OfferService } from 'apps/offer/services/offer'
 import { cartAppliedVoucherOffers, cartLines } from 'apps/cart/schemas'
 import {
   offerBenefits,

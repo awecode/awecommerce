@@ -5,10 +5,10 @@ import {
   text,
   timestamp
 } from 'drizzle-orm/pg-core'
-import { carts } from '../../cart/schemas'
+import { carts } from '../../cart/schemas/pg'
 import { pgEnum } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
-import { products } from '../../product/schemas'
+import { products } from '../../product/schemas/pg'
 
 export const shippingAddresses = pgTable('shipping_address', {
     id: serial().primaryKey(),
