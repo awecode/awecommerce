@@ -453,7 +453,6 @@ class OrderService {
 
   async cancel(
     orderId: number,
-    previousStatus: OrderStatus,
     cancelledBy: string,
     cancellationReason: string,
     cancellationRemarks?: string | null,
@@ -488,7 +487,7 @@ class OrderService {
       for (const offerId of offerIds) {
         await offerService.decreaseUsage(offerId, order.userId)
       }
-      await orderService.changeStatus(orderId, previousStatus, 'Cancelled', cancelledBy)
+      await orderService.changeStatus(orderId, order.status, 'Cancelled', cancelledBy)
     })
   }
 

@@ -91,7 +91,7 @@ test('should change status and record who changed it', async () => {
 
 test('should cancel an order with reason and a single cancel log', async () => {
   const order = await createOrder('flow-cancel-user')
-  await orderService.cancel(order.id, 'Pending', 'admin-1', 'Out of stock', 'Restock in May')
+  await orderService.cancel(order.id, 'admin-1', 'Out of stock', 'Restock in May')
 
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.status).toBe('Cancelled')
@@ -132,7 +132,7 @@ test('should list orders with filters and pagination', async () => {
   await orderService.changeStatus(shipped.id, 'Pending', 'Shipped')
   await sleep(5)
   const cancelled = await createOrder(userId)
-  await orderService.cancel(cancelled.id, 'Pending', 'admin', 'reason')
+  await orderService.cancel(cancelled.id, 'admin', 'reason')
   await sleep(5)
   const completed = await createOrder(userId)
   await orderService.changeStatus(completed.id, 'Pending', 'Completed')
@@ -307,4 +307,20 @@ test('should use discountedPrice when the product has no list price', async () =
 
   expect(Number(order.lines[0].price)).toBe(80)
   expect(Number(order.lines[0].discount)).toBe(0)
+})
+
+test('should record the order real status as the previous status when cancelling', async () => {
+  const order = await createOrder('flow-cancel-previous-status-user')
+  await orderService.changeStatus(order.id, 'Pending', 'Confirmed', 'admin')
+
+  await orderService.cancel(order.id, 'admin', 'Out of stock')
+
+  const changes = await db
+    .select()
+    .from(orderStatusChanges)
+    .where(eq(orderStatusChanges.orderId, order.id))
+  expect(changes.map((c) => [c.previousStatus, c.newStatus])).toEqual([
+    ['Pending', 'Confirmed'],
+    ['Confirmed', 'Cancelled'],
+  ])
 })

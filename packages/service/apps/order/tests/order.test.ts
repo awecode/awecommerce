@@ -85,9 +85,13 @@ test('should roll back cancel when the status change fails', async () => {
   const userId = 'order-cancel-user'
   const cart = await createCartWithProduct(userId, 'cancel-product')
   const order = await orderService.createFromCart(cart.id)
-  await expect(
-    orderService.cancel(order.id, 'NotAStatus' as any, 'admin', 'reason'),
-  ).rejects.toThrow()
+  const spy = vi
+    .spyOn(OrderService.prototype, 'changeStatus')
+    .mockRejectedValueOnce(new Error('status change failed'))
+  await expect(orderService.cancel(order.id, 'admin', 'reason')).rejects.toThrow(
+    'status change failed',
+  )
+  spy.mockRestore()
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.status).toBe('Pending')
 })

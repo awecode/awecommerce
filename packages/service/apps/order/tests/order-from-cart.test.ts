@@ -408,7 +408,7 @@ test('should give voucher usage back when an order is cancelled', async () => {
   const voucher = await createVoucher('CANCEL10', '10', { limitPerUser: 1 })
   const order = await orderWithVoucher('CANCEL10', userId, product.id)
 
-  await orderService.cancel(order.id, 'Pending', 'admin', 'Customer request')
+  await orderService.cancel(order.id, 'admin', 'Customer request')
 
   expect(await usage(voucher.id, userId)).toEqual({ total: 0, user: 0 })
   // The voucher can be used again
@@ -421,7 +421,7 @@ test('should give overall usage back when a guest order is cancelled', async () 
   const voucher = await createVoucher('GUESTCANCEL', '10', { overallLimit: 1 })
   const order = await orderWithVoucher('GUESTCANCEL', undefined, product.id)
 
-  await orderService.cancel(order.id, 'Pending', 'admin', 'Customer request')
+  await orderService.cancel(order.id, 'admin', 'Customer request')
 
   const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
   expect(offer.usageCount).toBe(0)
@@ -434,9 +434,9 @@ test('should reject cancelling an order twice and give usage back only once', as
   const order = await orderWithVoucher('TWICECANCEL', 'cancel-twice-user', product.id)
   await orderWithVoucher('TWICECANCEL', 'cancel-twice-other-user', product.id)
 
-  await orderService.cancel(order.id, 'Pending', 'admin', 'Customer request')
+  await orderService.cancel(order.id, 'admin', 'Customer request')
   await expect(
-    orderService.cancel(order.id, 'Cancelled', 'admin', 'Again'),
+    orderService.cancel(order.id, 'admin', 'Again'),
   ).rejects.toThrow(`Order is already cancelled: ${order.id}`)
 
   expect(await usage(voucher.id, 'cancel-twice-user')).toEqual({ total: 1, user: 0 })
@@ -453,7 +453,7 @@ test('should keep usage when cancelling fails', async () => {
     .spyOn(OrderService.prototype, 'changeStatus')
     .mockRejectedValueOnce(new Error('status change failed'))
   await expect(
-    orderService.cancel(order.id, 'Pending', 'admin', 'Customer request'),
+    orderService.cancel(order.id, 'admin', 'Customer request'),
   ).rejects.toThrow('status change failed')
   spy.mockRestore()
 

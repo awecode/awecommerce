@@ -117,7 +117,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
 
     const results = await Promise.allSettled(
       Array.from({ length: CONCURRENCY }, () =>
-        new OrderService(db).cancel(order.id, 'Pending', 'admin', 'reason'),
+        new OrderService(db).cancel(order.id, 'admin', 'reason'),
       ),
     )
 
