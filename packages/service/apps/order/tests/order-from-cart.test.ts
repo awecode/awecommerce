@@ -1,5 +1,5 @@
 import { beforeAll, expect, test, vi } from 'vitest'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, gte } from 'drizzle-orm'
 
 import { db } from 'core/db'
 import {
@@ -504,4 +504,24 @@ test('should fail checkout when an applied voucher has expired', async () => {
   )
   expect(await ordersForCart(cart.id)).toEqual([])
   expect(await cartStatus(cart.id)).toBe('Open')
+})
+
+test('should store the total on the order so it can be queried', async () => {
+  const userId = 'stored-total-user'
+  const product = await createProduct('100')
+  const method = await new ShippingMethodService(db).create({ name: 'Stored', price: '15' })
+  const cart = await createCart(userId, [{ productId: product.id, quantity: 2 }])
+
+  const order = await orderService.createFromCart(cart.id, { shippingMethodId: method.id })
+
+  expect(Number(order.total)).toBe(215)
+  const [row] = await db.select().from(orders).where(eq(orders.id, order.id))
+  expect(Number(row.total)).toBe(215)
+  expect(Number((await orderService.get(order.id))!.total)).toBe(215)
+
+  const large = (await orderService.list({
+    userId,
+    extraFilters: [gte(orders.total, '200')],
+  })) as { id: number }[]
+  expect(large.map((o) => o.id)).toEqual([order.id])
 })

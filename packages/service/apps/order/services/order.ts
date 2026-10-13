@@ -225,6 +225,7 @@ class OrderService {
           loyaltyDiscount: pricing.loyaltyDiscount,
           shippingCharge: pricing.shippingCharge,
           tax: pricing.tax,
+          total: pricing.total,
           ...(shippingMethod
             ? {
                 shippingMethod: {
@@ -269,7 +270,6 @@ class OrderService {
       return {
         ...order,
         lines,
-        total: pricing.total,
         hash: this.generateHash(order.id.toString()),
       }
     })

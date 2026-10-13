@@ -1,0 +1,1 @@
+ALTER TABLE "order" ALTER COLUMN "total" SET NOT NULL;

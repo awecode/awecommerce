@@ -139,7 +139,7 @@ try {
 ```
 
 - **Options:** `shippingMethodId` (its price becomes `shippingCharge`, and its details are kept in `shippingMethod`), `shippingAddress`, `guestUser` (for carts without a user), `metadata`, `redeemPoints` (see below), and `expectedTotal`. The order's user is always the cart's user.
-- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, minus the loyalty discount, plus shipping, plus tax when prices exclude tax (see [Tax](#tax)). Orders do not store it; `createFromCart` returns it as `total`.
+- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, minus the loyalty discount, plus shipping, plus tax when prices exclude tax (see [Tax](#tax)). It is stored in the order's `total` column, so orders can be filtered and sorted by it.
 - **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
 - **Order lines:** `price` is the product's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose product has neither is stored with `price` `null` and counts as zero. `productName` and `productSku` are copied onto the line, so renaming or changing a product later does not alter past orders.
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.

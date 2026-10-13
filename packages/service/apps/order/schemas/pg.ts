@@ -70,6 +70,12 @@ export const orders = pgTable('order', {
     precision: 100,
     scale: 20,
   }).notNull().default('0'),
+  // What the customer pays: products after discounts, plus shipping, plus tax
+  // when prices exclude tax. Set when the order is created from the cart.
+  total: numeric({
+    precision: 100,
+    scale: 20,
+  }).notNull(),
   metadata: jsonb().$type<Record<string, any> | null>(),
   cancelledBy: text(),
   cancelledAt: timestamp({ mode: 'string', withTimezone: true }),

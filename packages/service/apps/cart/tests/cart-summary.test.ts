@@ -129,7 +129,7 @@ test('should match the order created from the cart', async () => {
     expectedTotal: summary.total,
   })
 
-  expect(summary.total).toBe(order.total)
+  expect(Number(summary.total)).toBe(Number(order.total))
   expect(Number(summary.tax)).toBe(Number(order.tax))
   expect(Number(summary.totalOfferDiscount)).toBe(Number(order.discount))
   expect(Number(summary.shippingCharge)).toBe(50)

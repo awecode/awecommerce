@@ -211,7 +211,7 @@ test('should preview points in the cart summary without redeeming them', async (
     redeemPoints: 50,
     expectedTotal: summary.total,
   })
-  expect(order.total).toBe(summary.total)
+  expect(Number(order.total)).toBe(Number(summary.total))
   expect(Number(order.tax)).toBe(Number(summary.tax))
 })
 

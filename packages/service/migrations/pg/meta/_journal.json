@@ -36,6 +36,27 @@
       "when": 1791908998395,
       "tag": "0004_tax",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791909798754,
+      "tag": "0005_order_total",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791909799178,
+      "tag": "0006_backfill_order_total",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791909808011,
+      "tag": "0007_order_total_not_null",
+      "breakpoints": true
     }
   ]
 }
