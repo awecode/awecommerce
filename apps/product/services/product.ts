@@ -387,6 +387,16 @@ class ProductService {
   }
 
   async getRecentlyViewedProducts(userId: string, limit: number) {
+    const latestViews = this.db
+      .selectDistinctOn([productViews.productId], {
+        productId: productViews.productId,
+        createdAt: productViews.createdAt,
+      })
+      .from(productViews)
+      .leftJoin(products, eq(productViews.productId, products.id))
+      .where(and(eq(productViews.userId, userId)))
+      .orderBy(productViews.productId, desc(productViews.createdAt))
+      .as('latest_views')
     return await this.db
       .select({
         ...getTableColumns(products),
@@ -394,19 +404,8 @@ class ProductService {
         brand: getTableColumns(brands),
         productClass: getTableColumns(productClasses),
       })
-      .from(
-        this.db
-          .selectDistinctOn([productViews.productId], {
-            productId: productViews.productId,
-            createdAt: productViews.createdAt,
-          })
-          .from(productViews)
-          .leftJoin(products, eq(productViews.productId, products.id))
-          .where(and(eq(productViews.userId, userId)))
-          .orderBy(productViews.productId, desc(productViews.createdAt))
-          .as('latest_views'),
-      )
-      .leftJoin(products, sql`latest_views.product_id = ${products.id}`)
+      .from(latestViews)
+      .leftJoin(products, eq(latestViews.productId, products.id))
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
@@ -421,8 +420,8 @@ class ProductService {
           ),
         ),
       )
-      .orderBy(desc(sql`latest_views.created_at`))
-      .limit(4)
+      .orderBy(desc(latestViews.createdAt))
+      .limit(limit)
   }
 
   async hasAnyOrder(productId: number) {

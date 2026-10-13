@@ -106,3 +106,31 @@ test('should roll back product creation when related products fail', async () =>
     await db.select().from(products).where(eq(products.slug, 'rollback-product')),
   ).toEqual([])
 })
+
+test('should return recently viewed products, latest first', async () => {
+  const userId = 'recent-viewer'
+  const created = []
+  for (const name of ['Viewed A', 'Viewed B', 'Viewed C']) {
+    created.push(
+      await productService.create({ name, slug: name, sku: name, price: '10' }),
+    )
+  }
+  const [a, b, c] = created
+  const inactive = await productService.create({
+    name: 'Viewed Inactive',
+    slug: 'viewed-inactive',
+    sku: 'viewed-inactive',
+    price: '10',
+    isActive: false,
+  })
+  for (const product of [a, b, a, c, inactive]) {
+    await productService.logProductView(product.id, userId)
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+
+  const recent = await productService.getRecentlyViewedProducts(userId, 10)
+  expect(recent.map((p) => p.id)).toEqual([c.id, a.id, b.id])
+
+  const limited = await productService.getRecentlyViewedProducts(userId, 2)
+  expect(limited.map((p) => p.id)).toEqual([c.id, a.id])
+})
