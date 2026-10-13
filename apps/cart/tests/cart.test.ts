@@ -270,3 +270,19 @@ test('should keep other vouchers when re-applying one fails with a database erro
   expect(content.voucherOfferDiscounts.map((d) => d.voucherCode)).toEqual(['SECOND10'])
   expect(await appliedOfferIds(cart.id)).toHaveLength(1)
 })
+
+test('should reject applying the same voucher twice to a cart, but allow it on another cart', async () => {
+  const userId = 'voucher-twice-user'
+  const cart = await createCartWithVouchers(userId, ['TWICE10'])
+  const offerService = new OfferService(db)
+  const content = await cartService.getCartContentForSession(cart.sessionId)
+  await expect(
+    offerService.applyVoucherCode(content, undefined, 'TWICE10', userId),
+  ).rejects.toThrow('Voucher code already used in this cart')
+
+  const otherCart = await cartService.create(userId)
+  await cartService.addToCart(otherCart.id, (await createProduct()).id, 1)
+  const otherContent = await cartService.getCartContentForSession(otherCart.sessionId)
+  const applied = await offerService.applyVoucherCode(otherContent, undefined, 'TWICE10', userId)
+  expect(applied.voucherOfferDiscounts.map((d) => d.voucherCode)).toEqual(['TWICE10'])
+})

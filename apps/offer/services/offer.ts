@@ -1366,7 +1366,7 @@ class OfferService {
     if (
       await this.db.query.cartAppliedVoucherOffers.findFirst({
         where: and(
-          eq(offerUsages.offerId, voucherOffer.id),
+          eq(cartAppliedVoucherOffers.offerId, voucherOffer.id),
           eq(cartAppliedVoucherOffers.cartId, cartContent.id),
         ),
       })
