@@ -73,7 +73,7 @@ class LoyaltyService {
         eq(loyaltyPoints.userId, userId),
         or(
           isNull(loyaltyPoints.expiresAt),
-          lt(loyaltyPoints.expiresAt, new Date()),
+          gt(loyaltyPoints.expiresAt, new Date()),
         ),
         lt(loyaltyPoints.redeemedPoints, loyaltyPoints.earnedPoints),
       ),
@@ -150,12 +150,20 @@ class LoyaltyService {
         eq(loyaltyPoints.userId, userId),
         or(
           isNull(loyaltyPoints.expiresAt),
-          lt(loyaltyPoints.expiresAt, new Date()),
+          gt(loyaltyPoints.expiresAt, new Date()),
         ),
         lt(loyaltyPoints.redeemedPoints, loyaltyPoints.earnedPoints),
       ),
       orderBy: asc(loyaltyPoints.createdAt),
     })
+    const availablePoints = pointsData.reduce(
+      (acc, point) =>
+        acc.add(new Decimal(point.earnedPoints)).sub(new Decimal(point.redeemedPoints)),
+      new Decimal(0),
+    )
+    if (availablePoints.lt(pointsToRedeem)) {
+      throw new Error('Insufficient loyalty points')
+    }
     for (const point of pointsData) {
       if (pointsToDeduct <= 0) {
         break
