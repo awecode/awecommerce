@@ -4,10 +4,9 @@
   "description": "Awecommerce",
   "scripts": {
     "test": "vitest",
-    "prepare": "unbuild",
-    "build": "unbuild",
-    "build:stub": "unbuild --stub",
-    "check:dist": "unbuild && node scripts/check-dist.mjs",
+    "prepare": "tsdown",
+    "build": "tsdown",
+    "check:dist": "tsdown && node scripts/check-dist.mjs",
     "test:pg": "node scripts/test-pg.mjs",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm typecheck && node scripts/test-pg.mjs --if-available && pnpm check:dist",
@@ -100,14 +99,14 @@
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1",
-    "typescript": "^5.9.3",
-    "unbuild": "^3.6.1"
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.9",
     "@faker-js/faker": "^10.6.0",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11",
+    "tsdown": "^0.23.1",
     "tsx": "^4.23.15",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"

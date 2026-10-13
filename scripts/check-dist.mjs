@@ -52,9 +52,11 @@ const missingExports = (mod, subpath) =>
 
 const failures = []
 
-// Only library code may be shipped: apps and core, without tests
+// Only library code may be shipped: apps and core, without tests.
+// tsdown emits a small shared helper for `export *` re-exports.
 for (const file of listFiles(join(root, 'dist'))) {
   const path = relative(join(root, 'dist'), file)
+  if (path.startsWith('_virtual/_rolldown/runtime.')) continue
   if (!/^(apps|core)\//.test(path) || /(^|\/)tests\/|\.test\./.test(path)) {
     failures.push(`unexpected file in dist: ${path}`)
   }
