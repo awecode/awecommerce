@@ -2,7 +2,11 @@ import { beforeAll, expect, test, vi } from 'vitest'
 import { and, eq } from 'drizzle-orm'
 
 import { db } from 'core/db'
-import { OrderService, OrderTotalMismatchError } from 'apps/order/services/order'
+import {
+  OrderService,
+  OrderTotalMismatchError,
+  VoucherNoLongerValidError,
+} from 'apps/order/services/order'
 import { ShippingMethodService } from 'apps/order/services/shipping-method'
 import { CartService } from 'apps/cart/services/cart'
 import { OfferService } from 'apps/offer/services/offer'
@@ -461,4 +465,43 @@ test('should keep usage when cancelling fails', async () => {
   expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.status).toBe('Pending')
+})
+
+test('should fail checkout when an applied voucher has been used up meanwhile', async () => {
+  const userId = 'voucher-used-up-user'
+  const product = await createProduct('100')
+  const voucher = await createVoucher('USEDUP10', '10', { limitPerUser: 1 })
+  // Applied to two carts while still unused
+  const firstCart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  const secondCart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  await applyVoucher(firstCart.sessionId, 'USEDUP10', userId)
+  await applyVoucher(secondCart.sessionId, 'USEDUP10', userId)
+  await orderService.createFromCart(firstCart.id)
+
+  const error = await orderService.createFromCart(secondCart.id).catch((e) => e)
+
+  expect(error).toBeInstanceOf(VoucherNoLongerValidError)
+  expect(error.message).toBe('Voucher can no longer be applied: USEDUP10')
+  expect([error.offerId, error.voucherCode]).toEqual([voucher.id, 'USEDUP10'])
+  expect(await ordersForCart(secondCart.id)).toEqual([])
+  expect(await cartStatus(secondCart.id)).toBe('Open')
+  expect(await usage(voucher.id, userId)).toEqual({ total: 1, user: 1 })
+})
+
+test('should fail checkout when an applied voucher has expired', async () => {
+  const userId = 'voucher-expired-user'
+  const product = await createProduct('100')
+  const voucher = await createVoucher('EXPIRED10', '10')
+  const cart = await createCart(userId, [{ productId: product.id, quantity: 1 }])
+  await applyVoucher(cart.sessionId, 'EXPIRED10', userId)
+  await db
+    .update(offers)
+    .set({ endDate: new Date(Date.now() - 60_000).toISOString() })
+    .where(eq(offers.id, voucher.id))
+
+  await expect(orderService.createFromCart(cart.id)).rejects.toThrow(
+    'Voucher can no longer be applied: EXPIRED10',
+  )
+  expect(await ordersForCart(cart.id)).toEqual([])
+  expect(await cartStatus(cart.id)).toBe('Open')
 })

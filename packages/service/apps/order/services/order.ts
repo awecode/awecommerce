@@ -51,6 +51,16 @@ class OfferLimitReachedError extends Error {
   }
 }
 
+class VoucherNoLongerValidError extends Error {
+  constructor(
+    public offerId: number,
+    public voucherCode: string | null,
+  ) {
+    super(`Voucher can no longer be applied: ${voucherCode}`)
+    this.name = 'VoucherNoLongerValidError'
+  }
+}
+
 class OrderTotalMismatchError extends Error {
   constructor(
     public expectedTotal: string,
@@ -152,7 +162,7 @@ class OrderService {
         .select({ offerId: cartAppliedVoucherOffers.offerId })
         .from(cartAppliedVoucherOffers)
         .where(eq(cartAppliedVoucherOffers.cartId, cart.id))
-      await this.lockOffers(
+      const lockedVouchers = await this.lockOffers(
         tx,
         cartVouchers.map((voucher) => voucher.offerId),
       )
@@ -163,6 +173,19 @@ class OrderService {
       )
       if (!content.lines.length) {
         throw new Error('Cannot create an order without lines')
+      }
+      // Re-applying drops vouchers that ran out, expired or no longer match the
+      // cart. Fail instead of placing the order without a discount the
+      // customer applied.
+      const reappliedIds = new Set(content.voucherOfferDiscounts.map((d) => d.id))
+      const droppedVoucher = lockedVouchers.find(
+        (voucher) => !reappliedIds.has(voucher.id),
+      )
+      if (droppedVoucher) {
+        throw new VoucherNoLongerValidError(
+          droppedVoucher.id,
+          droppedVoucher.voucherCode,
+        )
       }
 
       let shippingMethod: typeof shippingMethods.$inferSelect | undefined
@@ -735,4 +758,9 @@ class OrderService {
   }
 }
 
-export { OfferLimitReachedError, OrderService, OrderTotalMismatchError }
+export {
+  OfferLimitReachedError,
+  OrderService,
+  OrderTotalMismatchError,
+  VoucherNoLongerValidError,
+}

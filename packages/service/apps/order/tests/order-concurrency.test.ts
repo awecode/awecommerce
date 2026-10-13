@@ -6,7 +6,11 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
 import * as tables from 'core/db/pg/schema'
-import { OfferLimitReachedError, OrderService } from 'apps/order/services/order'
+import {
+  OfferLimitReachedError,
+  OrderService,
+  VoucherNoLongerValidError,
+} from 'apps/order/services/order'
 import { CartService } from 'apps/cart/services/cart'
 import { ProductService } from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
@@ -231,7 +235,9 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     return cartIds
   }
 
-  const checkOutAll = async (cartIds: number[]) => {
+  // Returns how many checkouts were rejected. Each must be rejected with the
+  // given error, never placed without the offer.
+  const checkOutAll = async (cartIds: number[], expectedError: Function) => {
     const results = await Promise.allSettled(
       cartIds.map((cartId) => new OrderService(db).createFromCart(cartId)),
     )
@@ -239,7 +245,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
       (r): r is PromiseRejectedResult => r.status === 'rejected',
     )
     for (const { reason } of rejected) {
-      expect(reason).toBeInstanceOf(OfferLimitReachedError)
+      expect(reason).toBeInstanceOf(expectedError)
     }
     return rejected.length
   }
@@ -255,11 +261,12 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     const userIds = Array.from({ length: CONCURRENCY }, (_, i) => `${code}-user-${i}`)
     const cartIds = await cartsWithVoucher(code, userIds)
 
-    await checkOutAll(cartIds)
+    const rejected = await checkOutAll(cartIds, VoucherNoLongerValidError)
 
     const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
     expect(offer.usageCount).toBe(1)
     expect(await ordersUsingOffer(cartIds, voucher.id)).toBe(1)
+    expect(rejected).toBe(CONCURRENCY - 1)
   })
 
   test('concurrent checkouts by one user never exceed the per-user limit', async () => {
@@ -268,7 +275,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
     const voucher = await createLimitedVoucher(code, { limitPerUser: 1 })
     const cartIds = await cartsWithVoucher(code, Array(CONCURRENCY).fill(userId))
 
-    await checkOutAll(cartIds)
+    const rejected = await checkOutAll(cartIds, VoucherNoLongerValidError)
 
     const [usage] = await db
       .select()
@@ -276,6 +283,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
       .where(and(eq(offerUsages.offerId, voucher.id), eq(offerUsages.userId, userId)))
     expect(usage.usageCount).toBe(1)
     expect(await ordersUsingOffer(cartIds, voucher.id)).toBe(1)
+    expect(rejected).toBe(CONCURRENCY - 1)
   })
 
   test('concurrent checkouts never use a user offer beyond its overall limit', async () => {
@@ -301,7 +309,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
       cartIds.push(cart.id)
     }
 
-    const rejected = await checkOutAll(cartIds)
+    const rejected = await checkOutAll(cartIds, OfferLimitReachedError)
 
     const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
     expect(offer.usageCount).toBe(1)
