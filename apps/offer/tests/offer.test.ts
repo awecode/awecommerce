@@ -1,7 +1,7 @@
 import { beforeAll, expect, test } from 'vitest'
 
 import { db } from 'core/db'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { OfferRangeService, OfferService } from 'apps/offer/services/offer'
 import { ProductService } from 'apps/product/services/product'
 import {
@@ -9,6 +9,7 @@ import {
   offerConditions,
   offerRangeIncludedProducts,
   offerRanges,
+  offerUsages,
   offers,
 } from 'apps/offer/schemas'
 
@@ -23,6 +24,8 @@ const includedUserIds = sql`${JSON.stringify([allowedUser])}::text::jsonb`
 let productId: number
 let userOfferId: number
 let voucherOfferId: number
+let conditionId: number
+let benefitId: number
 
 beforeAll(async () => {
   const product = await productService.create({
@@ -53,6 +56,8 @@ beforeAll(async () => {
     .insert(offerBenefits)
     .values({ name: 'Benefit', type: 'percentage', value: '10' })
     .returning()
+  conditionId = condition.id
+  benefitId = benefit.id
   const [userOffer] = await db
     .insert(offers)
     .values({
@@ -115,4 +120,40 @@ test('should roll back offer range creation when an included product fails', asy
   expect(
     await db.select().from(offerRanges).where(eq(offerRanges.name, 'Rollback Range')),
   ).toEqual([])
+})
+
+const createUsageOffer = async (name: string) => {
+  const [offer] = await db
+    .insert(offers)
+    .values({ name, type: 'user', includeAllUsers: true, conditionId, benefitId })
+    .returning()
+  return offer.id
+}
+
+const getUsageCounts = async (offerId: number, userId: string) => {
+  const [offer] = await db.select().from(offers).where(eq(offers.id, offerId))
+  const [usage] = await db
+    .select()
+    .from(offerUsages)
+    .where(and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)))
+  return { total: offer.usageCount, user: usage?.usageCount ?? null }
+}
+
+test('should decrease both the user and the offer usage counts', async () => {
+  const offerId = await createUsageOffer('Usage Offer 1')
+  await offerService.increaseUsage(offerId, 'usage-user')
+  await offerService.increaseUsage(offerId, 'usage-user')
+  await offerService.decreaseUsage(offerId, 'usage-user')
+  expect(await getUsageCounts(offerId, 'usage-user')).toEqual({ total: 1, user: 1 })
+})
+
+test('should not decrease usage below zero or for a user without usage', async () => {
+  const offerId = await createUsageOffer('Usage Offer 2')
+  await offerService.increaseUsage(offerId, 'usage-user-a')
+  await offerService.decreaseUsage(offerId, 'usage-user-b')
+  expect(await getUsageCounts(offerId, 'usage-user-a')).toEqual({ total: 1, user: 1 })
+
+  await offerService.decreaseUsage(offerId, 'usage-user-a')
+  await offerService.decreaseUsage(offerId, 'usage-user-a')
+  expect(await getUsageCounts(offerId, 'usage-user-a')).toEqual({ total: 0, user: 0 })
 })

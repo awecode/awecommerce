@@ -3,6 +3,7 @@ import {
   and,
   desc,
   eq,
+  gt,
   gte,
   ilike,
   inArray,
@@ -1902,14 +1903,31 @@ class OfferService {
   }
 
   async decreaseUsage(offerId: number, userId: string) {
-    await this.db
-      .update(offerUsages)
-      .set({
-        usageCount: sql`${offerUsages.usageCount} - 1`,
-      })
-      .where(
-        and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)),
-      )
+    return await this.db.transaction(async (tx) => {
+      const [offerUsage] = await tx
+        .update(offerUsages)
+        .set({
+          usageCount: sql`${offerUsages.usageCount} - 1`,
+        })
+        .where(
+          and(
+            eq(offerUsages.offerId, offerId),
+            eq(offerUsages.userId, userId),
+            gt(offerUsages.usageCount, 0),
+          ),
+        )
+        .returning()
+
+      if (!offerUsage) {
+        return
+      }
+      await tx
+        .update(offers)
+        .set({
+          usageCount: sql`${offers.usageCount} - 1`,
+        })
+        .where(and(eq(offers.id, offerId), gt(offers.usageCount, 0)))
+    })
   }
 
   async createApplicationLog(data: NewOfferApplicationLog) {
