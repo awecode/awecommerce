@@ -7,6 +7,7 @@
     "prepare": "unbuild",
     "build": "unbuild",
     "build:stub": "unbuild --stub",
+    "check:dist": "unbuild && node scripts/check-dist.mjs",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
