@@ -1,7 +1,7 @@
 import { PGlite, types } from '@electric-sql/pglite'
 import { type NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import pg from 'pg'
 import { uuid_ossp } from '@electric-sql/pglite/contrib/uuid_ossp'
 import * as tables from '../pg/schema'
 
@@ -16,7 +16,7 @@ export type PgDatabase =
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
 let client: PGliteWithEnd
-let pool: Pool
+let pool: pg.Pool
 let db: PgDatabase
 
 const initializeDb = () => {
@@ -39,7 +39,7 @@ const initializeDb = () => {
     if (!postgresUrl) {
       throw new Error('POSTGRES_URL is not set')
     }
-    pool = new Pool({
+    pool = new pg.Pool({
       connectionString: postgresUrl,
     })
     db = drizzle(pool,{

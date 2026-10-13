@@ -1,5 +1,5 @@
-import { db } from 'core/db'
-import { closeDb } from 'core/db/pg/db'
+import { db } from '../../core/db'
+import { closeDb } from '../../core/db/pg/db'
 import { ProductService } from './services/product'
 
 const productService = new ProductService(db)

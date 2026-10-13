@@ -2,7 +2,7 @@ import process from 'node:process'
 
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
-import { Pool } from 'pg'
+import pg from 'pg'
 
 const url = process.env.POSTGRES_URL
 if (!url) {
@@ -10,7 +10,7 @@ if (!url) {
   process.exit(1)
 }
 
-const pool = new Pool({ connectionString: url })
+const pool = new pg.Pool({ connectionString: url })
 const db = drizzle(pool)
 
 migrate(db, {
