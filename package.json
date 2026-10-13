@@ -24,6 +24,66 @@
     "README.md"
   ],
   "exports": {
+    "./apps/cart/schemas": {
+      "import": {
+        "types": "./dist/apps/cart/schemas/index.d.ts",
+        "default": "./dist/apps/cart/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/cart/schemas/index.d.ts",
+        "default": "./dist/apps/cart/schemas/index.cjs"
+      }
+    },
+    "./apps/loyalty/schemas": {
+      "import": {
+        "types": "./dist/apps/loyalty/schemas/index.d.ts",
+        "default": "./dist/apps/loyalty/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/loyalty/schemas/index.d.ts",
+        "default": "./dist/apps/loyalty/schemas/index.cjs"
+      }
+    },
+    "./apps/offer/schemas": {
+      "import": {
+        "types": "./dist/apps/offer/schemas/index.d.ts",
+        "default": "./dist/apps/offer/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/offer/schemas/index.d.ts",
+        "default": "./dist/apps/offer/schemas/index.cjs"
+      }
+    },
+    "./apps/order/schemas": {
+      "import": {
+        "types": "./dist/apps/order/schemas/index.d.ts",
+        "default": "./dist/apps/order/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/order/schemas/index.d.ts",
+        "default": "./dist/apps/order/schemas/index.cjs"
+      }
+    },
+    "./apps/product/schemas": {
+      "import": {
+        "types": "./dist/apps/product/schemas/index.d.ts",
+        "default": "./dist/apps/product/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/product/schemas/index.d.ts",
+        "default": "./dist/apps/product/schemas/index.cjs"
+      }
+    },
+    "./core/db": {
+      "import": {
+        "types": "./dist/core/db/index.d.ts",
+        "default": "./dist/core/db/index.mjs"
+      },
+      "require": {
+        "types": "./dist/core/db/index.d.ts",
+        "default": "./dist/core/db/index.cjs"
+      }
+    },
     "./*": {
       "import": {
         "default": "./dist/*.mjs",

@@ -10,7 +10,7 @@ import process from 'node:process'
 process.env.NODE_ENV = 'test'
 
 const root = new URL('..', import.meta.url).pathname
-const { name } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+const { name, exports } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const require = createRequire(import.meta.url)
 
 // Not part of the library, or run side effects when loaded
@@ -32,12 +32,12 @@ const expectedExports = {
   'apps/order/services/shipping-address': ['ShippingAddressService'],
   'apps/order/services/shipping-method': ['ShippingMethodService'],
   'apps/product/services/product': ['ProductService', 'CategoryService'],
-  'apps/cart/schemas/index': ['carts', 'cartLines'],
-  'apps/offer/schemas/index': ['offers'],
-  'apps/order/schemas/index': ['orders'],
-  'apps/product/schemas/index': ['products'],
-  'apps/loyalty/schemas/index': ['loyaltyPoints'],
-  'core/db/index': ['db'],
+  'apps/cart/schemas': ['carts', 'cartLines'],
+  'apps/offer/schemas': ['offers'],
+  'apps/order/schemas': ['orders'],
+  'apps/product/schemas': ['products'],
+  'apps/loyalty/schemas': ['loyaltyPoints'],
+  'core/db': ['db'],
   'core/db/pg/schema': ['carts', 'orders', 'offers', 'products', 'loyaltyPoints'],
 }
 
@@ -48,10 +48,15 @@ const listModules = (dir) =>
     return entry.name.endsWith('.mjs') ? [path] : []
   })
 
-const subpaths = listModules(join(root, 'dist'))
-  .map((file) => relative(join(root, 'dist'), file).replace(/\.mjs$/, ''))
-  .filter((subpath) => !skip.some((pattern) => pattern.test(subpath)))
-  .sort()
+// Every built module, plus the explicit `exports` paths (such as folder paths)
+const subpaths = [
+  ...listModules(join(root, 'dist'))
+    .map((file) => relative(join(root, 'dist'), file).replace(/\.mjs$/, ''))
+    .filter((subpath) => !skip.some((pattern) => pattern.test(subpath))),
+  ...Object.keys(exports)
+    .filter((key) => !key.includes('*'))
+    .map((key) => key.slice(2)),
+].sort()
 
 const missingExports = (mod, subpath) =>
   (expectedExports[subpath] ?? []).filter((key) => mod[key] === undefined)
