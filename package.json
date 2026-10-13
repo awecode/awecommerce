@@ -99,7 +99,7 @@
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.4",
     "pg": "^8.23.1",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.9",
