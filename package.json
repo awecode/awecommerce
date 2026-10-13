@@ -89,12 +89,12 @@
     },
     "./*": {
       "import": {
-        "default": "./dist/*.mjs",
-        "types": "./dist/*.d.ts"
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.mjs"
       },
       "require": {
-        "default": "./dist/*.cjs",
-        "types": "./dist/*.d.ts"
+        "types": "./dist/*.d.ts",
+        "default": "./dist/*.cjs"
       }
     }
   },
