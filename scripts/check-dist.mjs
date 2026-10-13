@@ -13,16 +13,6 @@ const root = new URL('..', import.meta.url).pathname
 const { name, exports } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const require = createRequire(import.meta.url)
 
-// Not part of the library, or run side effects when loaded
-const skip = [
-  /(^|\/)tests\//,
-  /\.test$/,
-  /\.config$/,
-  /^scripts\//,
-  /^apps\/product\/seed$/,
-  /^core\/db\/pg\/migrate(-pglite)?$/,
-]
-
 // Exports that must be present, to catch modules that load but export nothing
 const expectedExports = {
   'apps/cart/services/cart': ['CartService'],
@@ -41,18 +31,17 @@ const expectedExports = {
   'core/db/pg/schema': ['carts', 'orders', 'offers', 'products', 'loyaltyPoints'],
 }
 
-const listModules = (dir) =>
+const listFiles = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) return listModules(path)
-    return entry.name.endsWith('.mjs') ? [path] : []
+    return entry.isDirectory() ? listFiles(path) : [path]
   })
+const listModules = (dir) => listFiles(dir).filter((file) => file.endsWith('.mjs'))
 
 // Every built module, plus the explicit `exports` paths (such as folder paths)
 const subpaths = [
   ...listModules(join(root, 'dist'))
-    .map((file) => relative(join(root, 'dist'), file).replace(/\.mjs$/, ''))
-    .filter((subpath) => !skip.some((pattern) => pattern.test(subpath))),
+    .map((file) => relative(join(root, 'dist'), file).replace(/\.mjs$/, '')),
   ...Object.keys(exports)
     .filter((key) => !key.includes('*'))
     .map((key) => key.slice(2)),
@@ -62,6 +51,14 @@ const missingExports = (mod, subpath) =>
   (expectedExports[subpath] ?? []).filter((key) => mod[key] === undefined)
 
 const failures = []
+
+// Only library code may be shipped: apps and core, without tests
+for (const file of listFiles(join(root, 'dist'))) {
+  const path = relative(join(root, 'dist'), file)
+  if (!/^(apps|core)\//.test(path) || /(^|\/)tests\/|\.test\./.test(path)) {
+    failures.push(`unexpected file in dist: ${path}`)
+  }
+}
 for (const subpath of subpaths) {
   const specifier = `${name}/${subpath}`
   for (const [format, load] of [
