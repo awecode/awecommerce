@@ -1838,67 +1838,37 @@ class OfferService {
   }
 
   async increaseUsage(offerId: number, userId: string) {
-    return await this.db.transaction(async (tx) => {
-      const [offerUsage] = await tx
-        .update(offerUsages)
-        .set({
-          usageCount: sql`${offerUsages.usageCount} + 1`,
-        })
-        .where(
-          and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)),
-        )
-        .returning()
-
-      if (!offerUsage) {
-        await tx.insert(offerUsages).values({
-          offerId,
-          userId,
-          usageCount: 1,
-        })
-      }
-      await tx
-        .update(offers)
-        .set({
-          usageCount: sql`${offers.usageCount} + 1`,
-        })
-        .where(eq(offers.id, offerId))
-    })
+    return await this.increaseUsageMultiple([offerId], userId)
   }
 
   async increaseUsageMultiple(offerIds: number[], userId: string) {
+    const uniqueOfferIds = [...new Set(offerIds)]
+    if (!uniqueOfferIds.length) {
+      return
+    }
     return await this.db.transaction(async (tx) => {
-      const updatedOfferUsages = await tx
-        .update(offerUsages)
-        .set({
-          usageCount: sql`${offerUsages.usageCount} + 1`,
-        })
-        .where(
-          and(
-            inArray(offerUsages.offerId, offerIds),
-            eq(offerUsages.userId, userId),
-          ),
-        )
-        .returning()
-
-      const existingOfferIds = updatedOfferUsages.map((o) => o.offerId)
-      const newOfferIds = offerIds.filter((id) => !existingOfferIds.includes(id))
-
-      if (newOfferIds.length > 0) {
-        await tx.insert(offerUsages).values(
-          newOfferIds.map((id) => ({
-            offerId: id,
+      await tx
+        .insert(offerUsages)
+        .values(
+          uniqueOfferIds.map((offerId) => ({
+            offerId,
             userId,
             usageCount: 1,
           })),
         )
-      }
+        .onConflictDoUpdate({
+          target: [offerUsages.offerId, offerUsages.userId],
+          set: {
+            usageCount: sql`${offerUsages.usageCount} + 1`,
+          },
+        })
 
       await tx
         .update(offers)
         .set({
           usageCount: sql`${offers.usageCount} + 1`,
         })
-        .where(inArray(offers.id, offerIds))
+        .where(inArray(offers.id, uniqueOfferIds))
     })
   }
 

@@ -157,3 +157,24 @@ test('should not decrease usage below zero or for a user without usage', async (
   await offerService.decreaseUsage(offerId, 'usage-user-a')
   expect(await getUsageCounts(offerId, 'usage-user-a')).toEqual({ total: 0, user: 0 })
 })
+
+test('should increase usage for new and existing users', async () => {
+  const offerId = await createUsageOffer('Usage Offer 3')
+  await offerService.increaseUsage(offerId, 'usage-user')
+  expect(await getUsageCounts(offerId, 'usage-user')).toEqual({ total: 1, user: 1 })
+  await offerService.increaseUsage(offerId, 'usage-user')
+  expect(await getUsageCounts(offerId, 'usage-user')).toEqual({ total: 2, user: 2 })
+})
+
+test('should increase usage for multiple offers', async () => {
+  const usedOfferId = await createUsageOffer('Usage Offer 4')
+  const newOfferId = await createUsageOffer('Usage Offer 5')
+  await offerService.increaseUsage(usedOfferId, 'usage-user')
+  await offerService.increaseUsageMultiple(
+    [usedOfferId, newOfferId, newOfferId],
+    'usage-user',
+  )
+  expect(await getUsageCounts(usedOfferId, 'usage-user')).toEqual({ total: 2, user: 2 })
+  expect(await getUsageCounts(newOfferId, 'usage-user')).toEqual({ total: 1, user: 1 })
+  await expect(offerService.increaseUsageMultiple([], 'usage-user')).resolves.not.toThrow()
+})
