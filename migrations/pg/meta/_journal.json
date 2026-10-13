@@ -15,6 +15,13 @@
       "when": 1791892386552,
       "tag": "0001_init",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791900455382,
+      "tag": "0002_order_line_nullable_price",
+      "breakpoints": true
     }
   ]
 }

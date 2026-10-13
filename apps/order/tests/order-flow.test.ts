@@ -303,7 +303,7 @@ test('should create an order directly from cart content lines', async () => {
   expect(Number(order.lines[0].discount)).toBe(0)
 })
 
-test('should reject a line whose product has no price', async () => {
+test('should create an order when a product has no price', async () => {
   const userId = 'flow-no-price-user'
   const cartService = new CartService(db)
   const cart = await cartService.create(userId)
@@ -315,11 +315,28 @@ test('should reject a line whose product has no price', async () => {
   await productService.update(unpriced.id, { price: null })
   const content = await cartService.getCartContentForSession(cart.sessionId)
 
-  await expect(
-    orderService.create({ userId, cartId: cart.id }, content.lines),
-  ).rejects.toThrow(`Cannot create an order: product ${unpriced.id} has no price`)
+  const order = await orderService.create({ userId, cartId: cart.id }, content.lines)
 
-  expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
+  const unpricedLine = order.lines.find((line) => line.productId === unpriced.id)
+  const pricedLine = order.lines.find((line) => line.productId === priced.id)
+  expect(unpricedLine?.price).toBeNull()
+  expect(Number(unpricedLine?.discount)).toBe(0)
+  expect(Number(pricedLine?.price)).toBe(10)
   const [cartAfter] = await db.select().from(carts).where(eq(carts.id, cart.id))
-  expect(cartAfter.status).toBe('Open')
+  expect(cartAfter.status).toBe('Frozen')
+})
+
+test('should use discountedPrice when the product has no list price', async () => {
+  const userId = 'flow-sale-price-only-user'
+  const cartService = new CartService(db)
+  const cart = await cartService.create(userId)
+  const product = await createProduct('100', '80')
+  await cartService.addToCart(cart.id, product.id, 2)
+  await productService.update(product.id, { price: null })
+  const content = await cartService.getCartContentForSession(cart.sessionId)
+
+  const order = await orderService.create({ userId, cartId: cart.id }, content.lines)
+
+  expect(Number(order.lines[0].price)).toBe(80)
+  expect(Number(order.lines[0].discount)).toBe(0)
 })

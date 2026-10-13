@@ -89,7 +89,7 @@ const order = await new OrderService(db).create(
 )
 ```
 
-`OrderService.create` throws `Cannot create an order: product <id> has no price` if a line's product has no price (for example, the price was removed after it was added to the cart), and `Cannot create an order without lines` for an empty list. Nothing is written in either case.
+`OrderService.create` throws `Cannot create an order without lines` for an empty list. Nothing is written in that case. A line whose product has no list price is still accepted: the order line stores `discountedPrice` when that is set, and `null` when the product has neither price.
 
 ### Services and import paths
 

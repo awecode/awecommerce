@@ -110,12 +110,6 @@ class OrderService {
     if (!cartLines.length) {
       throw new Error('Cannot create an order without lines')
     }
-    const unpricedLine = cartLines.find((line) => line.product.price === null)
-    if (unpricedLine) {
-      throw new Error(
-        `Cannot create an order: product ${unpricedLine.productId} has no price`,
-      )
-    }
     return await this.db.transaction(async (tx) => {
       const orderService = new OrderService(tx)
       const [order] = await tx.insert(orders).values(data).returning()
@@ -128,16 +122,20 @@ class OrderService {
       await tx
         .insert(orderLines)
         .values(
-          cartLines.map((line) => ({
-            orderId: order.id,
-            productId: line.productId,
-            // Lines without a price were rejected above
-            price: line.product.price!,
-            discount: line.product.discountedPrice
-              ? (Number(line.product.price) - Number(line.product.discountedPrice)).toString()
-              : '0',
-            quantity: line.quantity,
-          })),
+          cartLines.map((line) => {
+            const listPrice = line.product.price
+            const salePrice = line.product.discountedPrice
+            return {
+              orderId: order.id,
+              productId: line.productId,
+              price: listPrice ?? salePrice ?? null,
+              discount:
+                listPrice && salePrice
+                  ? (Number(listPrice) - Number(salePrice)).toString()
+                  : '0',
+              quantity: line.quantity,
+            }
+          }),
         )
         .returning()
       const lines = await tx.query.orderLines.findMany({

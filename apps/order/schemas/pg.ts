@@ -103,7 +103,7 @@ export const orderLines = pgTable('order_line', {
   price: numeric({
     precision: 100,
     scale: 20,
-  }).notNull(),
+  }),
   discount: numeric({
     precision: 100,
     scale: 20,
