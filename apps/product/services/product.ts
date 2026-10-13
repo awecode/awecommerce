@@ -67,23 +67,25 @@ class ProductService {
   }
 
   async create(product: NewProduct) {
-    const { images, relatedProducts, ...productData } = product
-    const result = await this.db
-      .insert(products)
-      .values(productData)
-      .returning()
-    if (images) {
-      const productImageService = new ProductImageService(this.db)
-      await productImageService.setImages(result[0].id, images)
-    }
-    if (relatedProducts) {
-      const relatedProductService = new RelatedProductService(this.db)
-      await relatedProductService.setRelatedProducts(
-        result[0].id,
-        relatedProducts,
-      )
-    }
-    return result[0]
+    return await this.db.transaction(async (tx) => {
+      const { images, relatedProducts, ...productData } = product
+      const result = await tx
+        .insert(products)
+        .values(productData)
+        .returning()
+      if (images) {
+        const productImageService = new ProductImageService(tx)
+        await productImageService.setImages(result[0].id, images)
+      }
+      if (relatedProducts) {
+        const relatedProductService = new RelatedProductService(tx)
+        await relatedProductService.setRelatedProducts(
+          result[0].id,
+          relatedProducts,
+        )
+      }
+      return result[0]
+    })
   }
 
   async get(productId: number) {
@@ -155,24 +157,26 @@ class ProductService {
   }
 
   async update(productId: number, product: Partial<NewProduct>) {
-    const { images, relatedProducts, ...productData } = product
-    const result = await this.db
-      .update(products)
-      .set({
-        ...productData,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(products.id, productId))
-      .returning()
-    if (images) {
-      const productImageService = new ProductImageService(this.db)
-      await productImageService.setImages(productId, images)
-    }
-    if (relatedProducts) {
-      const relatedProductService = new RelatedProductService(this.db)
-      await relatedProductService.setRelatedProducts(productId, relatedProducts)
-    }
-    return result[0]
+    return await this.db.transaction(async (tx) => {
+      const { images, relatedProducts, ...productData } = product
+      const result = await tx
+        .update(products)
+        .set({
+          ...productData,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(products.id, productId))
+        .returning()
+      if (images) {
+        const productImageService = new ProductImageService(tx)
+        await productImageService.setImages(productId, images)
+      }
+      if (relatedProducts) {
+        const relatedProductService = new RelatedProductService(tx)
+        await relatedProductService.setRelatedProducts(productId, relatedProducts)
+      }
+      return result[0]
+    })
   }
 
   async delete(productId: number) {
@@ -946,15 +950,17 @@ class ProductImageService {
   }
 
   async setImages(productId: number, imageUrls: string[]) {
-    const result = await this.db
-      .delete(productImages)
-      .where(eq(productImages.productId, productId))
-    if (imageUrls.length) {
-      await this.db
-        .insert(productImages)
-        .values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
-    }
-    return result
+    return await this.db.transaction(async (tx) => {
+      const result = await tx
+        .delete(productImages)
+        .where(eq(productImages.productId, productId))
+      if (imageUrls.length) {
+        await tx
+          .insert(productImages)
+          .values(imageUrls.map((imageUrl) => ({ productId, imageUrl })))
+      }
+      return result
+    })
   }
 }
 
@@ -966,17 +972,19 @@ class RelatedProductService {
   }
 
   async setRelatedProducts(productId: number, relatedProductIds: number[]) {
-    await this.db
-      .delete(productRelatedProducts)
-      .where(eq(productRelatedProducts.productId, productId))
-    if (relatedProductIds.length) {
-      await this.db.insert(productRelatedProducts).values(
-        relatedProductIds.map((relatedProductId) => ({
-          productId,
-          relatedProductId,
-        })),
-      )
-    }
+    return await this.db.transaction(async (tx) => {
+      await tx
+        .delete(productRelatedProducts)
+        .where(eq(productRelatedProducts.productId, productId))
+      if (relatedProductIds.length) {
+        await tx.insert(productRelatedProducts).values(
+          relatedProductIds.map((relatedProductId) => ({
+            productId,
+            relatedProductId,
+          })),
+        )
+      }
+    })
   }
 }
 

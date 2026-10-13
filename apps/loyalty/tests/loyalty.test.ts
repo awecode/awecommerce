@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { db } from 'core/db'
 import { LoyaltyService } from 'apps/loyalty/services/loyalty'
@@ -96,4 +96,48 @@ test('should not unredeem more than was redeemed for the order', async () => {
     .from(loyaltyPoints)
     .where(eq(loyaltyPoints.userId, userId))
   expect(Number(row.redeemedPoints)).toBe(20)
+})
+
+test('should roll back redeem when writing the log fails', async () => {
+  const userId = 'loyalty-user-7'
+  await db.insert(loyaltyPoints).values({ userId, orderId: 1, earnedPoints: '50' })
+  const spy = vi
+    .spyOn(LoyaltyService.prototype, 'createLog')
+    .mockRejectedValueOnce(new Error('log failed'))
+  await expect(loyaltyService.redeemPoints(userId, 2, 20)).rejects.toThrow('log failed')
+  spy.mockRestore()
+  const [row] = await db
+    .select()
+    .from(loyaltyPoints)
+    .where(eq(loyaltyPoints.userId, userId))
+  expect(Number(row.redeemedPoints)).toBe(0)
+})
+
+test('should roll back unredeem when writing the log fails', async () => {
+  const userId = 'loyalty-user-8'
+  await db.insert(loyaltyPoints).values({ userId, orderId: 1, earnedPoints: '50' })
+  await loyaltyService.redeemPoints(userId, 2, 20)
+  const spy = vi
+    .spyOn(LoyaltyService.prototype, 'createLog')
+    .mockRejectedValueOnce(new Error('log failed'))
+  await expect(loyaltyService.unredeemPoints(userId, 2, 20)).rejects.toThrow('log failed')
+  spy.mockRestore()
+  const [row] = await db
+    .select()
+    .from(loyaltyPoints)
+    .where(eq(loyaltyPoints.userId, userId))
+  expect(Number(row.redeemedPoints)).toBe(20)
+})
+
+test('should roll back earning points when writing the log fails', async () => {
+  const userId = 'loyalty-user-9'
+  await loyaltyService.updateSettings({ isEnabled: true, earnRate: '0.1' })
+  const spy = vi
+    .spyOn(LoyaltyService.prototype, 'createLog')
+    .mockRejectedValueOnce(new Error('log failed'))
+  await expect(loyaltyService.addLoyaltyPoint(userId, 1, 1000)).rejects.toThrow('log failed')
+  spy.mockRestore()
+  expect(
+    await db.select().from(loyaltyPoints).where(eq(loyaltyPoints.userId, userId)),
+  ).toEqual([])
 })

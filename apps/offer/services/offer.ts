@@ -60,75 +60,77 @@ class OfferRangeService {
   }
 
   async create(data: NewOfferRange) {
-    const [offerRange] = await this.db
-      .insert(offerRanges)
-      .values(data)
-      .returning()
-    if (data.includedProducts && data.includedProducts.length) {
-      await this.db.insert(offerRangeIncludedProducts).values(
-        data.includedProducts.map((productId) => ({
-          rangeId: offerRange.id,
-          productId,
-        })),
-      )
-    }
-    if (data.excludedProducts && data.excludedProducts.length) {
-      await this.db.insert(offerRangeExcludedProducts).values(
-        data.excludedProducts.map((productId) => ({
-          rangeId: offerRange.id,
-          productId,
-        })),
-      )
-    }
-    if (data.includedCategories && data.includedCategories.length) {
-      await this.db.insert(offerRangeIncludedCategories).values(
-        data.includedCategories.map((categoryId) => ({
-          rangeId: offerRange.id,
-          categoryId,
-        })),
-      )
-    }
-    if (data.excludedCategories && data.excludedCategories.length) {
-      await this.db.insert(offerRangeExcludedCategories).values(
-        data.excludedCategories.map((categoryId) => ({
-          rangeId: offerRange.id,
-          categoryId,
-        })),
-      )
-    }
-    if (data.includedBrands && data.includedBrands.length) {
-      await this.db.insert(offerRangeIncludedBrands).values(
-        data.includedBrands.map((brandId) => ({
-          rangeId: offerRange.id,
-          brandId,
-        })),
-      )
-    }
-    if (data.excludedBrands && data.excludedBrands.length) {
-      await this.db.insert(offerRangeExcludedBrands).values(
-        data.excludedBrands.map((brandId) => ({
-          rangeId: offerRange.id,
-          brandId,
-        })),
-      )
-    }
-    if (data.includedProductClasses && data.includedProductClasses.length) {
-      await this.db.insert(offerRangeIncludedProductClasses).values(
-        data.includedProductClasses.map((productClassId) => ({
-          rangeId: offerRange.id,
-          productClassId,
-        })),
-      )
-    }
-    if (data.excludedProductClasses && data.excludedProductClasses.length) {
-      await this.db.insert(offerRangeExcludedProductClasses).values(
-        data.excludedProductClasses.map((productClassId) => ({
-          rangeId: offerRange.id,
-          productClassId,
-        })),
-      )
-    }
-    return offerRange
+    return await this.db.transaction(async (tx) => {
+      const [offerRange] = await tx
+        .insert(offerRanges)
+        .values(data)
+        .returning()
+      if (data.includedProducts && data.includedProducts.length) {
+        await tx.insert(offerRangeIncludedProducts).values(
+          data.includedProducts.map((productId) => ({
+            rangeId: offerRange.id,
+            productId,
+          })),
+        )
+      }
+      if (data.excludedProducts && data.excludedProducts.length) {
+        await tx.insert(offerRangeExcludedProducts).values(
+          data.excludedProducts.map((productId) => ({
+            rangeId: offerRange.id,
+            productId,
+          })),
+        )
+      }
+      if (data.includedCategories && data.includedCategories.length) {
+        await tx.insert(offerRangeIncludedCategories).values(
+          data.includedCategories.map((categoryId) => ({
+            rangeId: offerRange.id,
+            categoryId,
+          })),
+        )
+      }
+      if (data.excludedCategories && data.excludedCategories.length) {
+        await tx.insert(offerRangeExcludedCategories).values(
+          data.excludedCategories.map((categoryId) => ({
+            rangeId: offerRange.id,
+            categoryId,
+          })),
+        )
+      }
+      if (data.includedBrands && data.includedBrands.length) {
+        await tx.insert(offerRangeIncludedBrands).values(
+          data.includedBrands.map((brandId) => ({
+            rangeId: offerRange.id,
+            brandId,
+          })),
+        )
+      }
+      if (data.excludedBrands && data.excludedBrands.length) {
+        await tx.insert(offerRangeExcludedBrands).values(
+          data.excludedBrands.map((brandId) => ({
+            rangeId: offerRange.id,
+            brandId,
+          })),
+        )
+      }
+      if (data.includedProductClasses && data.includedProductClasses.length) {
+        await tx.insert(offerRangeIncludedProductClasses).values(
+          data.includedProductClasses.map((productClassId) => ({
+            rangeId: offerRange.id,
+            productClassId,
+          })),
+        )
+      }
+      if (data.excludedProductClasses && data.excludedProductClasses.length) {
+        await tx.insert(offerRangeExcludedProductClasses).values(
+          data.excludedProductClasses.map((productClassId) => ({
+            rangeId: offerRange.id,
+            productClassId,
+          })),
+        )
+      }
+      return offerRange
+    })
   }
 
   async get(id: number) {
@@ -203,116 +205,118 @@ class OfferRangeService {
   }
 
   async update(id: number, data: UpdateOfferRange) {
-    const [offerRange] = await this.db
-      .update(offerRanges)
-      .set({ ...data, updatedAt: new Date().toISOString() })
-      .where(eq(offerRanges.id, id))
-      .returning()
-    if (data.includedProducts) {
-      await this.db
-        .delete(offerRangeIncludedProducts)
-        .where(eq(offerRangeIncludedProducts.rangeId, id))
-      if (data.includedProducts.length > 0) {
-        await this.db.insert(offerRangeIncludedProducts).values(
-          data.includedProducts.map((productId) => ({
-            rangeId: id,
-            productId,
-          })),
-        )
+    return await this.db.transaction(async (tx) => {
+      const [offerRange] = await tx
+        .update(offerRanges)
+        .set({ ...data, updatedAt: new Date().toISOString() })
+        .where(eq(offerRanges.id, id))
+        .returning()
+      if (data.includedProducts) {
+        await tx
+          .delete(offerRangeIncludedProducts)
+          .where(eq(offerRangeIncludedProducts.rangeId, id))
+        if (data.includedProducts.length > 0) {
+          await tx.insert(offerRangeIncludedProducts).values(
+            data.includedProducts.map((productId) => ({
+              rangeId: id,
+              productId,
+            })),
+          )
+        }
       }
-    }
-    if (data.excludedProducts) {
-      await this.db
-        .delete(offerRangeExcludedProducts)
-        .where(eq(offerRangeExcludedProducts.rangeId, id))
-      if (data.excludedProducts.length > 0) {
-        await this.db.insert(offerRangeExcludedProducts).values(
-          data.excludedProducts.map((productId) => ({
-            rangeId: id,
-            productId,
-          })),
-        )
+      if (data.excludedProducts) {
+        await tx
+          .delete(offerRangeExcludedProducts)
+          .where(eq(offerRangeExcludedProducts.rangeId, id))
+        if (data.excludedProducts.length > 0) {
+          await tx.insert(offerRangeExcludedProducts).values(
+            data.excludedProducts.map((productId) => ({
+              rangeId: id,
+              productId,
+            })),
+          )
+        }
       }
-    }
-    if (data.includedCategories) {
-      await this.db
-        .delete(offerRangeIncludedCategories)
-        .where(eq(offerRangeIncludedCategories.rangeId, id))
-      if (data.includedCategories.length > 0) {
-        await this.db.insert(offerRangeIncludedCategories).values(
-          data.includedCategories.map((categoryId) => ({
-            rangeId: id,
-            categoryId,
-          })),
-        )
+      if (data.includedCategories) {
+        await tx
+          .delete(offerRangeIncludedCategories)
+          .where(eq(offerRangeIncludedCategories.rangeId, id))
+        if (data.includedCategories.length > 0) {
+          await tx.insert(offerRangeIncludedCategories).values(
+            data.includedCategories.map((categoryId) => ({
+              rangeId: id,
+              categoryId,
+            })),
+          )
+        }
       }
-    }
-    if (data.excludedCategories) {
-      await this.db
-        .delete(offerRangeExcludedCategories)
-        .where(eq(offerRangeExcludedCategories.rangeId, id))
-      if (data.excludedCategories.length > 0) {
-        await this.db.insert(offerRangeExcludedCategories).values(
-          data.excludedCategories.map((categoryId) => ({
-            rangeId: id,
-            categoryId,
-          })),
-        )
+      if (data.excludedCategories) {
+        await tx
+          .delete(offerRangeExcludedCategories)
+          .where(eq(offerRangeExcludedCategories.rangeId, id))
+        if (data.excludedCategories.length > 0) {
+          await tx.insert(offerRangeExcludedCategories).values(
+            data.excludedCategories.map((categoryId) => ({
+              rangeId: id,
+              categoryId,
+            })),
+          )
+        }
       }
-    }
-    if (data.includedBrands) {
-      await this.db
-        .delete(offerRangeIncludedBrands)
-        .where(eq(offerRangeIncludedBrands.rangeId, id))
-      if (data.includedBrands.length > 0) {
-        await this.db.insert(offerRangeIncludedBrands).values(
-          data.includedBrands.map((brandId) => ({
-            rangeId: id,
-            brandId,
-          })),
-        )
+      if (data.includedBrands) {
+        await tx
+          .delete(offerRangeIncludedBrands)
+          .where(eq(offerRangeIncludedBrands.rangeId, id))
+        if (data.includedBrands.length > 0) {
+          await tx.insert(offerRangeIncludedBrands).values(
+            data.includedBrands.map((brandId) => ({
+              rangeId: id,
+              brandId,
+            })),
+          )
+        }
       }
-    }
-    if (data.excludedBrands) {
-      await this.db
-        .delete(offerRangeExcludedBrands)
-        .where(eq(offerRangeExcludedBrands.rangeId, id))
-      if (data.excludedBrands.length > 0) {
-        await this.db.insert(offerRangeExcludedBrands).values(
-          data.excludedBrands.map((brandId) => ({
-            rangeId: id,
-            brandId,
-          })),
-        )
+      if (data.excludedBrands) {
+        await tx
+          .delete(offerRangeExcludedBrands)
+          .where(eq(offerRangeExcludedBrands.rangeId, id))
+        if (data.excludedBrands.length > 0) {
+          await tx.insert(offerRangeExcludedBrands).values(
+            data.excludedBrands.map((brandId) => ({
+              rangeId: id,
+              brandId,
+            })),
+          )
+        }
       }
-    }
-    if (data.includedProductClasses) {
-      await this.db
-        .delete(offerRangeIncludedProductClasses)
-        .where(eq(offerRangeIncludedProductClasses.rangeId, id))
-      if (data.includedProductClasses.length > 0) {
-        await this.db.insert(offerRangeIncludedProductClasses).values(
-          data.includedProductClasses.map((productClassId) => ({
-            rangeId: id,
-            productClassId,
-          })),
-        )
+      if (data.includedProductClasses) {
+        await tx
+          .delete(offerRangeIncludedProductClasses)
+          .where(eq(offerRangeIncludedProductClasses.rangeId, id))
+        if (data.includedProductClasses.length > 0) {
+          await tx.insert(offerRangeIncludedProductClasses).values(
+            data.includedProductClasses.map((productClassId) => ({
+              rangeId: id,
+              productClassId,
+            })),
+          )
+        }
       }
-    }
-    if (data.excludedProductClasses) {
-      await this.db
-        .delete(offerRangeExcludedProductClasses)
-        .where(eq(offerRangeExcludedProductClasses.rangeId, id))
-      if (data.excludedProductClasses.length > 0) {
-        await this.db.insert(offerRangeExcludedProductClasses).values(
-          data.excludedProductClasses.map((productClassId) => ({
-            rangeId: id,
-            productClassId,
-          })),
-        )
+      if (data.excludedProductClasses) {
+        await tx
+          .delete(offerRangeExcludedProductClasses)
+          .where(eq(offerRangeExcludedProductClasses.rangeId, id))
+        if (data.excludedProductClasses.length > 0) {
+          await tx.insert(offerRangeExcludedProductClasses).values(
+            data.excludedProductClasses.map((productClassId) => ({
+              rangeId: id,
+              productClassId,
+            })),
+          )
+        }
       }
-    }
-    return offerRange
+      return offerRange
+    })
   }
 
   async delete(id: number) {
@@ -1833,64 +1837,68 @@ class OfferService {
   }
 
   async increaseUsage(offerId: number, userId: string) {
-    const [offerUsage] = await this.db
-      .update(offerUsages)
-      .set({
-        usageCount: sql`${offerUsages.usageCount} + 1`,
-      })
-      .where(
-        and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)),
-      )
-      .returning()
+    return await this.db.transaction(async (tx) => {
+      const [offerUsage] = await tx
+        .update(offerUsages)
+        .set({
+          usageCount: sql`${offerUsages.usageCount} + 1`,
+        })
+        .where(
+          and(eq(offerUsages.offerId, offerId), eq(offerUsages.userId, userId)),
+        )
+        .returning()
 
-    if (!offerUsage) {
-      await this.db.insert(offerUsages).values({
-        offerId,
-        userId,
-        usageCount: 1,
-      })
-    }
-    await this.db
-      .update(offers)
-      .set({
-        usageCount: sql`${offers.usageCount} + 1`,
-      })
-      .where(eq(offers.id, offerId))
+      if (!offerUsage) {
+        await tx.insert(offerUsages).values({
+          offerId,
+          userId,
+          usageCount: 1,
+        })
+      }
+      await tx
+        .update(offers)
+        .set({
+          usageCount: sql`${offers.usageCount} + 1`,
+        })
+        .where(eq(offers.id, offerId))
+    })
   }
 
   async increaseUsageMultiple(offerIds: number[], userId: string) {
-    const updatedOfferUsages = await this.db
-      .update(offerUsages)
-      .set({
-        usageCount: sql`${offerUsages.usageCount} + 1`,
-      })
-      .where(
-        and(
-          inArray(offerUsages.offerId, offerIds),
-          eq(offerUsages.userId, userId),
-        ),
-      )
-      .returning()
+    return await this.db.transaction(async (tx) => {
+      const updatedOfferUsages = await tx
+        .update(offerUsages)
+        .set({
+          usageCount: sql`${offerUsages.usageCount} + 1`,
+        })
+        .where(
+          and(
+            inArray(offerUsages.offerId, offerIds),
+            eq(offerUsages.userId, userId),
+          ),
+        )
+        .returning()
 
-    const existingOfferIds = updatedOfferUsages.map((o) => o.offerId)
-    const newOfferIds = offerIds.filter((id) => !existingOfferIds.includes(id))
+      const existingOfferIds = updatedOfferUsages.map((o) => o.offerId)
+      const newOfferIds = offerIds.filter((id) => !existingOfferIds.includes(id))
 
-    if (newOfferIds.length > 0) {
-      await this.db.insert(offerUsages).values(
-        newOfferIds.map((id) => ({
-          offerId: id,
-          userId,
-          usageCount: 1,
-        })),
-      )
-    }
+      if (newOfferIds.length > 0) {
+        await tx.insert(offerUsages).values(
+          newOfferIds.map((id) => ({
+            offerId: id,
+            userId,
+            usageCount: 1,
+          })),
+        )
+      }
 
-    await this.db
-      .update(offers)
-      .set({
-        usageCount: sql`${offers.usageCount} + 1`,
-      })
-      .where(inArray(offers.id, offerIds))
+      await tx
+        .update(offers)
+        .set({
+          usageCount: sql`${offers.usageCount} + 1`,
+        })
+        .where(inArray(offers.id, offerIds))
+    })
   }
 
   async decreaseUsage(offerId: number, userId: string) {

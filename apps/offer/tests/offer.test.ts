@@ -1,8 +1,8 @@
 import { beforeAll, expect, test } from 'vitest'
 
 import { db } from 'core/db'
-import { sql } from 'drizzle-orm'
-import { OfferService } from 'apps/offer/services/offer'
+import { eq, sql } from 'drizzle-orm'
+import { OfferRangeService, OfferService } from 'apps/offer/services/offer'
 import { ProductService } from 'apps/product/services/product'
 import {
   offerBenefits,
@@ -103,4 +103,16 @@ test('should not leak user-restricted offers through a crafted userId', async ()
   expect(
     await offerService.getActiveUserOfferDetails(injectedUserId, userOfferId),
   ).toBeFalsy()
+})
+
+test('should roll back offer range creation when an included product fails', async () => {
+  await expect(
+    new OfferRangeService(db).create({
+      name: 'Rollback Range',
+      includedProducts: [999999],
+    }),
+  ).rejects.toThrow()
+  expect(
+    await db.select().from(offerRanges).where(eq(offerRanges.name, 'Rollback Range')),
+  ).toEqual([])
 })

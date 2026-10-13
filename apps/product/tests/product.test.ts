@@ -91,3 +91,18 @@ test('should delete a product', async () => {
   const result = await db.select().from(products).where(eq(products.id, 1))
   expect(result).toHaveLength(0)
 })
+
+test('should roll back product creation when related products fail', async () => {
+  await expect(
+    productService.create({
+      name: 'Rollback Product',
+      slug: 'rollback-product',
+      sku: 'rollback-product',
+      price: '10',
+      relatedProducts: [999999],
+    }),
+  ).rejects.toThrow()
+  expect(
+    await db.select().from(products).where(eq(products.slug, 'rollback-product')),
+  ).toEqual([])
+})

@@ -3,6 +3,11 @@ import { afterEach, beforeEach, expect, test } from 'vitest'
 
 import { db } from 'core/db'
 import { OrderService } from 'apps/order/services/order'
+import { CartService } from 'apps/cart/services/cart'
+import { ProductService } from 'apps/product/services/product'
+import { carts } from 'apps/cart/schemas'
+import { orders } from 'apps/order/schemas'
+import { eq } from 'drizzle-orm'
 
 const orderService = new OrderService(db)
 
@@ -48,4 +53,49 @@ test('should throw when the secret is not set', () => {
   expect(() => orderService.generateHash('42')).toThrow(
     'ORDER_HASH_SECRET is not set',
   )
+})
+
+test('should roll back order creation when a line fails', async () => {
+  const userId = 'order-rollback-user'
+  const cart = await new CartService(db).create(userId)
+  const missingProductLine = {
+    id: 1,
+    cartId: cart.id,
+    productId: 999999,
+    quantity: 1,
+    createdAt: null,
+    updatedAt: null,
+    product: { price: '10' },
+  }
+  await expect(
+    orderService.create({ userId, cartId: cart.id }, [missingProductLine]),
+  ).rejects.toThrow()
+  expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
+  const [cartAfter] = await db.select().from(carts).where(eq(carts.id, cart.id))
+  expect(cartAfter.status).toBe('Open')
+})
+
+test('should roll back cancel when the status change fails', async () => {
+  const userId = 'order-cancel-user'
+  const product = await new ProductService(db).create({
+    name: 'Cancel Product',
+    slug: 'cancel-product',
+    sku: 'cancel-product',
+    price: '10',
+  })
+  const line = {
+    id: 1,
+    cartId: 0,
+    productId: product.id,
+    quantity: 1,
+    createdAt: null,
+    updatedAt: null,
+    product: { price: '10' },
+  }
+  const order = await orderService.create({ userId }, [line])
+  await expect(
+    orderService.cancel(order.id, 'NotAStatus' as any, 'admin', 'reason'),
+  ).rejects.toThrow()
+  const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
+  expect(orderAfter.status).toBe('Pending')
 })

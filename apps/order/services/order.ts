@@ -107,44 +107,47 @@ class OrderService {
       >
     >,
   ) {
-    const [order] = await this.db.insert(orders).values(data).returning()
-    if(data.cartId) {
-      await this.db
-        .update(carts)
-        .set({ status: 'Frozen' })
-        .where(eq(carts.id, data.cartId))
-    }
-    await this.db
-      .insert(orderLines)
-      .values(
-        cartLines.map((line) => ({
-          orderId: order.id,
-          productId: line.productId,
-          price: line.product.price,
-          discount: line.product.discountedPrice
-            ? (Number(line.product.price) - Number(line.product.discountedPrice)).toString()
-            : '0',
-          quantity: line.quantity,
-        })),
-      )
-      .returning()
-    const lines = await this.db.query.orderLines.findMany({
-      where: eq(orderLines.orderId, order.id),
-      with: {
-        product: {
-          columns: {
-            name: true,
-            thumbnail: true,
+    return await this.db.transaction(async (tx) => {
+      const orderService = new OrderService(tx)
+      const [order] = await tx.insert(orders).values(data).returning()
+      if(data.cartId) {
+        await tx
+          .update(carts)
+          .set({ status: 'Frozen' })
+          .where(eq(carts.id, data.cartId))
+      }
+      await tx
+        .insert(orderLines)
+        .values(
+          cartLines.map((line) => ({
+            orderId: order.id,
+            productId: line.productId,
+            price: line.product.price,
+            discount: line.product.discountedPrice
+              ? (Number(line.product.price) - Number(line.product.discountedPrice)).toString()
+              : '0',
+            quantity: line.quantity,
+          })),
+        )
+        .returning()
+      const lines = await tx.query.orderLines.findMany({
+        where: eq(orderLines.orderId, order.id),
+        with: {
+          product: {
+            columns: {
+              name: true,
+              thumbnail: true,
+            },
           },
         },
-      },
+      })
+      await orderService.createLog(order.id, STATUS_LOG.Pending, order.userId)
+      return {
+        ...order,
+        lines,
+        hash: this.generateHash(order.id.toString()),
+      }
     })
-    await this.createLog(order.id, STATUS_LOG.Pending, order.userId)
-    return {
-      ...order,
-      lines,
-      hash: this.generateHash(order.id.toString()),
-    }
   }
 
   async createLog(orderId: number, log: string, loggedBy?: string | null) {
@@ -169,17 +172,20 @@ class OrderService {
     newStatus: OrderStatus,
     createdBy?: string,
   ) {
-    await this.db
-      .update(orders)
-      .set({ status: newStatus })
-      .where(eq(orders.id, orderId))
-    await this.db.insert(orderStatusChanges).values({
-      orderId: orderId,
-      previousStatus: previousStatus,
-      newStatus,
-      createdBy,
+    return await this.db.transaction(async (tx) => {
+      const orderService = new OrderService(tx)
+      await tx
+        .update(orders)
+        .set({ status: newStatus })
+        .where(eq(orders.id, orderId))
+      await tx.insert(orderStatusChanges).values({
+        orderId: orderId,
+        previousStatus: previousStatus,
+        newStatus,
+        createdBy,
+      })
+      await orderService.createLog(orderId, STATUS_LOG[newStatus], createdBy)
     })
-    await this.createLog(orderId, STATUS_LOG[newStatus], createdBy)
   }
 
   async createTransaction(data: NewTransaction) {
@@ -357,17 +363,20 @@ class OrderService {
     cancellationReason: string,
     cancellationRemarks?: string | null,
   ) {
-    await this.db
-      .update(orders)
-      .set({
-        status: 'Cancelled',
-        cancelledBy,
-        cancelledAt: new Date().toISOString(),
-        cancellationReason,
-        cancellationRemarks,
-      })
-      .where(eq(orders.id, orderId))
-    await this.changeStatus(orderId, previousStatus, 'Cancelled', cancelledBy)
+    return await this.db.transaction(async (tx) => {
+      const orderService = new OrderService(tx)
+      await tx
+        .update(orders)
+        .set({
+          status: 'Cancelled',
+          cancelledBy,
+          cancelledAt: new Date().toISOString(),
+          cancellationReason,
+          cancellationRemarks,
+        })
+        .where(eq(orders.id, orderId))
+      await orderService.changeStatus(orderId, previousStatus, 'Cancelled', cancelledBy)
+    })
   }
 
   async get(orderId: number, userId?: string) {

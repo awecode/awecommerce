@@ -5,9 +5,3 @@ export default defineConfig({
   out: './migrations/pg',
   dialect: 'postgresql',
 })
-
-// export default defineConfig({
-//   schema: './core/db/sqlite/schema.ts',
-//   out: './migrations/sqlite',
-//   dialect: 'sqlite',
-// })

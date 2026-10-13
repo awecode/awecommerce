@@ -10,39 +10,43 @@ class ShippingAddressService {
   }
 
   async create(data: NewShippingAddress) {
-    const address = await this.db.insert(shippingAddresses).values(data).returning();
-    if(data.isDefault) {
-      await this.db.update(shippingAddresses).set({
-        isDefault: false,
-      }).where(
-        and(
-          eq(shippingAddresses.userId, data.userId),
-          ne(shippingAddresses.id, address[0].id),
-        )
-      );
-    }
-    return address[0];
+    return await this.db.transaction(async (tx) => {
+      const address = await tx.insert(shippingAddresses).values(data).returning();
+      if(data.isDefault) {
+        await tx.update(shippingAddresses).set({
+          isDefault: false,
+        }).where(
+          and(
+            eq(shippingAddresses.userId, data.userId),
+            ne(shippingAddresses.id, address[0].id),
+          )
+        );
+      }
+      return address[0];
+    });
   }
 
   async update(userId:string, id: number, data: Omit<UpdateShippingAddress, 'userId'>) {
-    const [address] = await this.db.update(shippingAddresses).set(data).where(
-     and(
-        eq(shippingAddresses.id, id),
-        eq(shippingAddresses.userId, userId)
-      )
-    ).returning()
-    if(address && data.isDefault) {
-      await this.db.update(shippingAddresses).set({
-        isDefault: false,
-        updatedAt: new Date().toISOString(),
-      }).where(
-        and(
-          eq(shippingAddresses.userId, address.userId),
-          ne(shippingAddresses.id, id),
+    return await this.db.transaction(async (tx) => {
+      const [address] = await tx.update(shippingAddresses).set(data).where(
+       and(
+          eq(shippingAddresses.id, id),
+          eq(shippingAddresses.userId, userId)
         )
-      );
-    }
-    return address
+      ).returning()
+      if(address && data.isDefault) {
+        await tx.update(shippingAddresses).set({
+          isDefault: false,
+          updatedAt: new Date().toISOString(),
+        }).where(
+          and(
+            eq(shippingAddresses.userId, address.userId),
+            ne(shippingAddresses.id, id),
+          )
+        );
+      }
+      return address
+    });
   }
 
   async getAll(userId: string) {
@@ -72,19 +76,21 @@ class ShippingAddressService {
   }
 
   async markAsDefault(id:number, userId:string) {
-    await this.db.update(shippingAddresses).set({
-      isDefault: false,
-    }).where(
-      eq(shippingAddresses.userId, userId)
-    );
-    return await this.db.update(shippingAddresses).set({
-      isDefault: true,
-    }).where(
-      and(
-        eq(shippingAddresses.userId, userId),
-        eq(shippingAddresses.id, id)
-      )
-    );
+    return await this.db.transaction(async (tx) => {
+      await tx.update(shippingAddresses).set({
+        isDefault: false,
+      }).where(
+        eq(shippingAddresses.userId, userId)
+      );
+      return await tx.update(shippingAddresses).set({
+        isDefault: true,
+      }).where(
+        and(
+          eq(shippingAddresses.userId, userId),
+          eq(shippingAddresses.id, id)
+        )
+      );
+    });
   }
 
   async delete(id: number, userId?: string) {

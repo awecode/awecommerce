@@ -166,178 +166,181 @@ class CartService {
     sessionId: string,
     sumProductQuantityOnCartMerge: boolean = SUM_PRODUCT_QUANTITY_ON_CART_MERGE,
   ): Promise<CartContentWithoutOfferInfo> {
-    // const userCart = await this.db
-    //   .select({
-    //     cart: carts,
-    //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
-    //   })
-    //   .from(carts)
-    //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-    //   .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
-    //   .groupBy(carts.id)
-    //   .orderBy(desc(carts.updatedAt));
-    const userCart = await this.db.query.carts.findFirst({
-      with: {
-        lines: {
-          with: {
-            product: {
-              columns: {
-                name: true,
-                price: true,
-                stockQuantity: true,
-                inventoryCost: true,
-                discountedPrice: true,
+    return await this.db.transaction(async (tx) => {
+      const cartService = new CartService(tx)
+      // const userCart = await this.db
+      //   .select({
+      //     cart: carts,
+      //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
+      //   })
+      //   .from(carts)
+      //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
+      //   .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
+      //   .groupBy(carts.id)
+      //   .orderBy(desc(carts.updatedAt));
+      const userCart = await tx.query.carts.findFirst({
+        with: {
+          lines: {
+            with: {
+              product: {
+                columns: {
+                  name: true,
+                  price: true,
+                  stockQuantity: true,
+                  inventoryCost: true,
+                  discountedPrice: true,
+                },
               },
             },
           },
         },
-      },
-      where: eq(carts.userId, userId),
-      orderBy: desc(carts.updatedAt),
-    })
-    if (!userCart) {
-      const result = await this.db
-        .update(carts)
-        .set({ userId })
-        .where(eq(carts.sessionId, sessionId))
-        .returning()
-      if (!result.length) {
-        return {
-          ...(await this.create(userId)),
-          lines: [],
+        where: eq(carts.userId, userId),
+        orderBy: desc(carts.updatedAt),
+      })
+      if (!userCart) {
+        const result = await tx
+          .update(carts)
+          .set({ userId })
+          .where(eq(carts.sessionId, sessionId))
+          .returning()
+        if (!result.length) {
+          return {
+            ...(await cartService.create(userId)),
+            lines: [],
+          }
         }
+        return await cartService.getCartContentForSession(result[0].sessionId) as CartContentWithoutOfferInfo
       }
-      return await this.getCartContentForSession(result[0].sessionId) as CartContentWithoutOfferInfo
-    }
-    // const sessionCart = await this.db
-    //   .select({
-    //     cart: carts,
-    //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
-    //   })
-    //   .from(carts)
-    //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-    //   .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
-    //   .groupBy(carts.id)
-    //   .orderBy(desc(carts.updatedAt));
-    const sessionCart = await this.db.query.carts.findFirst({
-      with: {
-        lines: {
-          with: {
-            product: {
-              columns: {
-                name: true,
-                price: true,
-                discountedPrice: true,
-                stockQuantity: true,
-                inventoryCost: true,
+      // const sessionCart = await this.db
+      //   .select({
+      //     cart: carts,
+      //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
+      //   })
+      //   .from(carts)
+      //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
+      //   .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
+      //   .groupBy(carts.id)
+      //   .orderBy(desc(carts.updatedAt));
+      const sessionCart = await tx.query.carts.findFirst({
+        with: {
+          lines: {
+            with: {
+              product: {
+                columns: {
+                  name: true,
+                  price: true,
+                  discountedPrice: true,
+                  stockQuantity: true,
+                  inventoryCost: true,
+                },
               },
             },
           },
         },
-      },
-      where: eq(carts.sessionId, sessionId),
-      orderBy: desc(carts.createdAt),
-    })
-    if (!sessionCart) {
-      return userCart
-    }
+        where: eq(carts.sessionId, sessionId),
+        orderBy: desc(carts.createdAt),
+      })
+      if (!sessionCart) {
+        return userCart
+      }
 
-    const lines = []
-    if (userCart.lines?.length && userCart.lines[0]) {
-      for (const userLine of userCart.lines) {
-        if (userLine.productId) {
-          const sessionLine = sessionCart.lines.find(
-            (l: CartLine) => l?.productId === userLine.productId,
-          )
-          if (sessionLine) {
-            lines.push({
-              cartId: sessionCart.id,
-              productId: sessionLine.productId,
-              id: sessionLine.id,
-              quantity: sumProductQuantityOnCartMerge
-                ? userLine.quantity + sessionLine.quantity
-                : sessionLine.quantity,
-            })
-          } else {
-            lines.push({
-              id: undefined,
-              cartId: sessionCart.id,
-              productId: userLine.productId,
-              quantity: userLine.quantity,
-            })
+      const lines = []
+      if (userCart.lines?.length && userCart.lines[0]) {
+        for (const userLine of userCart.lines) {
+          if (userLine.productId) {
+            const sessionLine = sessionCart.lines.find(
+              (l: CartLine) => l?.productId === userLine.productId,
+            )
+            if (sessionLine) {
+              lines.push({
+                cartId: sessionCart.id,
+                productId: sessionLine.productId,
+                id: sessionLine.id,
+                quantity: sumProductQuantityOnCartMerge
+                  ? userLine.quantity + sessionLine.quantity
+                  : sessionLine.quantity,
+              })
+            } else {
+              lines.push({
+                id: undefined,
+                cartId: sessionCart.id,
+                productId: userLine.productId,
+                quantity: userLine.quantity,
+              })
+            }
           }
         }
       }
-    }
 
-    for (const sessionLine of sessionCart.lines) {
-      if (
-        sessionLine &&
-        !userCart.lines.find(
-          (l: CartLine) => l?.productId === sessionLine.productId,
-        )
-      ) {
+      for (const sessionLine of sessionCart.lines) {
         if (
-          sessionLine.createdAt &&
-          typeof sessionLine.createdAt === 'string'
+          sessionLine &&
+          !userCart.lines.find(
+            (l: CartLine) => l?.productId === sessionLine.productId,
+          )
         ) {
-          sessionLine.createdAt = sessionLine.createdAt
+          if (
+            sessionLine.createdAt &&
+            typeof sessionLine.createdAt === 'string'
+          ) {
+            sessionLine.createdAt = sessionLine.createdAt
+          }
+          if (
+            sessionLine.updatedAt &&
+            typeof sessionLine.updatedAt === 'string'
+          ) {
+            sessionLine.updatedAt = sessionLine.updatedAt
+          }
+          lines.push(sessionLine)
         }
-        if (
-          sessionLine.updatedAt &&
-          typeof sessionLine.updatedAt === 'string'
-        ) {
-          sessionLine.updatedAt = sessionLine.updatedAt
-        }
-        lines.push(sessionLine)
       }
-    }
 
-    let insertedLines: CartLine[] = []
-    if (lines.length) {
-      insertedLines = await this.db
-        .insert(cartLines)
-        .values(lines)
-        .onConflictDoUpdate({
-          target: cartLines.id,
-          set: {
-            quantity: sql`excluded.quantity`,
-          },
-        })
-        .returning()
-    }
+      let insertedLines: CartLine[] = []
+      if (lines.length) {
+        insertedLines = await tx
+          .insert(cartLines)
+          .values(lines)
+          .onConflictDoUpdate({
+            target: cartLines.id,
+            set: {
+              quantity: sql`excluded.quantity`,
+            },
+          })
+          .returning()
+      }
 
-    await this.db
-      .update(carts)
-      .set({ status: 'Merged' })
-      .where(eq(carts.id, userCart.id))
+      await tx
+        .update(carts)
+        .set({ status: 'Merged' })
+        .where(eq(carts.id, userCart.id))
 
-    await this.db
-      .update(carts)
-      .set({ userId })
-      .where(eq(carts.sessionId, sessionId))
+      await tx
+        .update(carts)
+        .set({ userId })
+        .where(eq(carts.sessionId, sessionId))
 
-    sessionCart.userId = userId
+      sessionCart.userId = userId
 
-    const insertedLinesWithProduct = await this.db.query.cartLines.findMany({
-      where: inArray(cartLines.id, insertedLines.map(l => l.id)),
-      with: {
-        product: {
-          columns: {
-            name: true,
-            price: true,
-            stockQuantity: true,
-            inventoryCost: true,
-            discountedPrice: true,
+      const insertedLinesWithProduct = await tx.query.cartLines.findMany({
+        where: inArray(cartLines.id, insertedLines.map(l => l.id)),
+        with: {
+          product: {
+            columns: {
+              name: true,
+              price: true,
+              stockQuantity: true,
+              inventoryCost: true,
+              discountedPrice: true,
+            },
           },
         },
-      },
-    })
+      })
 
-    return {
-      ...sessionCart,
-      lines: insertedLinesWithProduct
-    }
+      return {
+        ...sessionCart,
+        lines: insertedLinesWithProduct
+      }
+    })
   }
 
   async unApplyVoucherOffer(cartId: number, offerId: number) {
