@@ -11,8 +11,8 @@ import {
 } from 'drizzle-orm/pglite'
 
 export type PgDatabase =
-  | NodePgDatabase<Record<string, never>>
-  | PgliteDatabase<Record<string, never>>
+  | NodePgDatabase<typeof tables>
+  | PgliteDatabase<typeof tables>
 type PGliteWithEnd = PGlite & { end: () => Promise<void> }
 
 let client: PGliteWithEnd
