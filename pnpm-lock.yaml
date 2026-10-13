@@ -13,13 +13,10 @@ importers:
         version: 10.6.0
       drizzle-orm:
         specifier: ^0.38.4
-        version: 0.38.4(@electric-sql/pglite@0.2.10)(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4)
+        version: 0.38.4(@electric-sql/pglite@0.2.10)(@types/pg@8.11.10)(pg@8.13.0)
       pg:
         specifier: ^8.13.0
         version: 8.13.0
-      postgres:
-        specifier: ^3.4.4
-        version: 3.4.4
       typescript:
         specifier: ^5.6.2
         version: 5.6.2
@@ -1867,10 +1864,6 @@ packages:
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
-  postgres@3.4.4:
-    resolution: {integrity: sha512-IbyN+9KslkqcXa8AO9fxpk97PA4pzewvpi2B3Dwy9u4zpV32QicaEdgmF3eSQUzdRk7ttDHQejNgAEr4XoeH4A==}
-    engines: {node: '>=12'}
-
   pretty-bytes@6.1.1:
     resolution: {integrity: sha512-mQUvGU6aUFQ+rNvTIAcZuWGRT9a6f6Yrg9bHs4ImKF+HZCEK+plBvnAZYSIQztknZF2qnzNtr6F8s0+IuptdlQ==}
     engines: {node: ^14.13.1 || >=16.0.0}
@@ -2958,12 +2951,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.38.4(@electric-sql/pglite@0.2.10)(@types/pg@8.11.10)(pg@8.13.0)(postgres@3.4.4):
+  drizzle-orm@0.38.4(@electric-sql/pglite@0.2.10)(@types/pg@8.11.10)(pg@8.13.0):
     optionalDependencies:
       '@electric-sql/pglite': 0.2.10
       '@types/pg': 8.11.10
       pg: 8.13.0
-      postgres: 3.4.4
 
   electron-to-chromium@1.5.88: {}
 
@@ -3498,8 +3490,6 @@ snapshots:
   postgres-interval@3.0.0: {}
 
   postgres-range@1.1.4: {}
-
-  postgres@3.4.4: {}
 
   pretty-bytes@6.1.1: {}
 

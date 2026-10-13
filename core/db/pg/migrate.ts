@@ -1,21 +1,25 @@
 import process from 'node:process'
 
-import { migrate } from 'drizzle-orm/postgres-js/migrator'
-import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { migrate } from 'drizzle-orm/node-postgres/migrator'
+import { Pool } from 'pg'
 
-import { drizzle } from 'drizzle-orm/postgres-js'
+const url = process.env.POSTGRES_URL
+if (!url) {
+  console.error('⚠️ POSTGRES_URL is not set')
+  process.exit(1)
+}
 
-const url = `${process.env.POSTGRES_URL}`
-const db = drizzle(postgres(url))
+const pool = new Pool({ connectionString: url })
+const db = drizzle(pool)
 
 migrate(db, {
   migrationsFolder: './migrations/pg',
-}).then(() =>
+}).then(() => {
   // eslint-disable-next-line no-console
-  console.log('🎉 Migration complete'),
-).catch((error) => {
+  console.log('🎉 Migration complete')
+}).catch((error) => {
   console.error('⚠️ Migration failed')
   console.error(error)
-}).finally(() => {
-  process.exit()
-})
+  process.exitCode = 1
+}).finally(() => pool.end())
