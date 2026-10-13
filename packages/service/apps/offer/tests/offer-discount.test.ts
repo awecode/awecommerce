@@ -320,8 +320,14 @@ test('should not copy a voucher discount onto the order line', async () => {
   const applied = await offerService.applyVoucherCode(content, undefined, 'ORDER10', userId)
   expect(applied.lines[0].totalOfferDiscount).toBe(10)
 
-  const order = await orderService.create({ userId }, applied.lines)
+  const order = await orderService.createFromCart(content.id)
 
   expect(Number(order.lines[0].price)).toBe(100)
   expect(Number(order.lines[0].discount)).toBe(0)
+  // The voucher discount goes on the order instead. Other active user offers
+  // from earlier tests may also apply, so compare against the recorded offers.
+  const voucher = order.offers!.find((o) => o.voucherCode === 'ORDER10')!
+  expect(voucher.discount).toBe(10)
+  const offersTotal = order.offers!.reduce((sum, o) => sum + o.discount, 0)
+  expect(Number(order.discount)).toBe(offersTotal)
 })

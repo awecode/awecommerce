@@ -11,7 +11,9 @@ import {
   SQL,
 } from 'drizzle-orm'
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import { CartLine, carts } from '../../cart/schemas'
+import { Decimal } from 'decimal.js'
+import { carts } from '../../cart/schemas'
+import { CartService } from '../../cart/services/cart'
 import {
   NewOrder,
   NewPaymentEvent,
@@ -21,12 +23,31 @@ import {
   orders,
   orderStatusChanges,
   paymentEvents,
+  shippingMethods,
   transactions,
 } from '../schemas'
 import { products } from '../../product/schemas'
 import { Database } from '../../types'
 
-type Extend<T, U> = T & U
+type CreateFromCartOptions = {
+  guestUser?: NewOrder['guestUser']
+  shippingAddress?: NewOrder['shippingAddress']
+  metadata?: NewOrder['metadata']
+  shippingMethodId?: number
+  // The total the customer was shown. If the computed total differs, the
+  // order is not created and OrderTotalMismatchError is thrown.
+  expectedTotal?: string | number
+}
+
+class OrderTotalMismatchError extends Error {
+  constructor(
+    public expectedTotal: string,
+    public actualTotal: string,
+  ) {
+    super(`Order total changed: expected ${expectedTotal}, got ${actualTotal}`)
+    this.name = 'OrderTotalMismatchError'
+  }
+}
 
 type OrderStatus =
   | 'Pending'
@@ -93,51 +114,103 @@ class OrderService {
     )
   }
 
-  async create(
-    data: NewOrder,
-    cartLines: Array<
-      Extend<
-        CartLine,
-        {
-          product: {
-            price: string | null
-            discountedPrice?: string | null
-          }
-        }
-      >
-    >,
-  ) {
-    if (!cartLines.length) {
-      throw new Error('Cannot create an order without lines')
-    }
+  // Creates an order from an open cart. Prices, offer discounts and shipping
+  // are read from the database here, never taken from the caller.
+  async createFromCart(cartId: number, options: CreateFromCartOptions = {}) {
+    const { shippingMethodId, expectedTotal, ...orderData } = options
     return await this.db.transaction(async (tx) => {
       const orderService = new OrderService(tx)
-      const [order] = await tx.insert(orders).values(data).returning()
-      if(data.cartId) {
-        await tx
-          .update(carts)
-          .set({ status: 'Frozen' })
-          .where(eq(carts.id, data.cartId))
+      // Locked so the same cart cannot be ordered twice at the same time
+      const [cart] = await tx
+        .select()
+        .from(carts)
+        .where(eq(carts.id, cartId))
+        .for('update')
+      if (!cart) {
+        throw new Error(`Cart not found: ${cartId}`)
       }
+      if (cart.status !== 'Open') {
+        throw new Error(`Cart is not open: ${cartId}`)
+      }
+
+      const content = await new CartService(tx).getCartContentForSession(
+        cart.sessionId,
+        true,
+      )
+      if (!content.lines.length) {
+        throw new Error('Cannot create an order without lines')
+      }
+
+      let shippingMethod: typeof shippingMethods.$inferSelect | undefined
+      if (shippingMethodId !== undefined) {
+        ;[shippingMethod] = await tx
+          .select()
+          .from(shippingMethods)
+          .where(eq(shippingMethods.id, shippingMethodId))
+        if (!shippingMethod) {
+          throw new Error(`Shipping method not found: ${shippingMethodId}`)
+        }
+      }
+
+      const lineValues = content.lines.map((line) => {
+        const listPrice = line.product.price
+        const salePrice = line.product.discountedPrice
+        return {
+          productId: line.productId,
+          productName: line.product.name,
+          productSku: line.product.sku,
+          price: listPrice ?? salePrice ?? null,
+          discount:
+            listPrice && salePrice
+              ? new Decimal(listPrice).sub(salePrice).toString()
+              : '0',
+          quantity: line.quantity,
+        }
+      })
+      const offerDiscount = new Decimal(content.totalOfferDiscount)
+      const shippingCharge = new Decimal(shippingMethod?.price ?? 0)
+      // A line without any price counts as zero
+      const subtotal = lineValues.reduce(
+        (sum, line) =>
+          sum.add(new Decimal(line.price ?? 0).sub(line.discount).mul(line.quantity)),
+        new Decimal(0),
+      )
+      const total = subtotal.sub(offerDiscount).add(shippingCharge)
+      if (expectedTotal !== undefined && !total.eq(expectedTotal)) {
+        throw new OrderTotalMismatchError(
+          new Decimal(expectedTotal).toString(),
+          total.toString(),
+        )
+      }
+
+      const [order] = await tx
+        .insert(orders)
+        .values({
+          ...orderData,
+          userId: cart.userId,
+          cartId: cart.id,
+          offers: [...content.userOfferDiscounts, ...content.voucherOfferDiscounts],
+          discount: offerDiscount.toString(),
+          shippingCharge: shippingCharge.toString(),
+          ...(shippingMethod
+            ? {
+                shippingMethod: {
+                  id: shippingMethod.id,
+                  name: shippingMethod.name,
+                  price: shippingMethod.price,
+                  metadata: shippingMethod.metadata,
+                },
+              }
+            : {}),
+        })
+        .returning()
+      await tx
+        .update(carts)
+        .set({ status: 'Frozen' })
+        .where(eq(carts.id, cart.id))
       await tx
         .insert(orderLines)
-        .values(
-          cartLines.map((line) => {
-            const listPrice = line.product.price
-            const salePrice = line.product.discountedPrice
-            return {
-              orderId: order.id,
-              productId: line.productId,
-              price: listPrice ?? salePrice ?? null,
-              discount:
-                listPrice && salePrice
-                  ? (Number(listPrice) - Number(salePrice)).toString()
-                  : '0',
-              quantity: line.quantity,
-            }
-          }),
-        )
-        .returning()
+        .values(lineValues.map((line) => ({ ...line, orderId: order.id })))
       const lines = await tx.query.orderLines.findMany({
         where: eq(orderLines.orderId, order.id),
         with: {
@@ -153,6 +226,7 @@ class OrderService {
       return {
         ...order,
         lines,
+        total: total.toString(),
         hash: this.generateHash(order.id.toString()),
       }
     })
@@ -533,4 +607,4 @@ class OrderService {
   }
 }
 
-export { OrderService }
+export { OrderService, OrderTotalMismatchError }

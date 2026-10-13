@@ -13,5 +13,14 @@
     "migrate": "pnpm --filter @awecommerce/service migrate",
     "seed:product": "pnpm --filter @awecommerce/service seed:product"
   },
-  "packageManager": "pnpm@9.4.0+sha1.9217c800d4ab947a7aee520242a7b70d64fc7638"
+  "packageManager": "pnpm@9.4.0+sha1.9217c800d4ab947a7aee520242a7b70d64fc7638",
+  "pnpm": {
+    "packageExtensions": {
+      "drizzle-kit": {
+        "peerDependencies": {
+          "drizzle-orm": "*"
+        }
+      }
+    }
+  }
 }

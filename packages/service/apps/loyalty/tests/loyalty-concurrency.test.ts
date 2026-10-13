@@ -1,10 +1,8 @@
 // Runs only against a real Postgres, because PGlite has a single connection and
 // cannot run transactions at the same time. Point it at an empty database:
 //   TEST_POSTGRES_URL=postgres://user@localhost:5432/awe_test pnpm vitest run loyalty-concurrency
-import path from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
@@ -46,9 +44,6 @@ describe.skipIf(!url)('loyalty under real concurrency', () => {
   beforeAll(async () => {
     pool = new pg.Pool({ connectionString: url, max: CONCURRENCY + 2 })
     db = drizzle(pool, { schema: tables })
-    await migrate(db, {
-      migrationsFolder: path.join(process.cwd(), 'migrations/pg'),
-    })
     loyaltyService = new LoyaltyService(db)
   })
 

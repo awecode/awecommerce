@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { db } from 'core/db'
 import { OrderService } from 'apps/order/services/order'
@@ -55,21 +55,27 @@ test('should throw when the secret is not set', () => {
   )
 })
 
-test('should roll back order creation when a line fails', async () => {
+const createCartWithProduct = async (userId: string, slug: string) => {
+  const product = await new ProductService(db).create({
+    name: slug,
+    slug,
+    sku: slug,
+    price: '10',
+  })
+  const cartService = new CartService(db)
+  const cart = await cartService.create(userId)
+  await cartService.addToCart(cart.id, product.id, 1)
+  return cart
+}
+
+test('should roll back order creation when a later write fails', async () => {
   const userId = 'order-rollback-user'
-  const cart = await new CartService(db).create(userId)
-  const missingProductLine = {
-    id: 1,
-    cartId: cart.id,
-    productId: 999999,
-    quantity: 1,
-    createdAt: null,
-    updatedAt: null,
-    product: { price: '10' },
-  }
-  await expect(
-    orderService.create({ userId, cartId: cart.id }, [missingProductLine]),
-  ).rejects.toThrow()
+  const cart = await createCartWithProduct(userId, 'rollback-product')
+  const spy = vi
+    .spyOn(OrderService.prototype, 'createLog')
+    .mockRejectedValueOnce(new Error('log failed'))
+  await expect(orderService.createFromCart(cart.id)).rejects.toThrow('log failed')
+  spy.mockRestore()
   expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
   const [cartAfter] = await db.select().from(carts).where(eq(carts.id, cart.id))
   expect(cartAfter.status).toBe('Open')
@@ -77,35 +83,13 @@ test('should roll back order creation when a line fails', async () => {
 
 test('should roll back cancel when the status change fails', async () => {
   const userId = 'order-cancel-user'
-  const product = await new ProductService(db).create({
-    name: 'Cancel Product',
-    slug: 'cancel-product',
-    sku: 'cancel-product',
-    price: '10',
-  })
-  const line = {
-    id: 1,
-    cartId: 0,
-    productId: product.id,
-    quantity: 1,
-    createdAt: null,
-    updatedAt: null,
-    product: { price: '10' },
-  }
-  const order = await orderService.create({ userId }, [line])
+  const cart = await createCartWithProduct(userId, 'cancel-product')
+  const order = await orderService.createFromCart(cart.id)
   await expect(
     orderService.cancel(order.id, 'NotAStatus' as any, 'admin', 'reason'),
   ).rejects.toThrow()
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.status).toBe('Pending')
-})
-
-test('should reject creating an order without lines', async () => {
-  const userId = 'order-empty-user'
-  await expect(orderService.create({ userId }, [])).rejects.toThrow(
-    'Cannot create an order without lines',
-  )
-  expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
 })
 
 test('should generate URL-safe hashes', () => {

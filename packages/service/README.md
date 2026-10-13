@@ -81,15 +81,39 @@ const product = await new ProductService(db).create({
 const cartService = new CartService(db)
 const cart = await cartService.create('user-1')
 await cartService.addToCart(cart.id, product.id, 2)
-const content = await cartService.getCartContentForSession(cart.sessionId)
 
-const order = await new OrderService(db).create(
-  { userId: 'user-1', cartId: cart.id },
-  content.lines,
-)
+const order = await new OrderService(db).createFromCart(cart.id)
 ```
 
-`OrderService.create` throws `Cannot create an order without lines` for an empty list. Nothing is written in that case. A line whose product has no list price is still accepted: the order line stores `discountedPrice` when that is set, and `null` when the product has neither price.
+### Placing an order
+
+`OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only products and quantities, so an order always uses current prices.
+
+```ts
+import { OrderService, OrderTotalMismatchError } from '@awecommerce/service/apps/order/services/order'
+
+try {
+  const order = await new OrderService(db).createFromCart(cart.id, {
+    shippingMethodId: 1,
+    shippingAddress: { line1: 'Street 1', city: 'Kathmandu' },
+    expectedTotal: '25', // the total the customer was shown
+  })
+  // order.total, order.lines, order.hash, ...
+} catch (error) {
+  if (error instanceof OrderTotalMismatchError) {
+    // Prices changed since the customer saw the total: show
+    // error.actualTotal and ask them to confirm
+  }
+}
+```
+
+- **Options:** `shippingMethodId` (its price becomes `shippingCharge`, and its details are kept in `shippingMethod`), `shippingAddress`, `guestUser` (for carts without a user), `metadata`, and `expectedTotal`. The order's user is always the cart's user.
+- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, plus shipping. Orders do not store it; `createFromCart` returns it as `total`. Tax and loyalty discounts are not included.
+- **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
+- **Order lines:** `price` is the product's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose product has neither is stored with `price` `null` and counts as zero. `productName` and `productSku` are copied onto the line, so renaming or changing a product later does not alter past orders.
+- **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`.
+- **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
+- **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
 
 ### Services and import paths
 
@@ -98,7 +122,7 @@ const order = await new OrderService(db).create(
 | `@awecommerce/service/apps/product/services/product` | `ProductService`, `BrandService`, `CategoryService`, `ProductClassService`, `ProductImageService`, `RelatedProductService` |
 | `@awecommerce/service/apps/cart/services/cart` | `CartService` |
 | `@awecommerce/service/apps/offer/services/offer` | `OfferService`, `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` |
-| `@awecommerce/service/apps/order/services/order` | `OrderService` |
+| `@awecommerce/service/apps/order/services/order` | `OrderService`, `OrderTotalMismatchError` |
 | `@awecommerce/service/apps/order/services/shipping-address` | `ShippingAddressService` |
 | `@awecommerce/service/apps/order/services/shipping-method` | `ShippingMethodService` |
 | `@awecommerce/service/apps/loyalty/services/loyalty` | `LoyaltyService` |
@@ -120,10 +144,7 @@ To combine several calls into one unit, open a transaction yourself and create t
 import { LoyaltyService } from '@awecommerce/service/apps/loyalty/services/loyalty'
 
 const order = await db.transaction(async (tx) => {
-  const created = await new OrderService(tx).create(
-    { userId: 'user-1', cartId: cart.id },
-    content.lines,
-  )
+  const created = await new OrderService(tx).createFromCart(cart.id)
   await new LoyaltyService(tx).redeemPoints('user-1', created.id, 30)
   return created
 })
@@ -134,14 +155,14 @@ If anything inside throws, neither the order nor the redemption is saved.
 ## Data formats
 
 - **Numbers.** Prices, discounts, amounts and points are `numeric(100, 20)` columns. They come back as strings with 20 decimal places, for example `"12.50000000000000000000"`. Convert them with `Number(...)` or `decimal.js` before doing math or displaying them.
-- **Order hashes.** `OrderService.create` returns a `hash` that lets someone view the order without logging in (`getByHash(orderId, hash)`). It is an HMAC-SHA256 of the order id with `ORDER_HASH_SECRET`, encoded as `base64url`, so it is safe to put in a URL as is. Changing the secret invalidates every existing hash.
+- **Order hashes.** `OrderService.createFromCart` returns a `hash` that lets someone view the order without logging in (`getByHash(orderId, hash)`). It is an HMAC-SHA256 of the order id with `ORDER_HASH_SECRET`, encoded as `base64url`, so it is safe to put in a URL as is. Changing the secret invalidates every existing hash.
 
 ## Environment variables
 
 | Variable | Used by | Purpose |
 |---|---|---|
 | `POSTGRES_URL` | `core/db`, `migrate:pg`, `seed:product` | Postgres connection URL |
-| `ORDER_HASH_SECRET` | `OrderService` (`create`, `getByHash`, `generateHash`, `checkHash`) | Secret for order hashes. Required: these methods throw `ORDER_HASH_SECRET is not set` without it. Use a long random value, such as the output of `openssl rand -base64 32` |
+| `ORDER_HASH_SECRET` | `OrderService` (`createFromCart`, `getByHash`, `generateHash`, `checkHash`) | Secret for order hashes. Required: these methods throw `ORDER_HASH_SECRET is not set` without it. Use a long random value, such as the output of `openssl rand -base64 32` |
 | `TEST_POSTGRES_URL` | Tests | An empty Postgres database for the tests that need a real server. Without it, those tests are skipped |
 | `PG_BIN` | `test:pg` | Folder containing `initdb` and `pg_ctl`, if they are not on your `PATH` (for example `/usr/lib/postgresql/16/bin` on Debian) |
 | `NODE_ENV` | `core/db` | `test` makes `core/db` use an in-memory PGlite database |

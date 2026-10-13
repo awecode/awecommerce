@@ -26,19 +26,12 @@ const createProduct = async (price = '100', discountedPrice?: string) => {
   })
 }
 
-const createOrder = async (userId: string, cartId?: number) => {
+const createOrder = async (userId: string) => {
   const product = await createProduct()
-  return await orderService.create({ userId, cartId }, [
-    {
-      id: 0,
-      cartId: cartId ?? 0,
-      productId: product.id,
-      quantity: 2,
-      createdAt: null,
-      updatedAt: null,
-      product: { price: product.price! },
-    },
-  ])
+  const cartService = new CartService(db)
+  const cart = await cartService.create(userId)
+  await cartService.addToCart(cart.id, product.id, 2)
+  return await orderService.createFromCart(cart.id)
 }
 
 beforeAll(() => {
@@ -47,19 +40,11 @@ beforeAll(() => {
 
 test('should create an order with lines, discount, hash, frozen cart and log', async () => {
   const userId = 'flow-create-user'
-  const cart = await new CartService(db).create(userId)
+  const cartService = new CartService(db)
+  const cart = await cartService.create(userId)
   const product = await createProduct('100', '80')
-  const order = await orderService.create({ userId, cartId: cart.id }, [
-    {
-      id: 0,
-      cartId: cart.id,
-      productId: product.id,
-      quantity: 3,
-      createdAt: null,
-      updatedAt: null,
-      product: { price: '100', discountedPrice: '80' },
-    },
-  ])
+  await cartService.addToCart(cart.id, product.id, 3)
+  const order = await orderService.createFromCart(cart.id)
 
   expect(order.status).toBe('Pending')
   expect(order.paymentStatus).toBe('Pending')
@@ -288,21 +273,6 @@ test('should roll back a payment event when updating the payment status fails', 
   expect(orderAfter.paymentStatus).toBe('Pending')
 })
 
-test('should create an order directly from cart content lines', async () => {
-  const userId = 'flow-cart-lines-user'
-  const cartService = new CartService(db)
-  const cart = await cartService.create(userId)
-  const product = await createProduct('40')
-  await cartService.addToCart(cart.id, product.id, 2)
-  const content = await cartService.getCartContentForSession(cart.sessionId)
-
-  const order = await orderService.create({ userId, cartId: cart.id }, content.lines)
-
-  expect(order.lines).toHaveLength(1)
-  expect(Number(order.lines[0].price)).toBe(40)
-  expect(Number(order.lines[0].discount)).toBe(0)
-})
-
 test('should create an order when a product has no price', async () => {
   const userId = 'flow-no-price-user'
   const cartService = new CartService(db)
@@ -313,9 +283,8 @@ test('should create an order when a product has no price', async () => {
   await cartService.addToCart(cart.id, unpriced.id, 1)
   // The price is removed after the product was added to the cart
   await productService.update(unpriced.id, { price: null })
-  const content = await cartService.getCartContentForSession(cart.sessionId)
 
-  const order = await orderService.create({ userId, cartId: cart.id }, content.lines)
+  const order = await orderService.createFromCart(cart.id)
 
   const unpricedLine = order.lines.find((line) => line.productId === unpriced.id)
   const pricedLine = order.lines.find((line) => line.productId === priced.id)
@@ -333,9 +302,8 @@ test('should use discountedPrice when the product has no list price', async () =
   const product = await createProduct('100', '80')
   await cartService.addToCart(cart.id, product.id, 2)
   await productService.update(product.id, { price: null })
-  const content = await cartService.getCartContentForSession(cart.sessionId)
 
-  const order = await orderService.create({ userId, cartId: cart.id }, content.lines)
+  const order = await orderService.createFromCart(cart.id)
 
   expect(Number(order.lines[0].price)).toBe(80)
   expect(Number(order.lines[0].discount)).toBe(0)

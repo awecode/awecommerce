@@ -36,6 +36,7 @@ export type CartContent = Cart & {
     CartLine & {
       product: {
         name: string
+        sku: string
         stockQuantity: number | null
         price: string | null
         inventoryCost: string | null

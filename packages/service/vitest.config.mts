@@ -17,5 +17,6 @@ export default defineConfig({
     environment: 'node',
     env: loadEnv('', process.cwd(), ''),
     setupFiles: ['./tests/setup.ts'],
+    globalSetup: ['./tests/pg-global-setup.ts'],
   },
 })

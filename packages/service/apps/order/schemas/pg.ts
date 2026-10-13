@@ -100,6 +100,10 @@ export const orderLines = pgTable('order_line', {
   id: serial().primaryKey(),
   orderId: integer().notNull().references(() => orders.id, { onDelete: 'cascade' }),
   productId: integer().notNull().references(() => products.id),
+  // Copied from the product when the order is created, so later product
+  // changes do not alter past orders
+  productName: text().notNull(),
+  productSku: text().notNull(),
   price: numeric({
     precision: 100,
     scale: 20,
