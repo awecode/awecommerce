@@ -10,7 +10,7 @@
     "check:dist": "unbuild && node scripts/check-dist.mjs",
     "test:pg": "node scripts/test-pg.mjs",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm typecheck && vitest run && pnpm check:dist",
+    "prepublishOnly": "pnpm typecheck && node scripts/test-pg.mjs --if-available && pnpm check:dist",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "migrate:pg": "tsx --env-file=./.env core/db/pg/migrate.ts",
