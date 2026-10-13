@@ -10,7 +10,7 @@ import { OrderService } from 'apps/order/services/order'
 import { CartService } from 'apps/cart/services/cart'
 import { ProductService } from 'apps/product/services/product'
 import { carts } from 'apps/cart/schemas'
-import { orders } from 'apps/order/schemas'
+import { orders, orderStatusChanges } from 'apps/order/schemas'
 import {
   offerBenefits,
   offerConditions,
@@ -135,5 +135,40 @@ describe.skipIf(!url)('orders under real concurrency', () => {
       .from(offerUsages)
       .where(and(eq(offerUsages.offerId, voucher.id), eq(offerUsages.userId, `${slug}-user`)))
     expect(userUsage.usageCount).toBe(0)
+  })
+
+  test('concurrent status changes to the same status record it once', async () => {
+    const slug = `concurrent-status-${Date.now()}`
+    const product = await new ProductService(db).create({
+      name: slug,
+      slug,
+      sku: slug,
+      price: '10',
+    })
+    const cartService = new CartService(db)
+    const cart = await cartService.create(slug)
+    await cartService.addToCart(cart.id, product.id, 1)
+    const order = await new OrderService(db).createFromCart(cart.id)
+
+    const results = await Promise.allSettled(
+      Array.from({ length: CONCURRENCY }, () =>
+        new OrderService(db).changeStatus(order.id, 'Confirmed', 'admin'),
+      ),
+    )
+
+    const reasons = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => r.reason.message)
+    expect(results.length - reasons.length).toBe(1)
+    expect(reasons).toEqual(
+      Array(CONCURRENCY - 1).fill(`Order is already Confirmed: ${order.id}`),
+    )
+    const history = await db
+      .select()
+      .from(orderStatusChanges)
+      .where(eq(orderStatusChanges.orderId, order.id))
+    expect(history.map((c) => [c.previousStatus, c.newStatus])).toEqual([
+      ['Pending', 'Confirmed'],
+    ])
   })
 })

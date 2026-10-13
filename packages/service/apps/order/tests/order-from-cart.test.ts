@@ -450,7 +450,8 @@ test('should keep usage when cancelling fails', async () => {
   const order = await orderWithVoucher('CANCELFAIL', userId, product.id)
 
   const spy = vi
-    .spyOn(OrderService.prototype, 'changeStatus')
+    // recordStatusChange is private; cancel() calls it after giving usage back
+    .spyOn(OrderService.prototype as any, 'recordStatusChange')
     .mockRejectedValueOnce(new Error('status change failed'))
   await expect(
     orderService.cancel(order.id, 'admin', 'Customer request'),

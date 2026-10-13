@@ -258,26 +258,55 @@ class OrderService {
       .orderBy(asc(orderLogs.createdAt))
   }
 
-  async changeStatus(
+  async changeStatus(orderId: number, newStatus: OrderStatus, changedBy?: string) {
+    if (newStatus === 'Cancelled') {
+      // cancel() also records who cancelled and why, and gives offer usage back
+      throw new Error('Use cancel() to cancel an order')
+    }
+    return await this.db.transaction(async (tx) => {
+      // Locked so the previous status cannot change before it is recorded
+      const [order] = await tx
+        .select()
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .for('update')
+      if (!order) {
+        throw new Error(`Order not found: ${orderId}`)
+      }
+      if (order.status === 'Cancelled') {
+        throw new Error(`Order is cancelled: ${orderId}`)
+      }
+      if (order.status === newStatus) {
+        throw new Error(`Order is already ${newStatus}: ${orderId}`)
+      }
+      await new OrderService(tx).recordStatusChange(
+        orderId,
+        order.status,
+        newStatus,
+        changedBy,
+      )
+    })
+  }
+
+  // Writes the new status, its history row and the log. Callers must lock the
+  // order row first, inside the same transaction.
+  private async recordStatusChange(
     orderId: number,
     previousStatus: OrderStatus,
     newStatus: OrderStatus,
-    createdBy?: string,
+    changedBy?: string,
   ) {
-    return await this.db.transaction(async (tx) => {
-      const orderService = new OrderService(tx)
-      await tx
-        .update(orders)
-        .set({ status: newStatus })
-        .where(eq(orders.id, orderId))
-      await tx.insert(orderStatusChanges).values({
-        orderId: orderId,
-        previousStatus: previousStatus,
-        newStatus,
-        createdBy,
-      })
-      await orderService.createLog(orderId, STATUS_LOG[newStatus], createdBy)
+    await this.db
+      .update(orders)
+      .set({ status: newStatus })
+      .where(eq(orders.id, orderId))
+    await this.db.insert(orderStatusChanges).values({
+      orderId,
+      previousStatus,
+      newStatus,
+      createdBy: changedBy,
     })
+    await this.createLog(orderId, STATUS_LOG[newStatus], changedBy)
   }
 
   async createTransaction(data: NewTransaction) {
@@ -487,7 +516,7 @@ class OrderService {
       for (const offerId of offerIds) {
         await offerService.decreaseUsage(offerId, order.userId)
       }
-      await orderService.changeStatus(orderId, order.status, 'Cancelled', cancelledBy)
+      await orderService.recordStatusChange(orderId, order.status, 'Cancelled', cancelledBy)
     })
   }
 

@@ -64,8 +64,8 @@ test('should create an order with lines, discount, hash, frozen cart and log', a
 
 test('should change status and record who changed it', async () => {
   const order = await createOrder('flow-status-user')
-  await orderService.changeStatus(order.id, 'Pending', 'Confirmed', 'admin-1')
-  await orderService.changeStatus(order.id, 'Confirmed', 'Shipped', 'admin-2')
+  await orderService.changeStatus(order.id, 'Confirmed', 'admin-1')
+  await orderService.changeStatus(order.id, 'Shipped', 'admin-2')
 
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.status).toBe('Shipped')
@@ -129,13 +129,13 @@ test('should list orders with filters and pagination', async () => {
   const pending = await createOrder(userId)
   await sleep(5)
   const shipped = await createOrder(userId)
-  await orderService.changeStatus(shipped.id, 'Pending', 'Shipped')
+  await orderService.changeStatus(shipped.id, 'Shipped')
   await sleep(5)
   const cancelled = await createOrder(userId)
   await orderService.cancel(cancelled.id, 'admin', 'reason')
   await sleep(5)
   const completed = await createOrder(userId)
-  await orderService.changeStatus(completed.id, 'Pending', 'Completed')
+  await orderService.changeStatus(completed.id, 'Completed')
   await orderService.changePaymentStatus(completed.id, 'Paid')
   await createOrder('flow-list-other-user')
 
@@ -311,7 +311,7 @@ test('should use discountedPrice when the product has no list price', async () =
 
 test('should record the order real status as the previous status when cancelling', async () => {
   const order = await createOrder('flow-cancel-previous-status-user')
-  await orderService.changeStatus(order.id, 'Pending', 'Confirmed', 'admin')
+  await orderService.changeStatus(order.id, 'Confirmed', 'admin')
 
   await orderService.cancel(order.id, 'admin', 'Out of stock')
 
@@ -323,4 +323,59 @@ test('should record the order real status as the previous status when cancelling
     ['Pending', 'Confirmed'],
     ['Confirmed', 'Cancelled'],
   ])
+})
+
+const statusHistory = async (orderId: number) =>
+  (
+    await db
+      .select()
+      .from(orderStatusChanges)
+      .where(eq(orderStatusChanges.orderId, orderId))
+  ).map((c) => [c.previousStatus, c.newStatus])
+
+const currentStatus = async (orderId: number) =>
+  (await db.select().from(orders).where(eq(orders.id, orderId)))[0].status
+
+test('should record the real previous status when changing status', async () => {
+  const order = await createOrder('flow-change-previous-status-user')
+  await orderService.changeStatus(order.id, 'Confirmed', 'admin-1')
+  await orderService.changeStatus(order.id, 'Shipped', 'admin-2')
+
+  expect(await statusHistory(order.id)).toEqual([
+    ['Pending', 'Confirmed'],
+    ['Confirmed', 'Shipped'],
+  ])
+})
+
+test('should reject status changes to a cancelled order', async () => {
+  const order = await createOrder('flow-change-cancelled-user')
+  await orderService.cancel(order.id, 'admin', 'reason')
+
+  await expect(orderService.changeStatus(order.id, 'Shipped', 'admin')).rejects.toThrow(
+    `Order is cancelled: ${order.id}`,
+  )
+  expect(await currentStatus(order.id)).toBe('Cancelled')
+  expect(await statusHistory(order.id)).toEqual([['Pending', 'Cancelled']])
+})
+
+test('should reject changing to the status the order already has', async () => {
+  const order = await createOrder('flow-change-same-status-user')
+  await expect(orderService.changeStatus(order.id, 'Pending', 'admin')).rejects.toThrow(
+    `Order is already Pending: ${order.id}`,
+  )
+  expect(await statusHistory(order.id)).toEqual([])
+})
+
+test('should require cancel() to cancel an order', async () => {
+  const order = await createOrder('flow-change-to-cancelled-user')
+  await expect(orderService.changeStatus(order.id, 'Cancelled', 'admin')).rejects.toThrow(
+    'Use cancel() to cancel an order',
+  )
+  expect(await currentStatus(order.id)).toBe('Pending')
+})
+
+test('should reject a status change for an unknown order', async () => {
+  await expect(orderService.changeStatus(999999, 'Confirmed', 'admin')).rejects.toThrow(
+    'Order not found: 999999',
+  )
 })

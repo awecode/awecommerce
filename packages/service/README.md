@@ -114,6 +114,7 @@ try {
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
 - **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
 - **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
+- **Status changes:** `changeStatus(orderId, newStatus, changedBy?)` records the order's current status as the previous status in its history. It throws `Order not found: <id>`, `Order is cancelled: <id>` (cancelled orders cannot change), `Order is already <status>: <id>`, and `Use cancel() to cancel an order` for `'Cancelled'`.
 - **Cancelling:** `cancel(orderId, cancelledBy, reason, remarks?)` records the order's current status as the previous status in its history, and gives back the usage of the order's offers, so their limits can be used again (guest orders give back only the overall count). It throws `Order is already cancelled: <id>` for an order that is already cancelled, including when two cancels run at the same moment, so usage is never given back twice.
 
 ### Services and import paths
