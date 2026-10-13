@@ -4,6 +4,7 @@
   "description": "Awecommerce",
   "scripts": {
     "test": "vitest",
+    "coverage": "vitest run --coverage",
     "prepare": "tsdown",
     "build": "tsdown",
     "check:dist": "tsdown && node scripts/check-dist.mjs",
