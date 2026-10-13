@@ -116,6 +116,11 @@ export const orderLines = pgTable('order_line', {
     precision: 100,
     scale: 20,
   }).notNull().default('0'),
+  // The tax percentage used for this line when the order was created
+  taxRate: numeric({
+    precision: 100,
+    scale: 20,
+  }),
   quantity: integer().notNull(),
   status: orderStatusEnum().notNull().default('Pending'),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),

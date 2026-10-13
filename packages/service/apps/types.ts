@@ -5,6 +5,7 @@ import * as offerSchemas from './offer/schemas'
 import * as orderSchemas from './order/schemas'
 import * as productSchemas from './product/schemas'
 import * as loyaltySchemas from './loyalty/schemas'
+import * as taxSchemas from './tax/schemas'
 
 const tables = {
   ...cartSchemas,
@@ -12,6 +13,7 @@ const tables = {
   ...orderSchemas,
   ...productSchemas,
   ...loyaltySchemas,
+  ...taxSchemas,
 }
 
 type BenefitType = 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
@@ -37,6 +39,7 @@ export type CartContent = Cart & {
       product: {
         name: string
         sku: string
+        productClassId: number | null
         stockQuantity: number | null
         price: string | null
         inventoryCost: string | null

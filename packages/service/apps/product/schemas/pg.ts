@@ -43,6 +43,8 @@ export const productClasses = pgTable('product_class', {
   slug: text().notNull().unique(),
   description: text(),
   trackStock: boolean().default(true),
+  // Tax percentage for products of this class; empty uses the store default
+  taxRate: numeric({ precision: 100, scale: 20 }),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),

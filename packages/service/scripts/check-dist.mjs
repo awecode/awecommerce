@@ -17,6 +17,7 @@ const require = createRequire(import.meta.url)
 const expectedExports = {
   'apps/cart/services/cart': ['CartService'],
   'apps/loyalty/services/loyalty': ['LoyaltyService'],
+  'apps/tax/services/tax': ['TaxService', 'calculateTax'],
   'apps/offer/services/offer': ['OfferService', 'OfferRangeService'],
   'apps/order/services/order': [
     'OrderService',
@@ -32,8 +33,9 @@ const expectedExports = {
   'apps/order/schemas': ['orders'],
   'apps/product/schemas': ['products'],
   'apps/loyalty/schemas': ['loyaltyPoints'],
+  'apps/tax/schemas': ['taxSettings'],
   'core/db': ['db'],
-  'core/db/pg/schema': ['carts', 'orders', 'offers', 'products', 'loyaltyPoints'],
+  'core/db/pg/schema': ['carts', 'orders', 'offers', 'products', 'loyaltyPoints', 'taxSettings'],
 }
 
 const listFiles = (dir) =>

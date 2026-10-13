@@ -28,7 +28,8 @@ import {
   shippingMethods,
   transactions,
 } from '../schemas'
-import { products } from '../../product/schemas'
+import { productClasses, products } from '../../product/schemas'
+import { calculateTax, TaxService } from '../../tax/services/tax'
 import { Database } from '../../types'
 
 type CreateFromCartOptions = {
@@ -199,18 +200,48 @@ class OrderService {
         }
       }
 
+      const taxSettings = await new TaxService(tx).getSettings()
+      const classIds = [
+        ...new Set(
+          content.lines
+            .map((line) => line.product.productClassId)
+            .filter((id): id is number => id !== null),
+        ),
+      ]
+      const classRates = new Map(
+        classIds.length
+          ? (
+              await tx
+                .select({ id: productClasses.id, taxRate: productClasses.taxRate })
+                .from(productClasses)
+                .where(inArray(productClasses.id, classIds))
+            ).map((productClass) => [productClass.id, productClass.taxRate])
+          : [],
+      )
+
       const lineValues = content.lines.map((line) => {
         const listPrice = line.product.price
         const salePrice = line.product.discountedPrice
+        const price = listPrice ?? salePrice ?? null
+        const discount =
+          listPrice && salePrice ? new Decimal(listPrice).sub(salePrice) : new Decimal(0)
+        // Taxed on what the customer pays for the line, after its offer discounts
+        const taxable = Decimal.max(
+          new Decimal(price ?? 0).sub(discount).mul(line.quantity).sub(line.totalOfferDiscount),
+          0,
+        )
+        const taxRate =
+          (line.product.productClassId !== null
+            ? classRates.get(line.product.productClassId)
+            : null) ?? taxSettings.defaultRate
         return {
           productId: line.productId,
           productName: line.product.name,
           productSku: line.product.sku,
-          price: listPrice ?? salePrice ?? null,
-          discount:
-            listPrice && salePrice
-              ? new Decimal(listPrice).sub(salePrice).toString()
-              : '0',
+          price,
+          discount: discount.toString(),
+          tax: calculateTax(taxable, taxRate, taxSettings.pricesIncludeTax).toString(),
+          taxRate,
           quantity: line.quantity,
         }
       })
@@ -231,7 +262,18 @@ class OrderService {
           sum.add(new Decimal(line.price ?? 0).sub(line.discount).mul(line.quantity)),
         new Decimal(0),
       )
-      const total = subtotal.sub(offerDiscount).add(shippingCharge)
+      const shippingTax = taxSettings.taxShipping
+        ? calculateTax(shippingCharge, taxSettings.defaultRate, taxSettings.pricesIncludeTax)
+        : new Decimal(0)
+      const tax = lineValues.reduce(
+        (sum, line) => sum.add(line.tax),
+        shippingTax,
+      )
+      // Tax-inclusive prices already contain the tax
+      const total = subtotal
+        .sub(offerDiscount)
+        .add(shippingCharge)
+        .add(taxSettings.pricesIncludeTax ? 0 : tax)
       if (expectedTotal !== undefined && !total.eq(expectedTotal)) {
         throw new OrderTotalMismatchError(
           new Decimal(expectedTotal).toString(),
@@ -248,6 +290,7 @@ class OrderService {
           offers: appliedOffers,
           discount: offerDiscount.toString(),
           shippingCharge: shippingCharge.toString(),
+          tax: tax.toString(),
           ...(shippingMethod
             ? {
                 shippingMethod: {

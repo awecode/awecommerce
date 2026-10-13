@@ -121,7 +121,7 @@ try {
 ```
 
 - **Options:** `shippingMethodId` (its price becomes `shippingCharge`, and its details are kept in `shippingMethod`), `shippingAddress`, `guestUser` (for carts without a user), `metadata`, and `expectedTotal`. The order's user is always the cart's user.
-- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, plus shipping. Orders do not store it; `createFromCart` returns it as `total`. Tax and loyalty discounts are not included.
+- **Total:** the sum of each line's `quantity × (price − discount)`, minus offer and voucher discounts, plus shipping, plus tax when prices exclude tax (see [Tax](#tax)). Orders do not store it; `createFromCart` returns it as `total`. Loyalty discounts are not included.
 - **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
 - **Order lines:** `price` is the product's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose product has neither is stored with `price` `null` and counts as zero. `productName` and `productSku` are copied onto the line, so renaming or changing a product later does not alter past orders.
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
@@ -142,13 +142,42 @@ try {
 | `@awecommerce/service/apps/order/services/shipping-address` | `ShippingAddressService` |
 | `@awecommerce/service/apps/order/services/shipping-method` | `ShippingMethodService` |
 | `@awecommerce/service/apps/loyalty/services/loyalty` | `LoyaltyService` |
-| `@awecommerce/service/apps/<module>/schemas` | That module's tables and types, for `product`, `cart`, `offer`, `order` and `loyalty` |
+| `@awecommerce/service/apps/tax/services/tax` | `TaxService`, `calculateTax` |
+| `@awecommerce/service/apps/<module>/schemas` | That module's tables and types, for `product`, `cart`, `offer`, `order`, `loyalty` and `tax` |
 | `@awecommerce/service/core/db/pg/schema` | All tables, for your Drizzle instance and `drizzle-kit` |
 | `@awecommerce/service/core/db` | `db`, the package's database instance |
 | `@awecommerce/service/core/db/pg/db` | `closeDb`, `initializeDb`, `getClient` |
 | `@awecommerce/service/apps/types` | Shared types such as `CartContent` and `Database` |
 
 Every path works with both `import` and `require`, and includes TypeScript types.
+
+## Tax
+
+Tax is set up store-wide with `TaxService`, and per product class:
+
+```ts
+import { TaxService } from '@awecommerce/service/apps/tax/services/tax'
+import { ProductClassService } from '@awecommerce/service/apps/product/services/product'
+
+await new TaxService(db).updateSettings({
+  pricesIncludeTax: false, // prices are entered without tax; tax is added at checkout
+  defaultRate: '13', // percentage
+  taxShipping: true, // tax shipping at the default rate
+})
+
+// A class with its own rate; products without a class, or whose class has no
+// rate, use the default rate
+await new ProductClassService(db).create({ name: 'Exempt', slug: 'exempt', taxRate: '0' })
+```
+
+`createFromCart` then works out tax for each order:
+
+- **What is taxed:** each line's amount after its sale price and its offer and voucher discounts, at the product class's `taxRate` or the store's `defaultRate`. Shipping is taxed at `defaultRate` when `taxShipping` is on.
+- **`pricesIncludeTax`:** one store-wide switch. When off, tax is added to the total. When on, prices and shipping already contain tax, so the total does not change and the tax is only split out for the record.
+- **Rounding:** tax is rounded to 2 decimal places per line (and for shipping), then added up.
+- **Recorded on the order:** each order line stores its `tax` and the `taxRate` used, and the order's `tax` is the sum including shipping tax, so past orders keep their tax when rates change.
+
+Without any settings, the default rate is `0`, so no tax is charged.
 
 ## Transactions
 
