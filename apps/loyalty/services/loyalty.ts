@@ -143,6 +143,9 @@ class LoyaltyService {
   }
 
   async redeemPoints(userId: string, orderId: number, points: number) {
+    if (!(points > 0)) {
+      throw new Error('Points must be greater than zero')
+    }
     const pointsToRedeem = points
     let pointsToDeduct = pointsToRedeem
     const pointsData = await this.db.query.loyaltyPoints.findMany({
@@ -189,6 +192,25 @@ class LoyaltyService {
   }
 
   async unredeemPoints(userId: string, orderId: number, points: number) {
+    if (!(points > 0)) {
+      throw new Error('Points must be greater than zero')
+    }
+    const orderLogs = await this.db.query.loyaltyLogs.findMany({
+      where: and(
+        eq(loyaltyLogs.userId, userId),
+        eq(loyaltyLogs.orderId, orderId),
+      ),
+    })
+    const unredeemablePoints = orderLogs.reduce((acc, log) => {
+      if (log.type === 'redeemed') return acc.add(new Decimal(log.points))
+      if (log.type === 'unredeemed') return acc.sub(new Decimal(log.points))
+      return acc
+    }, new Decimal(0))
+    if (unredeemablePoints.lt(points)) {
+      throw new Error(
+        'Cannot unredeem more points than were redeemed for this order',
+      )
+    }
     const pointsToUnredeem = points
     let pointsToAddBack = pointsToUnredeem
     const pointsData = await this.db.query.loyaltyPoints.findMany({

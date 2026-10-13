@@ -52,3 +52,48 @@ test('should reject redeeming more points than available', async () => {
   expect(Number(row.redeemedPoints)).toBe(0)
   expect(await loyaltyService.getLogs(userId)).toEqual([])
 })
+
+test('should reject redeeming zero, negative or invalid points', async () => {
+  const userId = 'loyalty-user-4'
+  await db.insert(loyaltyPoints).values({ userId, orderId: 1, earnedPoints: '50' })
+  for (const points of [0, -10, NaN]) {
+    await expect(loyaltyService.redeemPoints(userId, 2, points)).rejects.toThrow(
+      'Points must be greater than zero',
+    )
+  }
+  expect(await loyaltyService.getLogs(userId)).toEqual([])
+})
+
+test('should reject unredeeming zero, negative or invalid points', async () => {
+  const userId = 'loyalty-user-5'
+  await db.insert(loyaltyPoints).values({ userId, orderId: 1, earnedPoints: '50' })
+  await loyaltyService.redeemPoints(userId, 2, 20)
+  for (const points of [0, -10, NaN]) {
+    await expect(loyaltyService.unredeemPoints(userId, 2, points)).rejects.toThrow(
+      'Points must be greater than zero',
+    )
+  }
+  expect((await loyaltyService.getLogs(userId)).map((l) => l.type)).toEqual(['redeemed'])
+})
+
+test('should not unredeem more than was redeemed for the order', async () => {
+  const userId = 'loyalty-user-6'
+  await db.insert(loyaltyPoints).values({ userId, orderId: 1, earnedPoints: '100' })
+  await loyaltyService.redeemPoints(userId, 2, 30)
+  await loyaltyService.redeemPoints(userId, 3, 20)
+
+  await expect(loyaltyService.unredeemPoints(userId, 2, 40)).rejects.toThrow(
+    'Cannot unredeem more points than were redeemed for this order',
+  )
+  await loyaltyService.unredeemPoints(userId, 2, 30)
+  // Retrying the same refund must not give points back twice
+  await expect(loyaltyService.unredeemPoints(userId, 2, 30)).rejects.toThrow(
+    'Cannot unredeem more points than were redeemed for this order',
+  )
+
+  const [row] = await db
+    .select()
+    .from(loyaltyPoints)
+    .where(eq(loyaltyPoints.userId, userId))
+  expect(Number(row.redeemedPoints)).toBe(20)
+})
