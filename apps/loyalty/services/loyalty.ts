@@ -208,7 +208,7 @@ class LoyaltyService {
       userId,
       orderId,
       points: pointsToUnredeem.toString(),
-      type: 'earned',
+      type: 'unredeemed',
     })  
     return pointsToUnredeem
   }
