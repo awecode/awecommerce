@@ -85,6 +85,24 @@ await cartService.addToCart(cart.id, product.id, 2)
 const order = await new OrderService(db).createFromCart(cart.id)
 ```
 
+### Cart summary
+
+`CartService.getCartSummary(sessionId, { shippingMethodId? })` returns the cart content with offers and vouchers applied, each line's `tax` and `taxRate`, and the cart's `subtotal`, `totalOfferDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
+
+```ts
+const summary = await new CartService(db).getCartSummary(cart.sessionId, {
+  shippingMethodId: 1,
+})
+// show summary.lines, summary.tax, summary.total, ...
+
+const order = await new OrderService(db).createFromCart(cart.id, {
+  shippingMethodId: 1,
+  expectedTotal: summary.total,
+})
+```
+
+It does not place an order or use up offers. Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied.
+
 ### Placing an order
 
 `OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only products and quantities, so an order always uses current prices.

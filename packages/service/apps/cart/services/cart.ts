@@ -9,6 +9,7 @@ import {
 import { OfferService } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
 import { CartContent, CartContentWithoutOfferInfo, Database } from '../../types'
+import { priceCart } from './pricing'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -94,6 +95,30 @@ class CartService {
       .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
       .orderBy(desc(carts.createdAt))
     return result[0]
+  }
+
+  // Cart content with offers applied, tax per line and the totals the customer
+  // will be charged at checkout. Pass the shipping method they picked to
+  // include shipping and its tax.
+  async getCartSummary(
+    sessionId: string,
+    options: { shippingMethodId?: number } = {},
+  ) {
+    const content = await this.getCartContentForSession(sessionId, true)
+    const pricing = await priceCart(this.db, content, options.shippingMethodId)
+    return {
+      ...content,
+      lines: content.lines.map((line, index) => ({
+        ...line,
+        tax: pricing.lines[index].tax,
+        taxRate: pricing.lines[index].taxRate,
+      })),
+      subtotal: pricing.subtotal,
+      shippingCharge: pricing.shippingCharge,
+      tax: pricing.tax,
+      total: pricing.total,
+      pricesIncludeTax: pricing.pricesIncludeTax,
+    }
   }
 
   async getCartContentForSession(

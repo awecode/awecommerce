@@ -14,6 +14,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { cartAppliedVoucherOffers, carts } from '../../cart/schemas'
 import { CartService } from '../../cart/services/cart'
+import { priceCart } from '../../cart/services/pricing'
 import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
 import {
@@ -25,11 +26,9 @@ import {
   orders,
   orderStatusChanges,
   paymentEvents,
-  shippingMethods,
   transactions,
 } from '../schemas'
-import { productClasses, products } from '../../product/schemas'
-import { calculateTax, TaxService } from '../../tax/services/tax'
+import { products } from '../../product/schemas'
 import { Database } from '../../types'
 
 type CreateFromCartOptions = {
@@ -189,62 +188,8 @@ class OrderService {
         )
       }
 
-      let shippingMethod: typeof shippingMethods.$inferSelect | undefined
-      if (shippingMethodId !== undefined) {
-        ;[shippingMethod] = await tx
-          .select()
-          .from(shippingMethods)
-          .where(eq(shippingMethods.id, shippingMethodId))
-        if (!shippingMethod) {
-          throw new Error(`Shipping method not found: ${shippingMethodId}`)
-        }
-      }
-
-      const taxSettings = await new TaxService(tx).getSettings()
-      const classIds = [
-        ...new Set(
-          content.lines
-            .map((line) => line.product.productClassId)
-            .filter((id): id is number => id !== null),
-        ),
-      ]
-      const classRates = new Map(
-        classIds.length
-          ? (
-              await tx
-                .select({ id: productClasses.id, taxRate: productClasses.taxRate })
-                .from(productClasses)
-                .where(inArray(productClasses.id, classIds))
-            ).map((productClass) => [productClass.id, productClass.taxRate])
-          : [],
-      )
-
-      const lineValues = content.lines.map((line) => {
-        const listPrice = line.product.price
-        const salePrice = line.product.discountedPrice
-        const price = listPrice ?? salePrice ?? null
-        const discount =
-          listPrice && salePrice ? new Decimal(listPrice).sub(salePrice) : new Decimal(0)
-        // Taxed on what the customer pays for the line, after its offer discounts
-        const taxable = Decimal.max(
-          new Decimal(price ?? 0).sub(discount).mul(line.quantity).sub(line.totalOfferDiscount),
-          0,
-        )
-        const taxRate =
-          (line.product.productClassId !== null
-            ? classRates.get(line.product.productClassId)
-            : null) ?? taxSettings.defaultRate
-        return {
-          productId: line.productId,
-          productName: line.product.name,
-          productSku: line.product.sku,
-          price,
-          discount: discount.toString(),
-          tax: calculateTax(taxable, taxRate, taxSettings.pricesIncludeTax).toString(),
-          taxRate,
-          quantity: line.quantity,
-        }
-      })
+      const pricing = await priceCart(tx, content, shippingMethodId)
+      const { shippingMethod } = pricing
       const appliedOffers = [
         ...content.userOfferDiscounts,
         ...content.voucherOfferDiscounts,
@@ -254,30 +199,10 @@ class OrderService {
         appliedOffers.map((offer) => offer.id),
         cart.userId,
       )
-      const offerDiscount = new Decimal(content.totalOfferDiscount)
-      const shippingCharge = new Decimal(shippingMethod?.price ?? 0)
-      // A line without any price counts as zero
-      const subtotal = lineValues.reduce(
-        (sum, line) =>
-          sum.add(new Decimal(line.price ?? 0).sub(line.discount).mul(line.quantity)),
-        new Decimal(0),
-      )
-      const shippingTax = taxSettings.taxShipping
-        ? calculateTax(shippingCharge, taxSettings.defaultRate, taxSettings.pricesIncludeTax)
-        : new Decimal(0)
-      const tax = lineValues.reduce(
-        (sum, line) => sum.add(line.tax),
-        shippingTax,
-      )
-      // Tax-inclusive prices already contain the tax
-      const total = subtotal
-        .sub(offerDiscount)
-        .add(shippingCharge)
-        .add(taxSettings.pricesIncludeTax ? 0 : tax)
-      if (expectedTotal !== undefined && !total.eq(expectedTotal)) {
+      if (expectedTotal !== undefined && !new Decimal(pricing.total).eq(expectedTotal)) {
         throw new OrderTotalMismatchError(
           new Decimal(expectedTotal).toString(),
-          total.toString(),
+          pricing.total,
         )
       }
 
@@ -288,9 +213,9 @@ class OrderService {
           userId: cart.userId,
           cartId: cart.id,
           offers: appliedOffers,
-          discount: offerDiscount.toString(),
-          shippingCharge: shippingCharge.toString(),
-          tax: tax.toString(),
+          discount: pricing.offerDiscount,
+          shippingCharge: pricing.shippingCharge,
+          tax: pricing.tax,
           ...(shippingMethod
             ? {
                 shippingMethod: {
@@ -314,7 +239,9 @@ class OrderService {
       )
       await tx
         .insert(orderLines)
-        .values(lineValues.map((line) => ({ ...line, orderId: order.id })))
+        .values(
+          pricing.lines.map(({ cartLineId, ...line }) => ({ ...line, orderId: order.id })),
+        )
       const lines = await tx.query.orderLines.findMany({
         where: eq(orderLines.orderId, order.id),
         with: {
@@ -330,7 +257,7 @@ class OrderService {
       return {
         ...order,
         lines,
-        total: total.toString(),
+        total: pricing.total,
         hash: this.generateHash(order.id.toString()),
       }
     })
