@@ -83,21 +83,13 @@ const cart = await cartService.create('user-1')
 await cartService.addToCart(cart.id, product.id, 2)
 const content = await cartService.getCartContentForSession(cart.sessionId)
 
-// OrderService.create expects a price on every line. Cart lines type it as
-// nullable, so map them for TypeScript (plain JavaScript can pass content.lines)
-const lines = content.lines.map((line) => ({
-  ...line,
-  product: {
-    price: line.product.price!,
-    discountedPrice: line.product.discountedPrice ?? undefined,
-  },
-}))
-
 const order = await new OrderService(db).create(
   { userId: 'user-1', cartId: cart.id },
-  lines,
+  content.lines,
 )
 ```
+
+`OrderService.create` throws `Cannot create an order: product <id> has no price` if a line's product has no price (for example, the price was removed after it was added to the cart), and `Cannot create an order without lines` for an empty list. Nothing is written in either case.
 
 ### Services and import paths
 
@@ -130,7 +122,7 @@ import { LoyaltyService } from 'awecommerce/apps/loyalty/services/loyalty'
 const order = await db.transaction(async (tx) => {
   const created = await new OrderService(tx).create(
     { userId: 'user-1', cartId: cart.id },
-    lines,
+    content.lines,
   )
   await new LoyaltyService(tx).redeemPoints('user-1', created.id, 30)
   return created

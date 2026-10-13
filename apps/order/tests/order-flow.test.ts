@@ -287,3 +287,39 @@ test('should roll back a payment event when updating the payment status fails', 
   const [orderAfter] = await db.select().from(orders).where(eq(orders.id, order.id))
   expect(orderAfter.paymentStatus).toBe('Pending')
 })
+
+test('should create an order directly from cart content lines', async () => {
+  const userId = 'flow-cart-lines-user'
+  const cartService = new CartService(db)
+  const cart = await cartService.create(userId)
+  const product = await createProduct('40')
+  await cartService.addToCart(cart.id, product.id, 2)
+  const content = await cartService.getCartContentForSession(cart.sessionId)
+
+  const order = await orderService.create({ userId, cartId: cart.id }, content.lines)
+
+  expect(order.lines).toHaveLength(1)
+  expect(Number(order.lines[0].price)).toBe(40)
+  expect(Number(order.lines[0].discount)).toBe(0)
+})
+
+test('should reject a line whose product has no price', async () => {
+  const userId = 'flow-no-price-user'
+  const cartService = new CartService(db)
+  const cart = await cartService.create(userId)
+  const priced = await createProduct('10')
+  const unpriced = await createProduct('20')
+  await cartService.addToCart(cart.id, priced.id, 1)
+  await cartService.addToCart(cart.id, unpriced.id, 1)
+  // The price is removed after the product was added to the cart
+  await productService.update(unpriced.id, { price: null })
+  const content = await cartService.getCartContentForSession(cart.sessionId)
+
+  await expect(
+    orderService.create({ userId, cartId: cart.id }, content.lines),
+  ).rejects.toThrow(`Cannot create an order: product ${unpriced.id} has no price`)
+
+  expect(await db.select().from(orders).where(eq(orders.userId, userId))).toEqual([])
+  const [cartAfter] = await db.select().from(carts).where(eq(carts.id, cart.id))
+  expect(cartAfter.status).toBe('Open')
+})
