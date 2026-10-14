@@ -153,6 +153,7 @@ await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
 })
 ```
 
+- **Fields:** each needs a non-empty `label` (trimmed, and unique within the product), `required` as `true` or `false`, and `maxLength` as a positive whole number. `ProductService.create` and `update` throw otherwise, for example `Duplicate custom field label: <label>`.
 - **Answers:** `addToCart(cartId, variantId, quantity, answers?)` stores them on the line as `customizations`, a map of label to text. They are trimmed, and empty optional answers are dropped. A product with no `customFields` (the default `[]`) takes no answers.
 - **Validation:** it throws `Missing required field: <label>`, `Field is too long: <label> (max <n> characters)`, `Unknown field: <label>` for a label the product does not declare, and `Field must be text: <label>`. Nothing is added in these cases.
 - **Lines:** the same variant with the same answers adds to that line's quantity; different answers make a separate line. So two jerseys with different names are two lines. Merging a guest cart into the user's cart follows the same rule.

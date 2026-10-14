@@ -215,3 +215,48 @@ test('should fail checkout when the answers no longer fit the product fields', a
     expect(cartAfter.status).toBe('Open')
   }
 })
+
+test('should reject invalid custom fields when creating or updating a product', async () => {
+  const invalid: Array<[unknown[], string]> = [
+    [[{ label: '  ', required: true, maxLength: 5 }], 'Custom field label is required'],
+    [
+      [
+        { label: 'Name', required: true, maxLength: 5 },
+        { label: 'Name', required: false, maxLength: 3 },
+      ],
+      'Duplicate custom field label: Name',
+    ],
+    [
+      [{ label: 'Name', required: true, maxLength: 0 }],
+      'Custom field maxLength must be a positive whole number: Name',
+    ],
+    [
+      [{ label: 'Name', required: true, maxLength: 2.5 }],
+      'Custom field maxLength must be a positive whole number: Name',
+    ],
+    [
+      [{ label: 'Name', required: 'yes', maxLength: 5 }],
+      'Custom field required must be true or false: Name',
+    ],
+  ]
+  for (const [customFields, message] of invalid) {
+    const slug = `invalid-fields-${++count}`
+    await expect(
+      productService.create({ name: 'X', slug, sku: slug, price: '1', customFields: customFields as any }),
+    ).rejects.toThrow(message)
+    expect(await productService.getBySlug(slug)).toBeUndefined()
+  }
+
+  const jersey = await createJersey()
+  await expect(
+    productService.update(jersey.id, {
+      customFields: [{ label: 'Name', required: true, maxLength: -1 }],
+    }),
+  ).rejects.toThrow('Custom field maxLength must be a positive whole number: Name')
+  expect((await productService.get(jersey.id))!.customFields).toEqual(jerseyFields)
+})
+
+test('should trim custom field labels', async () => {
+  const product = await createJersey([{ label: '  Print name ', required: true, maxLength: 12 }])
+  expect(product.customFields).toEqual([{ label: 'Print name', required: true, maxLength: 12 }])
+})

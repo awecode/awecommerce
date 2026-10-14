@@ -18,6 +18,7 @@ import {
 import {
   brands,
   categories,
+  CustomField,
   NewBrand,
   NewCategory,
   NewProduct,
@@ -39,6 +40,29 @@ import {
 import { orderLines } from '../../order/schemas'
 import { aliasedTable } from 'drizzle-orm'
 import { Database } from '../../types'
+
+// Checks the custom fields a product asks the buyer for, and trims the labels
+// (answers are stored by label)
+const validateCustomFields = (fields: CustomField[]) => {
+  const labels = new Set<string>()
+  return fields.map((field) => {
+    const label = typeof field.label === 'string' ? field.label.trim() : ''
+    if (!label) {
+      throw new Error('Custom field label is required')
+    }
+    if (labels.has(label)) {
+      throw new Error(`Duplicate custom field label: ${label}`)
+    }
+    labels.add(label)
+    if (typeof field.required !== 'boolean') {
+      throw new Error(`Custom field required must be true or false: ${label}`)
+    }
+    if (!Number.isInteger(field.maxLength) || field.maxLength < 1) {
+      throw new Error(`Custom field maxLength must be a positive whole number: ${label}`)
+    }
+    return { label, required: field.required, maxLength: field.maxLength }
+  })
+}
 
 type PaginationArgs = {
   page: number
@@ -118,6 +142,9 @@ class ProductService {
         stockQuantity,
         ...productData
       } = product
+      if (productData.customFields) {
+        productData.customFields = validateCustomFields(productData.customFields)
+      }
       const result = await tx
         .insert(products)
         .values(productData)
@@ -218,6 +245,9 @@ class ProductService {
   async update(productId: number, product: UpdateProduct) {
     return await this.db.transaction(async (tx) => {
       const { images, relatedProducts, ...productData } = product
+      if (productData.customFields) {
+        productData.customFields = validateCustomFields(productData.customFields)
+      }
       const result = await tx
         .update(products)
         .set({
