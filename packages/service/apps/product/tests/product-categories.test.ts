@@ -110,3 +110,20 @@ test('excludeInactiveBranches leaves out categories under an inactive one', asyn
   expect(branches).not.toContain(tree.shirts.id)
   expect(branches).not.toContain(tree.formal.id)
 })
+
+test('a category cannot be its own parent or sit under its own subcategory', async () => {
+  const parent = await createCategory('loop-parent')
+  const child = await createCategory('loop-child', parent.id)
+  const grandchild = await createCategory('loop-grandchild', child.id)
+
+  await expect(categoryService.update(parent.id, { parentId: parent.id })).rejects.toThrow(
+    'A category cannot be its own parent',
+  )
+  await expect(categoryService.update(parent.id, { parentId: grandchild.id })).rejects.toThrow(
+    'A category cannot be under its own subcategory',
+  )
+  // Moving to an unrelated place still works
+  const other = await createCategory('loop-other')
+  expect((await categoryService.update(child.id, { parentId: other.id })).parentId).toBe(other.id)
+  expect((await categoryService.update(child.id, { parentId: null })).parentId).toBeNull()
+})

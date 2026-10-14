@@ -4,13 +4,33 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 const open = ref(false)
 const { data: store } = useStoreSettings()
 
-const links: NavigationMenuItem[] = [
-  { label: 'Products', icon: 'i-lucide-package', to: '/products', onSelect: () => (open.value = false) },
+const close = () => (open.value = false)
+const links: NavigationMenuItem[][] = [
+  [{ label: 'Products', icon: 'i-lucide-package', to: '/products', onSelect: close }],
+  [
+    { label: 'Catalog', type: 'label' },
+    { label: 'Categories', icon: 'i-lucide-folder-tree', to: '/catalog/categories', onSelect: close },
+    { label: 'Brands', icon: 'i-lucide-tag', to: '/catalog/brands', onSelect: close },
+    { label: 'Product classes', icon: 'i-lucide-shapes', to: '/catalog/product-classes', onSelect: close },
+  ],
 ]
 
-// The ⌘K palette: go to any screen
+// The ⌘K palette: go to any screen, or start a new record
 const groups = computed(() => [
-  { id: 'go-to', label: 'Go to', items: links.map(({ label, icon, to }) => ({ label, icon, to })) },
+  {
+    id: 'go-to',
+    label: 'Go to',
+    items: links.flat().filter((link) => link.to).map(({ label, icon, to }) => ({ label, icon, to })),
+  },
+  {
+    id: 'create',
+    label: 'Create',
+    items: [
+      { label: 'New category', icon: 'i-lucide-plus', to: '/catalog/categories?new=1' },
+      { label: 'New brand', icon: 'i-lucide-plus', to: '/catalog/brands?new=1' },
+      { label: 'New product class', icon: 'i-lucide-plus', to: '/catalog/product-classes?new=1' },
+    ],
+  },
 ])
 </script>
 

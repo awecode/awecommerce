@@ -1034,6 +1034,25 @@ class CategoryService {
   }
 
   async update(categoryId: number, category: Partial<NewCategory>) {
+    if (category.parentId === categoryId) {
+      throw new ValidationError('A category cannot be its own parent')
+    }
+    // The new parent must not be one of this category's subcategories, at any
+    // depth, or the tree would loop
+    if (category.parentId) {
+      const [loop] = await this.db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.id, category.parentId),
+            sql`${categories.id} IN ${categoryTreeIds([categoryId])}`,
+          ),
+        )
+      if (loop) {
+        throw new ValidationError('A category cannot be under its own subcategory')
+      }
+    }
     const result = await this.db
       .update(categories)
       .set({
