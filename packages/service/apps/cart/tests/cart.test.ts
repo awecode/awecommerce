@@ -25,6 +25,7 @@ const variantService = new ProductVariantService(db)
 
 const createProduct = async () => {
   return await productService.create({
+    status: 'Published',
     name: faker.commerce.productName(),
     slug: faker.string.uuid(),
     sku: faker.string.uuid(),
@@ -314,6 +315,21 @@ test('should reject adding an inactive variant', async () => {
   await expect(
     cartService.addToCart(cart.id, product.variants[0].id, 1),
   ).rejects.toThrow(`Product variant is not available: ${product.variants[0].id}`)
+})
+
+test('should reject adding a variant of an unpublished or inactive product', async () => {
+  const cart = await cartService.create()
+  const draft = await createProduct()
+  await productService.update(draft.id, { status: 'Draft' })
+  const inactive = await createProduct()
+  await productService.markAsInactive(inactive.id)
+
+  await expect(cartService.addToCart(cart.id, draft.variants[0].id, 1)).rejects.toThrow(
+    `Product variant is not available: ${draft.variants[0].id}`,
+  )
+  await expect(cartService.addToCart(cart.id, inactive.variants[0].id, 1)).rejects.toThrow(
+    `Product variant is not available: ${inactive.variants[0].id}`,
+  )
 })
 
 test('should reject adding a variant that does not exist', async () => {

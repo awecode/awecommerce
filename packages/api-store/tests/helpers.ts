@@ -36,7 +36,14 @@ export const createProduct = async (
   customFields: schema.CustomField[] = [],
 ) => {
   const slug = unique('store-api')
-  const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price, customFields })
+  const product = await new ProductService(db).create({
+    name: slug,
+    slug,
+    sku: slug,
+    price,
+    customFields,
+    status: 'Published',
+  })
   return product.variants[0]!.id
 }
 

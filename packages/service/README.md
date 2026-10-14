@@ -126,7 +126,7 @@ const product = await new ProductService(db).get(shirt.id)
 
 - **Options:** each product has its own options (such as Color) and values (such as Red). Passing `options` to `create` or `update` creates any missing ones and replaces the variant's options. Two variants of a product cannot have the same options, so a product with several variants needs options that tell them apart; this throws `A variant with these options already exists`. `ProductOptionService` lists, renames and deletes options and values; deleting one also removes it from every variant.
 - **Image:** `imageId` must be one of the product's own images (`Image does not belong to the product: <id>`). `setImages` returns the new images and keeps a variant's image when its URL is still in the list. Without an image, the product's `thumbnail` is used.
-- **Active:** `markAsInactive(variantId)` stops a variant from being sold: `addToCart` throws `Product variant is not available: <id>`, and `createFromCart` throws `Product variant is not available: <sku>` if it became inactive while in a cart.
+- **For sale:** a variant can be bought only while it is active, and its product is active and `Published` (products are `Draft` until then). Otherwise `addToCart` throws `Product variant is not available: <id>`, and `createFromCart` throws `Product variant is not available: <sku>` if that changed while it was in a cart. `markAsInactive(variantId)` stops one variant; unpublishing or deactivating the product stops all of them.
 - **Stock:** `stockQuantity` is stored on the variant but not checked when adding to the cart or ordering.
 - **Listing:** `ProductService.list` returns each product's `minPrice`, the lowest selling price (`discountedPrice`, else `price`) among its active variants. `minPrice`, `maxPrice` and `sortBy` use that price.
 - **Offers:** offers still target products, brands, categories and classes. All variants of a product count towards its quantity conditions, and each cart line gets its own discount from its variant's price.
@@ -206,7 +206,7 @@ It does not place an order, use up offers, or redeem points (`redeemPoints` only
 
 ### Placing an order
 
-`OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only variants and quantities, so an order always uses current prices. It throws `Product variant is not available: <sku>` when a variant in the cart is inactive.
+`OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only variants and quantities, so an order always uses current prices. It throws `Product variant is not available: <sku>` when a variant in the cart is no longer for sale (see Product variants).
 
 ```ts
 import {

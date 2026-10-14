@@ -23,6 +23,7 @@ let count = 0
 const createJersey = async (customFields = jerseyFields) => {
   const slug = `jersey-${++count}`
   return await productService.create({
+    status: 'Published',
     name: 'Jersey',
     slug,
     sku: slug,
@@ -43,6 +44,7 @@ test('should let a product declare custom fields', async () => {
   expect(jersey.customFields).toEqual(jerseyFields)
 
   const plain = await productService.create({
+    status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
     sku: `mug-${count}`,
@@ -108,6 +110,7 @@ test('should keep different answers on separate lines and add up matching ones',
 
 test('should add up the quantity of a product without fields', async () => {
   const mug = await productService.create({
+    status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
     sku: `mug-${count}`,
@@ -264,6 +267,7 @@ test('should trim custom field labels', async () => {
 test('should flag lines whose answers no longer fit in the cart summary', async () => {
   const jersey = await createJersey()
   const mug = await productService.create({
+    status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
     sku: `mug-${count}`,
@@ -291,6 +295,7 @@ test('should flag lines whose answers no longer fit in the cart summary', async 
 test('should add up simultaneous adds of the same item on one line', async () => {
   const jersey = await createJersey()
   const mug = await productService.create({
+    status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
     sku: `mug-${count}`,

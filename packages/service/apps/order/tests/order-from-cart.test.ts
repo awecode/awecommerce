@@ -37,6 +37,7 @@ const createProduct = async (price: string | undefined, discountedPrice?: string
   productCount++
   const slug = `from-cart-product-${productCount}`
   return await productService.create({
+    status: 'Published',
     name: `From Cart Product ${productCount}`,
     slug,
     sku: `SKU-${productCount}`,
@@ -267,6 +268,25 @@ test('should price each variant of a product on its own line', async () => {
   ])
   // 1 x 100 + 2 x 120
   expect(Number(order.total)).toBe(340)
+})
+
+test('should reject a cart whose product was unpublished or deactivated', async () => {
+  for (const hide of [
+    (id: number) => productService.update(id, { status: 'Draft' }),
+    (id: number) => productService.markAsInactive(id),
+  ]) {
+    const product = await createProduct('10')
+    const cart = await createCart('from-cart-hidden-user', [
+      { variantId: product.variants[0].id, quantity: 1 },
+    ])
+    await hide(product.id)
+
+    await expect(orderService.createFromCart(cart.id)).rejects.toThrow(
+      `Product variant is not available: ${product.variants[0].sku}`,
+    )
+    expect(await ordersForCart(cart.id)).toEqual([])
+    expect(await cartStatus(cart.id)).toBe('Open')
+  }
 })
 
 test('should reject a cart with a variant that became inactive and write nothing', async () => {

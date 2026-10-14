@@ -32,6 +32,7 @@ const createProduct = async (price: string, discountedPrice?: string) => {
   productCount++
   const slug = `offer-discount-product-${productCount}`
   return await productService.create({
+    status: 'Published',
     name: slug,
     slug,
     sku: slug,

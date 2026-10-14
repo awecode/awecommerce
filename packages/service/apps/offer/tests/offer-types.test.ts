@@ -29,7 +29,7 @@ beforeAll(() => {
 
 const createProduct = async (price: string) => {
   const slug = unique('offer-types-product')
-  return await productService.create({ name: slug, slug, sku: slug, price })
+  return await productService.create({ name: slug, slug, sku: slug, price, status: 'Published' })
 }
 
 // Every offer here covers only the given products, so it cannot reach the

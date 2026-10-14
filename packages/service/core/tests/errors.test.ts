@@ -60,6 +60,7 @@ test('missing records throw NotFoundError', async () => {
 
 test('input the services cannot accept throws ValidationError', async () => {
   const product = await new ProductService(db).create({
+    status: 'Published',
     name: 'errors-product',
     slug: 'errors-product',
     sku: 'errors-product',
@@ -89,6 +90,7 @@ test('input the services cannot accept throws ValidationError', async () => {
   )
   await rejectsWith(
     new ProductService(db).create({
+      status: 'Published',
       name: 'errors-dupe',
       slug: 'errors-dupe',
       sku: 'errors-dupe',

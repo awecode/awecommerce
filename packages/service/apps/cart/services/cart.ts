@@ -102,6 +102,13 @@ const withLineVariant = <
   line: L,
 ) => ({ ...line, variant: withVariantOptions(line.variant) })
 
+// Whether buyers can buy the variant: it, and its product, are active, and the
+// product is published
+const isForSale = (
+  variant: { isActive: boolean },
+  product: { isActive: boolean | null; status: string | null },
+) => variant.isActive && product.isActive === true && product.status === 'Published'
+
 class CartService {
   private db: Database
 
@@ -127,7 +134,7 @@ class CartService {
       throw new ValidationError('Quantity must be at least 1')
     }
     const [row] = await this.db
-      .select({ variant: productVariants, customFields: products.customFields })
+      .select({ variant: productVariants, product: products })
       .from(productVariants)
       .innerJoin(products, eq(products.id, productVariants.productId))
       .where(eq(productVariants.id, variantId))
@@ -135,13 +142,13 @@ class CartService {
     if (!variant) {
       throw new NotFoundError(`Product variant not found: ${variantId}`)
     }
-    if (!variant.isActive) {
+    if (!isForSale(variant, row.product)) {
       throw new ValidationError(`Product variant is not available: ${variantId}`)
     }
     if (!variant.discountedPrice && !variant.price) {
       throw new ValidationError('Product price not found')
     }
-    const customizations = validateCustomizations(row.customFields, answers)
+    const customizations = validateCustomizations(row.product.customFields, answers)
 
     // One statement, so simultaneous adds of the same item cannot make two lines
     const result = await this.db
@@ -597,4 +604,4 @@ class CartService {
   }
 }
 
-export { CartService, customizationsError }
+export { CartService, customizationsError, isForSale }

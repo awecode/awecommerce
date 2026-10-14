@@ -31,7 +31,7 @@ const unique = (name: string) => `${name}-${++count}`
 
 const createProduct = async (price: string, productClassId?: number) => {
   const slug = unique('loyalty-product')
-  return await productService.create({ name: slug, slug, sku: slug, price, productClassId })
+  return await productService.create({ name: slug, slug, sku: slug, price, status: 'Published', productClassId })
 }
 
 // A user with a points balance and a cart

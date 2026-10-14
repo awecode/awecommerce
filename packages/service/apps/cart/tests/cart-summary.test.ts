@@ -29,7 +29,7 @@ const createProduct = async (
   options: { discountedPrice?: string; productClassId?: number } = {},
 ) => {
   const slug = unique('summary-product')
-  return await productService.create({ name: slug, slug, sku: slug, price, ...options })
+  return await productService.create({ name: slug, slug, sku: slug, price, status: 'Published', ...options })
 }
 
 const createCart = async (items: Array<{ variantId: number; quantity: number }>) => {

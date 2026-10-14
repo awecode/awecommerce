@@ -29,6 +29,7 @@ describe.skipIf(!url)('cart under real concurrency', () => {
   test('concurrent adds of the same item end up on one line', async () => {
     const slug = `concurrent-add-${Date.now()}`
     const product = await new ProductService(db).create({
+      status: 'Published',
       name: slug,
       slug,
       sku: slug,
