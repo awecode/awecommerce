@@ -61,29 +61,44 @@ The query schema is `productListQuery` in `packages/api-store/shared/utils/catal
 
 ### Cart
 
-The cart is found by the `awe_cart` cookie (httpOnly), which holds the cart's `sessionId`. It is set on the first add; a checked-out cart counts as no cart, so the next add starts a new one. Every change returns the cart summary (`CartService.getCartSummary`).
+The cart is found by the `awe_cart` cookie (httpOnly), which holds the cart's `sessionId`. It is set on the first add; a checked-out cart counts as no cart, so the next add starts a new one.
+
+Signed in, the buyer gets their own open cart on every device. A guest cart still in the cookie is merged into it the first time they are seen signed in (same items add up), and the cookie is pointed at the account cart. After signing out, the cookie no longer shows that cart: a cart that belongs to a user is only shown to that user. Every change returns the cart summary (`CartService.getCartSummary`).
 
 | Route | Body | Does |
 |---|---|---|
-| `GET /api/store/cart?shippingMethodId=` | | The cart summary, with that method's charge and tax when given, or 204 with no body before the first add |
+| `GET /api/store/cart?shippingMethodId=&redeemPoints=` | | The cart summary, with that method's charge and tax, and the value of those loyalty points (signed in), when given, or 204 with no body before the first add |
 | `POST /api/store/cart/lines` | `{ variantId, quantity, customizations? }` | Adds a variant, creating the cart |
 | `PATCH /api/store/cart/lines/:id` | `{ quantity?, customizations? }` | Changes the line; both or neither are saved |
 | `DELETE /api/store/cart/lines/:id` | | Removes the line |
 | `POST /api/store/cart/vouchers` | `{ code }` | Applies a voucher |
 | `DELETE /api/store/cart/vouchers/:code` | | Removes a voucher |
 
-Checkout is for guests until sign-in exists:
+### Checkout
 
 | Route | Body | Does |
 |---|---|---|
 | `GET /api/store/shipping-methods` | | The shipping methods |
-| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress, guestUser }` | Places the order and clears the cart cookie. Returns the order with its `hash`. |
+| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress or shippingAddressId, guestUser?, redeemPoints? }` | Places the order and clears the cart cookie. Returns the order with its `hash`. |
 | `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page. A wrong hash gives 404. |
 
 - `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.
 - The other 409s: `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
-- `shippingAddress` needs `line1`, `city` and `country`; `line2`, `houseNo`, `province`, `postalCode`, `countryCode` and `instructions` are optional. `guestUser` needs `name` and `email`; `phone` is optional. Other fields are dropped.
+- `shippingAddress` needs `line1`, `city` and `country`; `line2`, `houseNo`, `province`, `postalCode`, `countryCode` and `instructions` are optional. Signed-in buyers can pass `shippingAddressId` (one of their saved addresses) instead; its fields are copied onto the order. Pass one of the two.
+- Guests must pass `guestUser` (`name` and `email`; `phone` is optional). Signed in, the order belongs to the user and `guestUser` is ignored.
+- `redeemPoints` (signed in) redeems loyalty points; preview them with the same value in `GET /api/store/cart?redeemPoints=`. Guests get 422.
+- Other fields are dropped.
 - The storefront needs `ORDER_HASH_SECRET` (see its `.env.example`) to sign order links.
+
+### Account (signed in; 401 otherwise)
+
+| Route | Body | Does |
+|---|---|---|
+| `GET /api/store/addresses` | | Saved addresses, newest first |
+| `POST /api/store/addresses` | address fields, `isDefault?` | Saves one; a default replaces the previous default |
+| `PATCH /api/store/addresses/:id` | any address fields, `isDefault?` | Changes one (404 if it is not the buyer's) |
+| `DELETE /api/store/addresses/:id` | | Deletes one (404 if it is not the buyer's) |
+| `GET /api/store/loyalty` | | `{ canRedeem, redeemRate, points, value }`: the points that can be redeemed now and their worth |
 
 The body schemas are in `packages/api-store/shared/utils/cart.ts` and `checkout.ts`, and are auto-imported in the apps too, for forms. A body of the wrong shape gives 400.
 

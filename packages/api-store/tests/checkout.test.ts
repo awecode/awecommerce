@@ -43,9 +43,8 @@ describe.skipIf(!url)('store checkout API', async () => {
         expectedTotal: summary.body.total,
         shippingAddress,
         guestUser,
-        // Unknown fields are dropped, so a buyer cannot set these
+        // Unknown fields are dropped, so a buyer cannot set this
         metadata: { injected: true },
-        redeemPoints: 10,
       },
     })
     expect(placed.status).toBe(200)

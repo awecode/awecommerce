@@ -1,5 +1,5 @@
 import { NotFoundError, ValidationError } from '../../../core/errors'
-import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import {
   listedProduct,
   optionValuesWithOption,
@@ -408,58 +408,42 @@ class CartService {
   ): Promise<CartContentWithoutOfferInfo> {
     return await this.db.transaction(async (tx) => {
       const cartService = new CartService(tx)
-      // const userCart = await this.db
-      //   .select({
-      //     cart: carts,
-      //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
-      //   })
-      //   .from(carts)
-      //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-      //   .where(and(eq(carts.userId, userId), eq(carts.status, 'Open')))
-      //   .groupBy(carts.id)
-      //   .orderBy(desc(carts.updatedAt));
+      // Only open carts: a checked-out or merged cart must not change
       const userCart = await tx.query.carts.findFirst({
         with: {
           lines: {
             with: lineVariant,
           },
         },
-        where: eq(carts.userId, userId),
-        orderBy: desc(carts.updatedAt),
+        where: and(eq(carts.userId, userId), eq(carts.status, 'Open')),
+        orderBy: [desc(carts.updatedAt), desc(carts.id)],
       })
-      if (!userCart) {
-        const result = await tx
-          .update(carts)
-          .set({ userId })
-          .where(eq(carts.sessionId, sessionId))
-          .returning()
-        if (!result.length) {
-          return {
-            ...(await cartService.create(userId)),
-            lines: [],
-          }
-        }
-        return await cartService.getCartContentForSession(result[0].sessionId) as CartContentWithoutOfferInfo
-      }
-      // const sessionCart = await this.db
-      //   .select({
-      //     cart: carts,
-      //     lines: sql<CartLine[]>`json_agg(${cartLines})`,
-      //   })
-      //   .from(carts)
-      //   .leftJoin(cartLines, eq(carts.id, cartLines.cartId))
-      //   .where(and(eq(carts.sessionId, sessionId), eq(carts.status, 'Open')))
-      //   .groupBy(carts.id)
-      //   .orderBy(desc(carts.updatedAt));
+      // A guest cart, or one already this user's; never another user's
       const sessionCart = await tx.query.carts.findFirst({
         with: {
           lines: {
             with: lineVariant,
           },
         },
-        where: eq(carts.sessionId, sessionId),
-        orderBy: desc(carts.createdAt),
+        where: and(
+          eq(carts.sessionId, sessionId),
+          eq(carts.status, 'Open'),
+          or(isNull(carts.userId), eq(carts.userId, userId)),
+        ),
       })
+      if (sessionCart && userCart?.id === sessionCart.id) {
+        return { ...sessionCart, lines: sessionCart.lines.map(withLineVariant) }
+      }
+      if (!userCart) {
+        if (!sessionCart) {
+          return {
+            ...(await cartService.create(userId)),
+            lines: [],
+          }
+        }
+        await tx.update(carts).set({ userId }).where(eq(carts.id, sessionCart.id))
+        return await cartService.getCartContentForSession(sessionCart.sessionId) as CartContentWithoutOfferInfo
+      }
       if (!sessionCart) {
         return { ...userCart, lines: userCart.lines.map(withLineVariant) }
       }
@@ -525,7 +509,7 @@ class CartService {
       await tx
         .update(carts)
         .set({ userId })
-        .where(eq(carts.sessionId, sessionId))
+        .where(eq(carts.id, sessionCart.id))
 
       sessionCart.userId = userId
 

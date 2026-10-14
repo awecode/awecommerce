@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { fetch, setup } from '@nuxt/test-utils/e2e'
 import { eq } from 'drizzle-orm'
@@ -6,6 +7,7 @@ import pg from 'pg'
 import { afterAll } from 'vitest'
 import * as schema from '@awecommerce/service/core/db/pg/schema'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
+import { sessions, users } from '../../auth/server/db/schema'
 
 export const url = process.env.TEST_POSTGRES_URL
 
@@ -15,6 +17,8 @@ export const setupApi = async () => {
   // The built server reads these
   process.env.NUXT_POSTGRES_URL = url
   process.env.ORDER_HASH_SECRET = 'test-secret'
+  process.env.BETTER_AUTH_URL = 'http://localhost:3000'
+  process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
 
   const pool = new pg.Pool({ connectionString: url })
@@ -97,23 +101,49 @@ export const createVoucher = async (db: TestDb, variantId: number, percent: stri
   return { code, offerId: offer.id }
 }
 
-// A browser: keeps the cart cookie between requests
+// A user with a session. Returns the session token, sent as a Bearer token.
+export const createUser = async (db: TestDb) => {
+  const userId = randomUUID()
+  await db.insert(users).values({ id: userId, name: 'Buyer', email: `${userId}@example.com` })
+  const token = randomUUID()
+  await db.insert(sessions).values({
+    id: randomUUID(),
+    token,
+    userId,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  })
+  return { userId, token }
+}
+
+// A browser: keeps its cookies between requests, and can sign in and out
 export const buyer = () => {
-  let cookie = ''
-  return async (path: string, options: { method?: string; body?: unknown } = {}) => {
+  const cookies = new Map<string, string>()
+  let token: string | undefined
+  const request = async (path: string, options: { method?: string; body?: unknown } = {}) => {
     const response = await fetch(path, {
       method: options.method ?? 'GET',
       headers: {
-        cookie,
+        cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; '),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })
-    const setCookie = response.headers.get('set-cookie')
-    if (setCookie) {
-      cookie = setCookie.split(';')[0]!
+    for (const header of response.headers.getSetCookie()) {
+      const [pair] = header.split(';')
+      const [name, ...value] = pair!.split('=')
+      cookies.set(name!, value.join('='))
     }
+    const setCookie = response.headers.getSetCookie().find((c) => c.startsWith('awe_cart=')) ?? null
     const text = await response.text()
     return { status: response.status, body: text ? JSON.parse(text) : null, setCookie }
   }
+  return Object.assign(request, {
+    signIn: (sessionToken: string) => {
+      token = sessionToken
+    },
+    signOut: () => {
+      token = undefined
+    },
+  })
 }

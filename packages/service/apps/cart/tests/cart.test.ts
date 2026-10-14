@@ -8,7 +8,7 @@ import {
   ProductVariantService,
 } from 'apps/product/services/product'
 import { OfferService } from 'apps/offer/services/offer'
-import { cartAppliedVoucherOffers, cartLines } from 'apps/cart/schemas'
+import { cartAppliedVoucherOffers, cartLines, carts } from 'apps/cart/schemas'
 import {
   offerBenefits,
   offerConditions,
@@ -179,6 +179,51 @@ test('should return empty cart for merge when both user and session cart are emp
   expect(mergedCart.sessionId).toBe(cart2.sessionId)
   expect(mergedCart.lines.length).toBe(0)
 })
+test('should leave a cart alone when it is already the user cart', async () => {
+  const userId = 'merge-same-user'
+  const cart = await cartService.create(userId)
+  const product = await createProduct()
+  await cartService.addToCart(cart.id, product.variants[0].id, 2)
+
+  const merged = await cartService.mergeCarts(userId, cart.sessionId)
+
+  expect(merged.id).toBe(cart.id)
+  expect(merged.lines.map((l) => l.quantity)).toEqual([2])
+  expect((await cartService.getCartForSession(cart.sessionId))?.status).toBe('Open')
+})
+
+test('should not merge a checked-out user cart', async () => {
+  const userId = 'merge-frozen-user'
+  const frozen = await cartService.create(userId)
+  const product = await createProduct()
+  await cartService.addToCart(frozen.id, product.variants[0].id, 4)
+  await db.update(carts).set({ status: 'Frozen' }).where(eq(carts.id, frozen.id))
+  const guest = await cartService.create()
+  const other = await createProduct()
+  await cartService.addToCart(guest.id, other.variants[0].id, 1)
+
+  const merged = await cartService.mergeCarts(userId, guest.sessionId)
+
+  expect(merged.id).toBe(guest.id)
+  expect(merged.lines.map((l) => l.variantId)).toEqual([other.variants[0].id])
+  const [stillFrozen] = await db.select().from(carts).where(eq(carts.id, frozen.id))
+  expect(stillFrozen.status).toBe('Frozen')
+})
+
+test("should not take another user's cart", async () => {
+  const theirs = await cartService.create('merge-owner')
+  const product = await createProduct()
+  await cartService.addToCart(theirs.id, product.variants[0].id, 1)
+
+  const merged = await cartService.mergeCarts('merge-intruder', theirs.sessionId)
+
+  expect(merged.id).not.toBe(theirs.id)
+  expect(merged.userId).toBe('merge-intruder')
+  expect(merged.lines).toEqual([])
+  const [still] = await db.select().from(carts).where(eq(carts.id, theirs.id))
+  expect(still.userId).toBe('merge-owner')
+})
+
 const createVoucher = async (voucherCode: string) => {
   const [range] = await db
     .insert(offerRanges)

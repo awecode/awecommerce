@@ -1,4 +1,5 @@
 import { and, desc, eq, ne } from 'drizzle-orm';
+import { NotFoundError } from '../../../core/errors';
 import { NewShippingAddress, shippingAddresses, UpdateShippingAddress } from '../schemas';
 import { Database } from '../../types';
 
@@ -34,7 +35,10 @@ class ShippingAddressService {
           eq(shippingAddresses.userId, userId)
         )
       ).returning()
-      if(address && data.isDefault) {
+      if (!address) {
+        throw new NotFoundError(`Shipping address not found: ${id}`);
+      }
+      if(data.isDefault) {
         await tx.update(shippingAddresses).set({
           isDefault: false,
           updatedAt: new Date().toISOString(),
@@ -94,12 +98,16 @@ class ShippingAddressService {
   }
 
   async delete(id: number, userId?: string) {
-    return await this.db.delete(shippingAddresses).where(
+    const [address] = await this.db.delete(shippingAddresses).where(
       and(
         eq(shippingAddresses.id, id),
         userId ? eq(shippingAddresses.userId, userId) :undefined
       )
-    );
+    ).returning();
+    if (!address) {
+      throw new NotFoundError(`Shipping address not found: ${id}`);
+    }
+    return address;
   }
 }
 
