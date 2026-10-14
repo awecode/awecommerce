@@ -4,13 +4,17 @@ import { ProductService } from '@awecommerce/service/apps/product/services/produ
 export default defineServiceHandler(async (event) => {
   const productService = new ProductService(useDb())
   const found = await productService.getBySlug(getRouterParam(event, 'slug')!)
-  const product = found && isListed(found) ? await productService.get(found.id) : null
+  const isListed = found && (await productService.listedProductIds([found.id])).length > 0
+  const product = isListed ? await productService.get(found.id) : null
   if (!product) {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Product not found' })
   }
+  const listedRelated = new Set(
+    await productService.listedProductIds(product.relatedProducts.map((related) => related.id)),
+  )
   return {
     ...product,
     variants: product.variants.filter((variant) => variant.isActive).map(storeVariant),
-    relatedProducts: product.relatedProducts.filter(isListed),
+    relatedProducts: product.relatedProducts.filter((related) => listedRelated.has(related.id)),
   }
 })

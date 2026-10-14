@@ -88,11 +88,30 @@ const inactiveCategoryIds = sql`(
   SELECT id FROM hidden
 )`
 
+// The store's one rule for showing and selling a product: it is active and
+// published, and its brand, its product class and its category (with every
+// category above it) are not inactive. Works in any query on products.
+const listedProduct = and(
+  eq(products.isActive, true),
+  eq(products.status, 'Published'),
+  or(
+    isNull(products.brandId),
+    sql`${products.brandId} IN (SELECT b.id FROM ${brands} b WHERE b."isActive" IS TRUE)`,
+  ),
+  or(
+    isNull(products.productClassId),
+    sql`${products.productClassId} IN (SELECT pc.id FROM ${productClasses} pc WHERE pc."isActive" IS TRUE)`,
+  ),
+  or(isNull(products.categoryId), sql`${products.categoryId} NOT IN ${inactiveCategoryIds}`),
+)!
+
 interface ProductFilter {
   brands?: number[]
   categories?: number[]
   // Makes `categories` also match every category under them
   includeSubcategories?: boolean
+  // Only products the store shows (see listedProduct)
+  listedOnly?: boolean
   productClass?: number
   status?: Product['status']
   q?: string
@@ -263,6 +282,19 @@ class ProductService {
     return result[0]
   }
 
+  // The given products that the store shows (see listedProduct), by id
+  async listedProductIds(productIds: number[]) {
+    if (!productIds.length) {
+      return []
+    }
+    const rows = await this.db
+      .select({ id: products.id })
+      .from(products)
+      .where(and(inArray(products.id, productIds), listedProduct))
+      .orderBy(asc(products.id))
+    return rows.map((row) => row.id)
+  }
+
   async update(productId: number, product: UpdateProduct) {
     return await this.db.transaction(async (tx) => {
       const { images, relatedProducts, ...productData } = product
@@ -299,6 +331,10 @@ class ProductService {
 
   async list<F extends ProductFilter = {}>(filter: Exact<F, ProductFilter>) {
     const where: SQL[] = []
+
+    if (filter.listedOnly) {
+      where.push(listedProduct)
+    }
 
     if (filter.getFilters) {
       where.push(...filter.getFilters())
@@ -1304,6 +1340,7 @@ class RelatedProductService {
 }
 
 export {
+  listedProduct,
   BrandService,
   CategoryService,
   ProductClassService,

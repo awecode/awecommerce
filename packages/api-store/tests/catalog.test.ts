@@ -124,6 +124,24 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect((await request(`/api/store/products/${draft.slug}`)).status).toBe(404)
   })
 
+  test('the product page follows the same rule as the list', async () => {
+    const prefix = unique('page-rule')
+    const brand = await new BrandService(db).create({ name: unique('b'), slug: unique('b') })
+    const parent = await new CategoryService(db).create({ name: unique('c'), slug: unique('c') })
+    const child = await new CategoryService(db).create({ name: unique('c'), slug: unique('c'), parentId: parent.id })
+    const product = await createProduct(prefix)
+    const branded = await createProduct(prefix, { brandId: brand.id })
+    const inChild = await createProduct(prefix, { categoryId: child.id })
+    await new RelatedProductService(db).setRelatedProducts(product.id, [branded.id, inChild.id])
+
+    await new BrandService(db).markAsInactive(brand.id)
+    await new CategoryService(db).update(parent.id, { isActive: false })
+
+    expect((await request(`/api/store/products/${branded.slug}`)).status).toBe(404)
+    expect((await request(`/api/store/products/${inChild.slug}`)).status).toBe(404)
+    expect((await request(`/api/store/products/${product.slug}`)).body.relatedProducts).toEqual([])
+  })
+
   test('lists active categories with their parents, and brands with active products', async () => {
     const categoryService = new CategoryService(db)
     const parent = await categoryService.create({ name: unique('parent'), slug: unique('parent') })

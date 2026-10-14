@@ -26,7 +26,7 @@ pnpm dev:backoffice
 
 ### Catalog
 
-Buyers see only products that are active and `Published` and not under an inactive category (at any depth), only active variants, and never a variant's `inventoryCost` (not in product pages, not in the cart).
+Buyers see, and can buy, only listed products: active and `Published`, with an active brand and product class when set, and not under an inactive category at any depth (the library's `listedProduct` rule). They see only active variants, and never a variant's `inventoryCost` (not in product pages, not in the cart).
 
 | Route | Does |
 |---|---|

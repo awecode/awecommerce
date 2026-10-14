@@ -15,7 +15,8 @@ import {
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { cartAppliedVoucherOffers, carts } from '../../cart/schemas'
-import { CartService, customizationsError, isForSale } from '../../cart/services/cart'
+import { CartService, customizationsError } from '../../cart/services/cart'
+import { ProductService } from '../../product/services/product'
 import { priceCart } from '../../cart/services/pricing'
 import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
@@ -191,8 +192,14 @@ class OrderService {
       if (!content.lines.length) {
         throw new ValidationError('Cannot create an order without lines')
       }
+      // Only active variants of products the store shows
+      const listedIds = new Set(
+        await new ProductService(tx).listedProductIds(
+          content.lines.map((line) => line.variant.productId),
+        ),
+      )
       const inactiveLine = content.lines.find(
-        (line) => !isForSale(line.variant, line.variant.product),
+        (line) => !line.variant.isActive || !listedIds.has(line.variant.productId),
       )
       if (inactiveLine) {
         throw new ValidationError(

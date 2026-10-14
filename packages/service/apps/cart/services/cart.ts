@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from '../../../core/errors'
 import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import {
+  listedProduct,
   optionValuesWithOption,
   withVariantOptions,
 } from '../../product/services/product'
@@ -102,13 +103,6 @@ const withLineVariant = <
   line: L,
 ) => ({ ...line, variant: withVariantOptions(line.variant) })
 
-// Whether buyers can buy the variant: it, and its product, are active, and the
-// product is published
-const isForSale = (
-  variant: { isActive: boolean },
-  product: { isActive: boolean | null; status: string | null },
-) => variant.isActive && product.isActive === true && product.status === 'Published'
-
 class CartService {
   private db: Database
 
@@ -134,7 +128,11 @@ class CartService {
       throw new ValidationError('Quantity must be at least 1')
     }
     const [row] = await this.db
-      .select({ variant: productVariants, product: products })
+      .select({
+        variant: productVariants,
+        product: products,
+        listed: sql<boolean>`${listedProduct}`,
+      })
       .from(productVariants)
       .innerJoin(products, eq(products.id, productVariants.productId))
       .where(eq(productVariants.id, variantId))
@@ -142,7 +140,8 @@ class CartService {
     if (!variant) {
       throw new NotFoundError(`Product variant not found: ${variantId}`)
     }
-    if (!isForSale(variant, row.product)) {
+    // Only active variants of products the store shows
+    if (!variant.isActive || !row.listed) {
       throw new ValidationError(`Product variant is not available: ${variantId}`)
     }
     if (!variant.discountedPrice && !variant.price) {
@@ -604,4 +603,4 @@ class CartService {
   }
 }
 
-export { CartService, customizationsError, isForSale }
+export { CartService, customizationsError }

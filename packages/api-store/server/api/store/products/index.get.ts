@@ -1,12 +1,10 @@
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 
-// Active, published products, one page at a time. Products under an inactive
-// category, at any depth, are left out.
+// Products the store shows (the library's listed rule), one page at a time
 export default defineServiceHandler(async (event) => {
   const query = await getValidatedQuery(event, productListQuery.parse)
   return await new ProductService(useDb()).list({
-    isActive: true,
-    status: 'Published',
+    listedOnly: true,
     q: query.q,
     categories: query.categories,
     // A category shows the products of its subcategories too
