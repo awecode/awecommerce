@@ -26,8 +26,9 @@ pnpm migrate:auth   # users, sessions, accounts, verifications (POSTGRES_URL, or
 Then:
 
 ```sh
-pnpm dev:storefront   # http://localhost:3000
-pnpm dev:backoffice   # http://localhost:3001
+pnpm dev              # storefront on http://localhost:3000, backoffice on http://localhost:3001
+pnpm dev:storefront   # storefront only
+pnpm dev:backoffice   # backoffice only
 ```
 
 ## Backoffice
