@@ -31,7 +31,8 @@ export const productListQuery = z.object({
   productClass: z.coerce.number().int().optional(),
   featured: z.stringbool().optional(),
   bestSeller: z.stringbool().optional(),
-  sortBy: z.enum(['priceAsc', 'priceDesc']).optional(),
+  // Newest first when not given
+  sortBy: z.enum(['priceAsc', 'priceDesc', 'nameAsc', 'nameDesc', 'newest', 'oldest']).optional(),
   ...pageFields,
 })
 

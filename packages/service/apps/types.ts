@@ -7,6 +7,7 @@ import * as orderSchemas from './order/schemas'
 import * as productSchemas from './product/schemas'
 import * as loyaltySchemas from './loyalty/schemas'
 import * as taxSchemas from './tax/schemas'
+import * as storeSchemas from './store/schemas'
 
 const tables = {
   ...cartSchemas,
@@ -15,6 +16,7 @@ const tables = {
   ...productSchemas,
   ...loyaltySchemas,
   ...taxSchemas,
+  ...storeSchemas,
 }
 
 type BenefitType = 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'

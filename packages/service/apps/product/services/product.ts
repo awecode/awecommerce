@@ -138,7 +138,8 @@ interface ProductFilter {
   qFilter?: SQL
   minPrice?: number
   maxPrice?: number
-  sortBy?: 'priceAsc' | 'priceDesc'
+  // Newest first when not given
+  sortBy?: 'priceAsc' | 'priceDesc' | 'nameAsc' | 'nameDesc' | 'newest' | 'oldest'
   getFilters?: () => SQL[]
 }
 
@@ -148,6 +149,52 @@ const minVariantPrice = sql<string | null>`(
   FROM ${productVariants}
   WHERE ${productVariants.productId} = ${products.id}
   AND ${productVariants.isActive} = true
+)`
+
+// The highest selling price among the product's active variants
+const maxVariantPrice = sql<string | null>`(
+  SELECT MAX(COALESCE(${productVariants.discountedPrice}, ${productVariants.price}))
+  FROM ${productVariants}
+  WHERE ${productVariants.productId} = ${products.id}
+  AND ${productVariants.isActive} = true
+)`
+
+// How many variants the product has, active or not
+const variantCount = sql<number>`(
+  SELECT COUNT(*)::int FROM ${productVariants}
+  WHERE ${productVariants.productId} = ${products.id}
+)`
+
+// The stock of the product's active variants
+const totalStock = sql<number>`(
+  SELECT COALESCE(SUM(${productVariants.stockQuantity}), 0)::int FROM ${productVariants}
+  WHERE ${productVariants.productId} = ${products.id}
+  AND ${productVariants.isActive} = true
+)`
+
+type SingleVariant = {
+  id: number
+  sku: string
+  price: string | null
+  discountedPrice: string | null
+  stockQuantity: number | null
+  isActive: boolean
+}
+
+// The product's variant when it has exactly one, so a list can show and edit
+// its price and stock in place; null otherwise. Prices stay decimal strings.
+const singleVariant = sql<SingleVariant | null>`(
+  SELECT json_build_object(
+    'id', v.id,
+    'sku', v.sku,
+    'price', v.price::text,
+    'discountedPrice', v."discountedPrice"::text,
+    'stockQuantity', v."stockQuantity",
+    'isActive', v."isActive"
+  )
+  FROM ${productVariants} v
+  WHERE v."productId" = ${products.id}
+  AND (SELECT COUNT(*) FROM ${productVariants} w WHERE w."productId" = ${products.id}) = 1
 )`
 
 // Loads a variant's option values with their option, for withVariantOptions
@@ -173,6 +220,16 @@ const withVariantOptions = <V extends VariantWithOptionValues>({
     .sort((a, b) => a.option.id - b.option.id)
     .map(({ value, option }) => ({ name: option.name, value })),
 })
+
+// What can be changed on many products at once
+type BulkProductChanges = Pick<UpdateProduct, 'status' | 'isActive' | 'isFeatured' | 'isBestSeller'>
+
+// At most this many variants from one generateVariants call
+const MAX_GENERATED_VARIANTS = 100
+
+// A SKU part from an option value: Dark Blue becomes DARK-BLUE
+const skuPart = (value: string, index: number) =>
+  value.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || String(index + 1)
 
 class ProductService {
   private db: Database
@@ -336,6 +393,26 @@ class ProductService {
     })
   }
 
+  // Changes several products at once: all of them, or none when one is missing
+  async updateMany(productIds: number[], changes: BulkProductChanges) {
+    const ids = [...new Set(productIds)]
+    if (!ids.length) {
+      return []
+    }
+    return await this.db.transaction(async (tx) => {
+      const updated = await tx
+        .update(products)
+        .set({ ...changes, updatedAt: new Date().toISOString() })
+        .where(inArray(products.id, ids))
+        .returning()
+      const missing = ids.find((id) => !updated.some((product) => product.id === id))
+      if (missing !== undefined) {
+        throw new NotFoundError(`Product not found: ${missing}`)
+      }
+      return updated
+    })
+  }
+
   async delete(productId: number) {
     const result = await this.db
       .delete(products)
@@ -436,21 +513,24 @@ class ProductService {
       }
     }
 
-    let orderBy: SQL | undefined
-    if (filter.sortBy) {
-      if (filter.sortBy === 'priceAsc') {
-        orderBy = sql`${minVariantPrice}`
-      } else {
-        orderBy = desc(minVariantPrice)
-      }
-    } else {
-      orderBy = desc(products.id)
-    }
+    // The id breaks ties, so pages do not overlap
+    const orderBy: SQL[] = {
+      priceAsc: [sql`${minVariantPrice}`, asc(products.id)],
+      priceDesc: [desc(minVariantPrice), desc(products.id)],
+      nameAsc: [asc(products.name), asc(products.id)],
+      nameDesc: [desc(products.name), desc(products.id)],
+      newest: [desc(products.createdAt), desc(products.id)],
+      oldest: [asc(products.createdAt), asc(products.id)],
+    }[filter.sortBy ?? 'newest']
 
     let query = this.db
       .select({
         ...getTableColumns(products),
         minPrice: minVariantPrice,
+        maxPrice: maxVariantPrice,
+        variantCount,
+        totalStock,
+        singleVariant,
         brand: getTableColumns(brands),
         category: getTableColumns(categories),
         productClass: getTableColumns(productClasses),
@@ -459,7 +539,7 @@ class ProductService {
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
-      .orderBy(orderBy)
+      .orderBy(...orderBy)
       .where(and(...where))
 
     return await paginate(
@@ -1269,6 +1349,76 @@ class ProductVariantService {
 
   async markAsInactive(variantId: number) {
     return await this.update(variantId, { isActive: false })
+  }
+
+  // Creates a variant for every combination of the option values that the
+  // product does not have yet, such as { Size: ['S', 'M'], Colour: ['Red'] }.
+  // New variants copy the first variant's prices, start with no stock, and
+  // get SKUs from its SKU and the values (SHIRT-S-RED). A product's only
+  // variant without options takes the first combination instead. Returns the
+  // variants it created or changed.
+  async generateVariants(productId: number, options: Record<string, string[]>) {
+    const values = Object.entries(options).map(([name, list]) => {
+      const unique = [...new Set(list.map((value) => value.trim()).filter(Boolean))]
+      if (!unique.length) {
+        throw new ValidationError(`Give at least one value for ${name}`)
+      }
+      return [name, unique] as const
+    })
+    if (!values.length) {
+      throw new ValidationError('Give at least one option with values')
+    }
+    const total = values.reduce((product, [, list]) => product * list.length, 1)
+    if (total > MAX_GENERATED_VARIANTS) {
+      throw new ValidationError(`Too many combinations: ${total} (at most ${MAX_GENERATED_VARIANTS})`)
+    }
+    const combinations = values.reduce<Record<string, string>[]>(
+      (combos, [name, list]) => combos.flatMap((combo) => list.map((value) => ({ ...combo, [name]: value }))),
+      [{}],
+    )
+
+    return await this.db.transaction(async (tx) => {
+      const variantService = new ProductVariantService(tx)
+      const [product] = await tx.select().from(products).where(eq(products.id, productId)).for('update')
+      if (!product) {
+        throw new NotFoundError(`Product not found: ${productId}`)
+      }
+      const existing = await variantService.list(productId)
+      const key = (combo: Record<string, string>) =>
+        Object.entries(combo).sort(([a], [b]) => a.localeCompare(b)).map(([n, v]) => `${n}=${v}`).join('|')
+      const existingKeys = new Set(
+        existing.map((variant) => key(Object.fromEntries(variant.options.map((o) => [o.name, o.value])))),
+      )
+      const base = existing[0]
+      let optionless = existing.length === 1 && !existing[0]!.options.length ? existing[0] : undefined
+      const results = []
+      for (const combo of combinations) {
+        if (existingKeys.has(key(combo))) {
+          continue
+        }
+        if (optionless) {
+          results.push(await variantService.update(optionless.id, { options: combo }))
+          optionless = undefined
+          continue
+        }
+        const stem = [base?.sku ?? product.slug.toUpperCase(), ...Object.values(combo).map(skuPart)].join('-')
+        let sku = stem
+        for (let n = 2; (await tx.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, sku))).length; n++) {
+          sku = `${stem}-${n}`
+        }
+        results.push(
+          await variantService.create(productId, {
+            sku,
+            price: base?.price,
+            discountedPrice: base?.discountedPrice,
+            inventoryCost: base?.inventoryCost,
+            stockQuantity: 0,
+            options: combo,
+          }),
+        )
+      }
+      return results
+    })
   }
 
   private async checkImage(productId: number, imageId?: number | null) {

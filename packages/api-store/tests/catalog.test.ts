@@ -168,6 +168,10 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect(brandIds).not.toContain(draftOnly.id)
   })
 
+  test('shows the store settings', async () => {
+    expect((await request('/api/store/settings')).body).toMatchObject({ currency: expect.any(String), locale: expect.any(String) })
+  })
+
   test('the cart summary does not show variant costs', async () => {
     const cartBuyer = buyer()
     const product = await createProduct(unique('cost'))

@@ -114,6 +114,55 @@ describe.skipIf(!url)('admin catalog API', async () => {
     expect(missing.body.data.code).toBe('MissingReference')
   })
 
+  test('list rows carry a variant summary and sort by name', async () => {
+    const prefix = unique('admin-summary')
+    const b = (await admin('/api/admin/products', { method: 'POST', body: newProduct({ name: `${prefix}-b`, stockQuantity: 3 }) })).body
+    const a = (await admin('/api/admin/products', { method: 'POST', body: newProduct({ name: `${prefix}-a` }) })).body
+
+    const rows = (await admin(`/api/admin/products?q=${prefix}&sortBy=nameAsc`)).body.results
+    expect(rows.map((r: any) => r.id)).toEqual([a.id, b.id])
+    expect(rows[1]).toMatchObject({ variantCount: 1, totalStock: 3 })
+    expect(rows[1].singleVariant).toMatchObject({ id: b.variants[0].id, stockQuantity: 3 })
+  })
+
+  test('changes several products at once, or none', async () => {
+    const first = (await admin('/api/admin/products', { method: 'POST', body: newProduct() })).body
+    const second = (await admin('/api/admin/products', { method: 'POST', body: newProduct() })).body
+
+    const published = await admin('/api/admin/products/bulk', {
+      method: 'POST',
+      body: { ids: [first.id, second.id], changes: { status: 'Published' } },
+    })
+    expect(published.body.updated.sort()).toEqual([first.id, second.id].sort())
+    expect((await admin(`/api/admin/products/${second.id}`)).body.status).toBe('Published')
+
+    const missing = await admin('/api/admin/products/bulk', {
+      method: 'POST',
+      body: { ids: [first.id, 999999999], changes: { isActive: false } },
+    })
+    expect(missing.status).toBe(404)
+    expect((await admin(`/api/admin/products/${first.id}`)).body.isActive).toBe(true)
+    expect((await admin('/api/admin/products/bulk', { method: 'POST', body: { ids: [first.id], changes: {} } })).status).toBe(400)
+  })
+
+  test('generates variants from options', async () => {
+    const product = (await admin('/api/admin/products', { method: 'POST', body: newProduct() })).body
+
+    const generated = await admin(`/api/admin/products/${product.id}/variants/generate`, {
+      method: 'POST',
+      body: { options: { Size: ['S', 'M'], Colour: ['Red'] } },
+    })
+
+    expect(generated.status).toBe(200)
+    expect(generated.body).toHaveLength(2)
+    expect((await admin(`/api/admin/products/${product.id}`)).body.variants).toHaveLength(2)
+    const tooMany = Array.from({ length: 11 }, (_, i) => `v${i}`)
+    expect((await admin(`/api/admin/products/${product.id}/variants/generate`, {
+      method: 'POST',
+      body: { options: { A: tooMany, B: tooMany } },
+    })).status).toBe(422)
+  })
+
   test('gives 404 for missing records and 400 for bad bodies', async () => {
     for (const [method, path, body] of [
       ['PATCH', '/api/admin/products/999999999', { name: 'x' }],

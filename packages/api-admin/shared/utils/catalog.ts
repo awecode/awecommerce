@@ -59,6 +59,24 @@ export const createProductSchema = productFields.extend(
 )
 export const updateProductSchema = productFields.partial()
 
+// Changes for several products at once (publish, unpublish, activate, ...)
+export const bulkProductSchema = z.object({
+  ids: z.array(id).min(1).max(100),
+  changes: z
+    .object({
+      status: z.enum(['Draft', 'Published']).optional(),
+      isActive: z.boolean().optional(),
+      isFeatured: z.boolean().optional(),
+      isBestSeller: z.boolean().optional(),
+    })
+    .refine((changes) => Object.values(changes).some((value) => value !== undefined), 'Give at least one change'),
+})
+
+// Option name to its values, such as { Size: ['S', 'M'], Colour: ['Red'] }
+export const generateVariantsSchema = z.object({
+  options: z.record(z.string().trim().min(1), z.array(z.string())),
+})
+
 export const createVariantSchema = variantFields
 export const updateVariantSchema = variantFields.partial()
 

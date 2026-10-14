@@ -54,6 +54,16 @@
         "default": "./dist/apps/tax/schemas/index.cjs"
       }
     },
+    "./apps/store/schemas": {
+      "import": {
+        "types": "./dist/apps/store/schemas/index.d.ts",
+        "default": "./dist/apps/store/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/store/schemas/index.d.ts",
+        "default": "./dist/apps/store/schemas/index.cjs"
+      }
+    },
     "./apps/offer/schemas": {
       "import": {
         "types": "./dist/apps/offer/schemas/index.d.ts",

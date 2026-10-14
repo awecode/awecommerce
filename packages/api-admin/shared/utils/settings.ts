@@ -26,6 +26,15 @@ export const loyaltySettingsSchema = z.object({
   expiresAfterInDays: z.number().int().min(1).nullable().optional(),
 })
 
+// Any of the fields; the others keep their values
+export const storeSettingsSchema = z.object({
+  name: z.string().trim().optional(),
+  // ISO 4217 code, such as USD
+  currency: z.string().trim().length(3).optional(),
+  // BCP 47 tag, such as en-US
+  locale: z.string().trim().min(2).optional(),
+})
+
 const shippingMethodFields = z.object({
   name: z.string().trim().min(1),
   price: decimal,

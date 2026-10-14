@@ -55,6 +55,7 @@ Buyers see, and can buy, only listed products: active and `Published`, with an a
 |---|---|
 | `GET /api/store/products` | One page of products. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
 | `GET /api/store/products/:slug` | A product with its active variants, options, images and listed related products |
+| `GET /api/store/settings` | The store's `name`, `currency` and `locale`, for showing prices |
 | `GET /api/store/categories` | Active categories with a listed product in them or below them, each with its `parent`. Categories under an inactive category are left out. |
 | `GET /api/store/brands` | Active brands with a listed product |
 
@@ -115,12 +116,14 @@ Every `/api/admin` route needs a signed-in admin (see Sign-in). The body schemas
 
 | Route | Body or query | Does |
 |---|---|---|
-| `GET /api/admin/products` | `q`, `status`, `active`, `categories`, `brands`, `productClass`, `featured`, `bestSeller`, `sortBy`, `page`, `size` | Every product, drafts, inactive ones and those under inactive brands, categories or classes included |
+| `GET /api/admin/products` | `q`, `status`, `active`, `categories`, `brands`, `productClass`, `featured`, `bestSeller`, `sortBy` (`newest`, `oldest`, `nameAsc`, `nameDesc`, `priceAsc`, `priceDesc`), `page`, `size` | Every product, drafts, inactive ones and those under inactive brands, categories or classes included. Each row has `minPrice`, `maxPrice`, `variantCount`, `totalStock` and, for a product with one variant, `singleVariant` (its id, SKU, prices and stock, for editing in place). |
+| `POST /api/admin/products/bulk` | `{ ids, changes }` with any of `status`, `isActive`, `isFeatured`, `isBestSeller` | Changes up to 100 products at once: all, or none when one is missing (404) |
 | `POST /api/admin/products` | product fields, plus the first variant's `sku`, `price`, `discountedPrice`, `inventoryCost`, `stockQuantity` | Creates a product (as `Draft`) with its first variant |
 | `GET /api/admin/products/:id` | | The product with all variants (costs included), options, images and related products |
 | `PATCH /api/admin/products/:id` | any product fields, `status`, flags, `images`, `relatedProducts`, `customFields` | Changes it; publish with `status: 'Published'` |
 | `DELETE /api/admin/products/:id` | | Deletes it with its variants |
 | `POST /api/admin/products/:id/variants` | variant fields with `options` such as `{ Size: 'L' }` | Adds a variant |
+| `POST /api/admin/products/:id/variants/generate` | `{ options: { Size: ['S', 'M'], Colour: ['Red'] } }` | Creates every combination the product does not have yet (at most 100); see the library README |
 | `PATCH`, `DELETE /api/admin/variants/:id` | variant fields | Changes or deletes a variant |
 | `PATCH`, `DELETE /api/admin/options/:id` | `{ name }` | Renames or deletes an option (removed from every variant) |
 | `PATCH`, `DELETE /api/admin/option-values/:id` | `{ value }` | Renames or deletes an option value |
@@ -154,6 +157,7 @@ Body schemas are in `packages/api-admin/shared/utils/settings.ts`.
 
 | Route | Body | Does |
 |---|---|---|
+| `GET`, `PATCH /api/admin/settings/store` | any of `name`, `currency` (ISO code such as `USD`), `locale` (such as `en-US`) | Reads or changes the store settings; an unknown currency or locale gives 422 |
 | `GET`, `PATCH /api/admin/settings/tax` | any of `pricesIncludeTax`, `defaultRate`, `taxShipping` | Reads or changes the tax settings; `PATCH` returns all of them. Placed orders keep their tax. |
 | `GET`, `PATCH /api/admin/settings/loyalty` | any of `isEnabled`, `earnRate`, `redeemRate`, `expiresAfterInDays` | Reads or changes the loyalty settings. Points can be redeemed only while enabled with a `redeemRate`. |
 | `GET`, `POST /api/admin/shipping-methods` | `{ name, price, metadata? }` | Lists (newest first) or creates shipping methods |

@@ -18,6 +18,7 @@ const expectedExports = {
   'apps/cart/services/cart': ['CartService'],
   'apps/loyalty/services/loyalty': ['LoyaltyService'],
   'apps/tax/services/tax': ['TaxService', 'calculateTax'],
+  'apps/store/services/store': ['StoreSettingsService'],
   'apps/offer/services/offer': ['OfferService', 'OfferRangeService'],
   'apps/order/services/order': [
     'OrderService',
@@ -42,8 +43,9 @@ const expectedExports = {
   'apps/product/schemas': ['products'],
   'apps/loyalty/schemas': ['loyaltyPoints'],
   'apps/tax/schemas': ['taxSettings'],
+  'apps/store/schemas': ['storeSettings'],
   'core/db': ['db'],
-  'core/db/pg/schema': ['carts', 'orders', 'offers', 'products', 'loyaltyPoints', 'taxSettings'],
+  'core/db/pg/schema': ['carts', 'orders', 'offers', 'products', 'loyaltyPoints', 'taxSettings', 'storeSettings'],
 }
 
 const listFiles = (dir) =>
