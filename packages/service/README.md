@@ -210,6 +210,10 @@ It does not place an order, use up offers, or redeem points (`redeemPoints` only
 
 `CartService.mergeCarts(userId, sessionId)` brings a guest cart into a user's account when they sign in. The guest cart (by `sessionId`) becomes the user's cart, and the lines of the user's open cart are added to it (the same item adds up); that older cart is marked `Merged`. Only open carts are used: a checked-out cart is never changed, a cart that belongs to another user is never taken (the user just gets their own cart), and calling it with the user's own cart returns that cart unchanged.
 
+### Guest orders after signing in
+
+`OrderService.claimGuestOrders(userId, email)` gives a user the orders placed as a guest with that email (`guestUser.email`, in any case) and returns their ids. Orders that already have a user are left alone. Call it only with an email the user has proven they own, such as a verified sign-in email; otherwise anyone could see another buyer's orders by signing up with their email.
+
 ### Placing an order
 
 `OrderService.createFromCart(cartId, options)` turns an open cart into an order. Prices, offer and voucher discounts, and shipping are all read from the database at that moment; the caller never passes amounts. Carts store only variants and quantities, so an order always uses current prices. It throws `Product variant is not available: <sku>` when a variant in the cart is no longer for sale (see Product variants).

@@ -8,6 +8,9 @@ import { useDb } from '../../../api-core/server/utils/db'
 import { sendMagicLinkEmail } from './email'
 import { toMagicLinkConfirmUrl } from './magicLinkConfirmUrl'
 import type { BetterAuthOptions } from 'better-auth'
+import { eq } from 'drizzle-orm'
+import { users } from '../db/schema'
+import { runSignedInListeners } from './signedIn'
 
 // `db` is replaceable so the schema CLI can run without a database connection
 // `satisfies` rather than a return type, so the plugins' types (the admin
@@ -45,6 +48,19 @@ export function createAuthConfig(db: Parameters<typeof drizzleAdapter>[0] = useD
     //   }),
     // },
     databaseHooks: {
+      session: {
+        create: {
+          // Every sign-in makes a session. Other layers react through
+          // onSignedIn, so this layer needs to know nothing about them (the
+          // store links earlier guest orders, for example).
+          after: async (session) => {
+            const [user] = await db.select().from(users).where(eq(users.id, session.userId))
+            if (user) {
+              await runSignedInListeners({ user })
+            }
+          },
+        },
+      },
       user: {
         create: {
           before: async (user) => {

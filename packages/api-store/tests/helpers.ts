@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { fetch, setup } from '@nuxt/test-utils/e2e'
 import { eq } from 'drizzle-orm'
@@ -7,7 +7,7 @@ import pg from 'pg'
 import { afterAll } from 'vitest'
 import * as schema from '@awecommerce/service/core/db/pg/schema'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import { sessions, users } from '../../auth/server/db/schema'
+import { sessions, users, verifications } from '../../auth/server/db/schema'
 
 export const url = process.env.TEST_POSTGRES_URL
 
@@ -119,13 +119,17 @@ export const createUser = async (db: TestDb) => {
 export const buyer = () => {
   const cookies = new Map<string, string>()
   let token: string | undefined
-  const request = async (path: string, options: { method?: string; body?: unknown } = {}) => {
+  const request = async (
+    path: string,
+    options: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
+  ) => {
     const response = await fetch(path, {
       method: options.method ?? 'GET',
       headers: {
         cookie: [...cookies].map(([name, value]) => `${name}=${value}`).join('; '),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
+        ...options.headers,
       },
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })
@@ -145,5 +149,29 @@ export const buyer = () => {
     signOut: () => {
       token = undefined
     },
+  })
+}
+
+// Signs the browser in through the real magic link endpoint, as if the buyer
+// had pasted the token from the email: the token is stored the way Better
+// Auth's magic link plugin stores it (a hash), then verified. Unlike createUser,
+// this goes through Better Auth, so the sign-in listeners run.
+export const signInWithMagicLink = async (
+  db: TestDb,
+  request: ReturnType<typeof buyer>,
+  email: string,
+) => {
+  const token = randomUUID().replaceAll('-', '')
+  await db.insert(verifications).values({
+    id: randomUUID(),
+    identifier: `magic-link:${createHash('sha256').update(token).digest('base64url')}`,
+    value: JSON.stringify({ type: 'magic-link', email }),
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  })
+  return await request('/api/auth/magic-link-verify', {
+    method: 'POST',
+    body: { token },
+    // Same origin as BETTER_AUTH_URL, as from the sign-in page
+    headers: { origin: process.env.BETTER_AUTH_URL! },
   })
 }

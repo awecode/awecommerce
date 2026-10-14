@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { LoyaltyService } from '@awecommerce/service/apps/loyalty/services/loyalty'
 import { loyaltyPoints } from '@awecommerce/service/apps/loyalty/schemas'
-import { buyer, createProduct, createUser, setupApi, url } from './helpers'
+import { buyer, createProduct, createUser, setupApi, signInWithMagicLink, unique, url } from './helpers'
 
 const address = { line1: '1 Main St', city: 'Kathmandu', country: 'Nepal' }
 
@@ -159,6 +159,30 @@ describe.skipIf(!url)('signed-in store API', async () => {
     expect((await buyer()('/api/store/orders')).status).toBe(401)
     const byHash = await buyer()(`/api/store/orders/${first.id}?hash=${encodeURIComponent(first.hash)}`)
     expect(byHash.body.id).toBe(first.id)
+  })
+
+  test('signing in links the orders placed as a guest with the same email', async () => {
+    const email = `${unique('ann')}@example.com`
+    const guestOrder = async (guestEmail: string) => {
+      const guest = buyer()
+      await addLine(guest, await createProduct(db, '10'), 1)
+      return (await guest('/api/store/checkout', {
+        method: 'POST',
+        body: { expectedTotal: '10', shippingAddress: address, guestUser: { name: 'Ann', email: guestEmail } },
+      })).body
+    }
+    const first = await guestOrder(email)
+    const second = await guestOrder(email.toUpperCase())
+    const someoneElse = await guestOrder(`${unique('bob')}@example.com`)
+
+    const request = buyer()
+    const signedIn = await signInWithMagicLink(db, request, email)
+    expect(signedIn.status).toBe(200)
+
+    const ids = (await request('/api/store/orders')).body.results.map((o: any) => o.id)
+    expect(ids.sort()).toEqual([first.id, second.id].sort())
+    expect(ids).not.toContain(someoneElse.id)
+    expect((await request(`/api/store/orders/${first.id}`)).status).toBe(200)
   })
 
   test('shows loyalty points, previews their value and redeems them at checkout', async () => {

@@ -7,6 +7,7 @@ import {
   eq,
   getTableColumns,
   inArray,
+  isNull,
   notInArray,
   or,
   sql,
@@ -675,6 +676,24 @@ class OrderService {
       return null
     }
     return order
+  }
+
+  // Gives a user the orders they placed as a guest with this email, in any
+  // case. Returns the ids of the orders it linked. Call it only with an email
+  // the user has proven they own (for example a verified sign-in email):
+  // otherwise anyone could see another buyer's orders.
+  async claimGuestOrders(userId: string, email: string) {
+    const claimed = await this.db
+      .update(orders)
+      .set({ userId, updatedAt: new Date().toISOString() })
+      .where(
+        and(
+          isNull(orders.userId),
+          sql`lower(${orders.guestUser}->>'email') = lower(${email})`,
+        ),
+      )
+      .returning({ id: orders.id })
+    return claimed.map((order) => order.id)
   }
 
   async getByHash(orderId: number, hash: string) {

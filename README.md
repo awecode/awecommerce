@@ -37,6 +37,7 @@ Customers and staff sign in the same way, with a magic link, and share one `user
 - Every `/api/admin` route needs an admin (401 signed out, 403 for customers), set in `packages/api-admin/server/middleware/admin.ts` rather than through an environment variable.
 - The storefront's pages are public (`authRequiredByDefault: false`); a page that needs a customer sets `definePageMeta({ auth: true })`. The backoffice's pages need sign-in by default and send guests to `/login`.
 - In routes, `getUser(event)`, `requireAuthenticated(event)` and `requireAdmin(event)` come from the auth layer (see `packages/auth/README.md`).
+- To run code after every sign-in, call `onSignedIn(({ user }) => ...)` from a Nitro plugin. The store uses it to link the orders a buyer placed as a guest with the same email (`packages/api-store/server/plugins/claim-guest-orders.ts`), only when that email is verified, which magic link sign-in does.
 - The auth tables have their own `drizzle-kit` schema and migrations in `packages/auth` (`pnpm generate:auth`, `pnpm migrate:auth`), recorded in `__drizzle_migrations_auth`, apart from the library's.
 - Its login components use Tailwind classes; the apps do not have Tailwind yet.
 
@@ -98,7 +99,7 @@ Signed in, the buyer gets their own open cart on every device. A guest cart stil
 | `POST /api/store/addresses` | address fields, `isDefault?` | Saves one; a default replaces the previous default |
 | `PATCH /api/store/addresses/:id` | any address fields, `isDefault?` | Changes one (404 if it is not the buyer's) |
 | `DELETE /api/store/addresses/:id` | | Deletes one (404 if it is not the buyer's) |
-| `GET /api/store/orders?page=&size=` | | The buyer's orders, newest first, one page at a time (`size` at most 100) |
+| `GET /api/store/orders?page=&size=` | | The buyer's orders, newest first, one page at a time (`size` at most 100). Orders placed as a guest with the same email are linked on sign-in. |
 | `GET /api/store/orders/:id` | | One of the buyer's orders, without a hash (404 if it is not theirs) |
 | `GET /api/store/loyalty` | | `{ canRedeem, redeemRate, points, value }`: the points that can be redeemed now and their worth |
 
