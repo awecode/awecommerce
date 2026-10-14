@@ -98,6 +98,7 @@ const priceCart = async (
       sku: variant.sku,
       imageUrl: variant.image?.imageUrl ?? product.thumbnail,
       options: variant.options,
+      customizations: line.customizations,
       price,
       discount: discount.toString(),
       tax: calculateTax(taxable, taxRate, taxSettings.pricesIncludeTax).toString(),

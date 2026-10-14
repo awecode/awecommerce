@@ -53,6 +53,10 @@ export const productClasses = pgTable('product_class', {
 
 export const productStatus = pgEnum('product_status', ['Draft', 'Published'])
 
+// A field the buyer fills in when adding the product to the cart, such as the
+// name to print on a jersey
+export type CustomField = { label: string; required: boolean; maxLength: number }
+
 export const products = pgTable('product', {
   id: serial().primaryKey(),
   name: text().notNull(),
@@ -69,6 +73,8 @@ export const products = pgTable('product', {
   isBestSeller: boolean().default(false),
   isActive: boolean().default(true),
   extraInfo: jsonb().default({}).$type<Record<string, any>>(),
+  // The fields the buyer fills in per purchase; empty when it asks for nothing
+  customFields: jsonb().notNull().default([]).$type<CustomField[]>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })

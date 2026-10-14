@@ -114,6 +114,8 @@ export const orderLines = pgTable('order_line', {
   sku: text().notNull(),
   imageUrl: text(),
   options: jsonb().notNull().default([]).$type<Array<{ name: string; value: string }>>(),
+  // The buyer's answers to the product's custom fields, copied from the cart
+  customizations: jsonb().notNull().default({}).$type<Record<string, string>>(),
   price: numeric({
     precision: 100,
     scale: 20,

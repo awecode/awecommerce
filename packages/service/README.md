@@ -131,6 +131,33 @@ const product = await new ProductService(db).get(shirt.id)
 - **Listing:** `ProductService.list` returns each product's `minPrice`, the lowest selling price (`discountedPrice`, else `price`) among its active variants. `minPrice`, `maxPrice` and `sortBy` use that price.
 - **Offers:** offers still target products, brands, categories and classes. All variants of a product count towards its quantity conditions, and each cart line gets its own discount from its variant's price.
 
+### Line customizations
+
+Some products need information from the buyer that differs on every purchase, such as the name and number to print on a jersey. The product declares the fields in `customFields`, and the buyer's answers go on the cart line:
+
+```ts
+const jersey = await new ProductService(db).create({
+  name: 'Jersey',
+  slug: 'jersey',
+  sku: 'JERSEY-1',
+  price: '50',
+  customFields: [
+    { label: 'Print name', required: true, maxLength: 12 },
+    { label: 'Number', required: false, maxLength: 2 },
+  ],
+})
+
+await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
+  'Print name': 'Dipesh',
+  Number: '10',
+})
+```
+
+- **Answers:** `addToCart(cartId, variantId, quantity, answers?)` stores them on the line as `customizations`, a map of label to text. They are trimmed, and empty optional answers are dropped. A product with no `customFields` (the default `[]`) takes no answers.
+- **Validation:** it throws `Missing required field: <label>`, `Field is too long: <label> (max <n> characters)`, `Unknown field: <label>` for a label the product does not declare, and `Field must be text: <label>`. Nothing is added in these cases.
+- **Lines:** the same variant with the same answers adds to that line's quantity; different answers make a separate line. So two jerseys with different names are two lines. Merging a guest cart into the user's cart follows the same rule.
+- **Orders:** checkout copies each line's answers onto the order line's `customizations`. That copy is the record: changing or removing the product's `customFields` later does not change orders already placed.
+
 ### Cart summary
 
 `CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax` and `taxRate`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:

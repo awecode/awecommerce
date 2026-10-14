@@ -3,7 +3,7 @@ import {
   optionValuesWithOption,
   withVariantOptions,
 } from '../../product/services/product'
-import { productVariants } from '../../product/schemas'
+import { CustomField, products, productVariants } from '../../product/schemas'
 import {
   cartAppliedVoucherOffers,
   CartLine,
@@ -18,6 +18,57 @@ import { priceCart } from './pricing'
 import { LoyaltyService } from '../../loyalty/services/loyalty'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
+
+// Checks the buyer's answers against the product's custom fields. Returns them
+// trimmed, without empty optional answers, so equal answers always match.
+const validateCustomizations = (
+  fields: CustomField[],
+  answers: Record<string, unknown>,
+) => {
+  const labels = new Set(fields.map((field) => field.label))
+  for (const label of Object.keys(answers)) {
+    if (!labels.has(label)) {
+      throw new Error(`Unknown field: ${label}`)
+    }
+  }
+  const customizations: Record<string, string> = {}
+  for (const field of fields) {
+    const answer = answers[field.label]
+    if (answer !== undefined && typeof answer !== 'string') {
+      throw new Error(`Field must be text: ${field.label}`)
+    }
+    const text = (answer ?? '').trim()
+    if (!text) {
+      if (field.required) {
+        throw new Error(`Missing required field: ${field.label}`)
+      }
+      continue
+    }
+    if (text.length > field.maxLength) {
+      throw new Error(
+        `Field is too long: ${field.label} (max ${field.maxLength} characters)`,
+      )
+    }
+    customizations[field.label] = text
+  }
+  return customizations
+}
+
+// Whether two sets of answers are the same, in any key order
+const sameCustomizations = (
+  a: Record<string, string>,
+  b: Record<string, string>,
+) => {
+  const sorted = (answers: Record<string, string>) =>
+    JSON.stringify(Object.entries(answers).sort(([x], [y]) => x.localeCompare(y)))
+  return sorted(a) === sorted(b)
+}
+
+// Cart lines are the same when they have the same variant and answers
+const sameLine = (
+  a: { variantId: number; customizations: Record<string, string> },
+  b: { variantId: number; customizations: Record<string, string> },
+) => a.variantId === b.variantId && sameCustomizations(a.customizations, b.customizations)
 
 // Loads a cart line's variant with what pricing and the order snapshot need
 const lineVariant = {
@@ -48,14 +99,24 @@ class CartService {
     return result[0]
   }
 
-  async addToCart(cartId: number, variantId: number, quantity: number) {
+  // Adds a variant with the buyer's answers to the product's custom fields. The
+  // same variant with the same answers adds to that line's quantity; different
+  // answers make a separate line.
+  async addToCart(
+    cartId: number,
+    variantId: number,
+    quantity: number,
+    answers: Record<string, string> = {},
+  ) {
     if (quantity < 1) {
       throw new Error('Quantity must be at least 1')
     }
-    const [variant] = await this.db
-      .select()
+    const [row] = await this.db
+      .select({ variant: productVariants, customFields: products.customFields })
       .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
       .where(eq(productVariants.id, variantId))
+    const variant = row?.variant
     if (!variant) {
       throw new Error(`Product variant not found: ${variantId}`)
     }
@@ -65,6 +126,23 @@ class CartService {
     if (!variant.discountedPrice && !variant.price) {
       throw new Error('Product price not found')
     }
+    const customizations = validateCustomizations(row.customFields, answers)
+
+    const existingLines = await this.db
+      .select()
+      .from(cartLines)
+      .where(and(eq(cartLines.cartId, cartId), eq(cartLines.variantId, variantId)))
+    const existing = existingLines.find((line) =>
+      sameLine(line, { variantId, customizations }),
+    )
+    if (existing) {
+      const [updated] = await this.db
+        .update(cartLines)
+        .set({ quantity: sql`${cartLines.quantity} + ${quantity}` })
+        .where(eq(cartLines.id, existing.id))
+        .returning()
+      return updated
+    }
 
     const result = await this.db
       .insert(cartLines)
@@ -72,6 +150,7 @@ class CartService {
         cartId,
         variantId,
         quantity,
+        customizations,
       })
       .returning()
 
@@ -301,13 +380,14 @@ class CartService {
 
       const lines: NewCartLine[] = []
       for (const userLine of userCart.lines) {
-        const sessionLine = sessionCart.lines.find(
-          (l: CartLine) => l.variantId === userLine.variantId,
+        const sessionLine = sessionCart.lines.find((l: CartLine) =>
+          sameLine(l, userLine),
         )
         if (sessionLine) {
           lines.push({
             cartId: sessionCart.id,
             variantId: sessionLine.variantId,
+            customizations: sessionLine.customizations,
             id: sessionLine.id,
             quantity: sumProductQuantityOnCartMerge
               ? userLine.quantity + sessionLine.quantity
@@ -317,17 +397,19 @@ class CartService {
           lines.push({
             cartId: sessionCart.id,
             variantId: userLine.variantId,
+            customizations: userLine.customizations,
             quantity: userLine.quantity,
           })
         }
       }
 
       for (const sessionLine of sessionCart.lines) {
-        if (!userCart.lines.find((l: CartLine) => l.variantId === sessionLine.variantId)) {
+        if (!userCart.lines.find((l: CartLine) => sameLine(l, sessionLine))) {
           lines.push({
             id: sessionLine.id,
             cartId: sessionLine.cartId,
             variantId: sessionLine.variantId,
+            customizations: sessionLine.customizations,
             quantity: sessionLine.quantity,
             createdAt: sessionLine.createdAt,
             updatedAt: sessionLine.updatedAt,

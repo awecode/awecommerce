@@ -3,6 +3,7 @@ import { productVariants } from '../../product/schemas/pg'
 import { relations, sql } from 'drizzle-orm'
 import {
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   serial,
@@ -46,6 +47,8 @@ export const cartLines = pgTable('cart_line', {
     onDelete: 'cascade',
   }),
   quantity: integer().notNull(),
+  // The buyer's answers to the product's custom fields, by label
+  customizations: jsonb().notNull().default({}).$type<Record<string, string>>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
 })
