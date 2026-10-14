@@ -13,7 +13,7 @@ import {
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { cartAppliedVoucherOffers, carts } from '../../cart/schemas'
-import { CartService, validateCustomizations } from '../../cart/services/cart'
+import { CartService, customizationsError } from '../../cart/services/cart'
 import { priceCart } from '../../cart/services/pricing'
 import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
@@ -212,14 +212,9 @@ class OrderService {
       // them. Fail instead of placing an order with answers it no longer asks for.
       for (const line of content.lines) {
         const { product } = line.variant
-        try {
-          validateCustomizations(product.customFields, line.customizations)
-        } catch (error) {
-          throw new CustomizationsNoLongerValidError(
-            line.id,
-            product.name,
-            (error as Error).message,
-          )
+        const reason = customizationsError(product.customFields, line.customizations)
+        if (reason) {
+          throw new CustomizationsNoLongerValidError(line.id, product.name, reason)
         }
       }
 

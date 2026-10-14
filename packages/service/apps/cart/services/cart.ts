@@ -54,6 +54,20 @@ const validateCustomizations = (
   return customizations
 }
 
+// Why saved answers no longer fit the product's current custom fields, or null
+// when they still do
+const customizationsError = (
+  fields: CustomField[],
+  answers: Record<string, string>,
+) => {
+  try {
+    validateCustomizations(fields, answers)
+    return null
+  } catch (error) {
+    return (error as Error).message
+  }
+}
+
 // Whether two sets of answers are the same, in any key order
 const sameCustomizations = (
   a: Record<string, string>,
@@ -234,6 +248,11 @@ class CartService {
         ...line,
         tax: pricing.lines[index].tax,
         taxRate: pricing.lines[index].taxRate,
+        // Checkout fails while this is set; the buyer needs to update the line
+        customizationsError: customizationsError(
+          line.variant.product.customFields,
+          line.customizations,
+        ),
       })),
       subtotal: pricing.subtotal,
       loyaltyDiscount: pricing.loyaltyDiscount,
@@ -517,4 +536,4 @@ class CartService {
   }
 }
 
-export { CartService, validateCustomizations }
+export { CartService, customizationsError }

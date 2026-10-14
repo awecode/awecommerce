@@ -158,7 +158,7 @@ await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
 - **Validation:** it throws `Missing required field: <label>`, `Field is too long: <label> (max <n> characters)`, `Unknown field: <label>` for a label the product does not declare, and `Field must be text: <label>`. Nothing is added in these cases.
 - **Lines:** the same variant with the same answers adds to that line's quantity; different answers make a separate line. So two jerseys with different names are two lines. Merging a guest cart into the user's cart follows the same rule.
 - **Orders:** checkout copies each line's answers onto the order line's `customizations`. That copy is the record: changing or removing the product's `customFields` later does not change orders already placed.
-- **Fields changed while in the cart:** checkout checks the answers again against the product's current `customFields`. If they no longer fit (a new required field, a shorter `maxLength`, or a removed field that was answered), `createFromCart` throws `CustomizationsNoLongerValidError` (with `cartLineId`, `productName` and `reason`) and writes nothing; ask the buyer to update that line.
+- **Fields changed while in the cart:** checkout checks the answers again against the product's current `customFields`. If they no longer fit (a new required field, a shorter `maxLength`, or a removed field that was answered), `createFromCart` throws `CustomizationsNoLongerValidError` (with `cartLineId`, `productName` and `reason`) and writes nothing; ask the buyer to update that line. `getCartSummary` shows the same problem ahead of checkout: each line has `customizationsError`, `null` when its answers fit, otherwise the reason (for example `Missing required field: Initials`).
 
 ### Cart summary
 

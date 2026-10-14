@@ -260,3 +260,30 @@ test('should trim custom field labels', async () => {
   const product = await createJersey([{ label: '  Print name ', required: true, maxLength: 12 }])
   expect(product.customFields).toEqual([{ label: 'Print name', required: true, maxLength: 12 }])
 })
+
+test('should flag lines whose answers no longer fit in the cart summary', async () => {
+  const jersey = await createJersey()
+  const mug = await productService.create({
+    name: 'Mug',
+    slug: `mug-${++count}`,
+    sku: `mug-${count}`,
+    price: '10',
+  })
+  const cart = await cartService.create('custom-summary-user')
+  const jerseyLine = await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
+    'Print name': 'Dipesh',
+  })
+  const mugLine = await cartService.addToCart(cart.id, mug.variants[0].id, 1)
+
+  const before = await cartService.getCartSummary(cart.sessionId)
+  expect(before.lines.map((l) => l.customizationsError)).toEqual([null, null])
+
+  await productService.update(jersey.id, {
+    customFields: [...jerseyFields, { label: 'Initials', required: true, maxLength: 3 }],
+  })
+  const after = await cartService.getCartSummary(cart.sessionId)
+
+  const errors = Object.fromEntries(after.lines.map((l) => [l.id, l.customizationsError]))
+  expect(errors[jerseyLine.id]).toBe('Missing required field: Initials')
+  expect(errors[mugLine.id]).toBeNull()
+})
