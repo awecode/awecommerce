@@ -186,6 +186,8 @@ Benefits apply per unit, to at most `maxAffectedItems` units per line when it is
 
 A voucher that gives nothing throws `Voucher code is not applicable to any product in the cart`.
 
+Managing offers: `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` and `OfferService` create, get, update, delete and list them. `update` and `delete` throw `NotFoundError` for a missing record, and `delete` returns the deleted one. `OfferService.create` and `update` throw `ValidationError` for a voucher without a `voucherCode` (`A voucher needs a voucher code`) and for another offer with one (`Only vouchers have a voucher code`). `OfferService.get` includes the offer's `condition` and `benefit`; `OfferRangeService.get` lists the range's included and excluded products, brands, categories and classes by id and name.
+
 ### Cart summary
 
 `CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax`, `taxRate`, `isAvailable` and `customizationsError`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:

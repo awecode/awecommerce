@@ -35,6 +35,31 @@ export const productListQuery = z.object({
   ...pageFields,
 })
 
+export const offerRangeListQuery = listQuery
+
+export const offerConditionListQuery = z.object({
+  type: z.enum(['basket_quantity', 'basket_total', 'distinct_items']).optional(),
+  range: z.coerce.number().int().optional(),
+  ...pageFields,
+})
+
+export const offerBenefitListQuery = z.object({
+  q: z.string().trim().min(1).optional(),
+  active: z.stringbool().optional(),
+  type: z.enum(['fixed_amount', 'percentage', 'free_shipping', 'fixed_price']).optional(),
+  ...pageFields,
+})
+
+export const offerListQuery = z.object({
+  q: z.string().trim().min(1).optional(),
+  type: z.enum(['site', 'user', 'voucher']).optional(),
+  active: z.stringbool().optional(),
+  featured: z.stringbool().optional(),
+  condition: z.coerce.number().int().optional(),
+  benefit: z.coerce.number().int().optional(),
+  ...pageFields,
+})
+
 // A record, or a 404 when there is none
 export const orNotFound = <T>(record: T | null | undefined, message: string): T => {
   if (!record) {

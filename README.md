@@ -129,6 +129,25 @@ Every `/api/admin` route needs a signed-in admin (see Sign-in). The body schemas
 
 Something still in use (an ordered product or variant, a brand, class or category with products, a category with subcategories) cannot be deleted: 409 with `data.code` `InUse`. Deactivate it instead.
 
+### Offers
+
+An offer is built from parts, created first: a range (which products), a condition on that range (when it applies) and a benefit (what the buyer gets). See the library README for what each condition and benefit type does. Body schemas are in `packages/api-admin/shared/utils/offers.ts`.
+
+| Route | Body or query | Does |
+|---|---|---|
+| `GET`, `POST /api/admin/offer-ranges` | `q`, `active`, `page`, `size` / name, `includeAll…` flags, `inclusiveFilter`, `included…` and `excluded…` id lists | Lists or creates ranges. With `inclusiveFilter`, a product must match every list; without, any one. |
+| `GET`, `PATCH`, `DELETE /api/admin/offer-ranges/:id` | | Shows (with the products, brands, categories and classes by name), changes (each list given replaces the old one) or deletes |
+| `GET`, `POST /api/admin/offer-conditions` | `type`, `range` / `{ rangeId, type, value }` | Lists or creates conditions |
+| `GET`, `PATCH`, `DELETE /api/admin/offer-conditions/:id` | `{ type?, value? }` | |
+| `GET`, `POST /api/admin/offer-benefits` | `q`, `active`, `type` / `{ name, type, value, maxAffectedItems? }` | Lists or creates benefits |
+| `GET`, `PATCH`, `DELETE /api/admin/offer-benefits/:id` | | |
+| `GET`, `POST /api/admin/offers` | `q`, `type`, `active`, `featured`, `condition`, `benefit` / offer fields | Lists or creates site offers, user offers and vouchers |
+| `GET`, `PATCH`, `DELETE /api/admin/offers/:id` | | Shows (with its condition and benefit), changes or deletes |
+
+- A voucher needs a `voucherCode`, and other offers cannot have one (422). Codes are unique (409 `AlreadyExists`).
+- A part still used cannot be deleted (409 `InUse`): delete the offer, then its benefit and condition, then the range. Orders keep their own copy of the offers they used, so deleting an offer does not change them.
+- `usageCount` is not settable; checkout and cancelling keep it.
+
 ## API errors
 
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:

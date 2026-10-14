@@ -1,5 +1,5 @@
 import { Exact, paginate } from '../../../core/pagination'
-import { ValidationError } from '../../../core/errors'
+import { NotFoundError, ValidationError } from '../../../core/errors'
 import { CartContent, Database } from '../../types'
 import {
   and,
@@ -25,6 +25,7 @@ import {
 } from '../../product/schemas'
 import { minVariantPrice } from '../../product/services/product'
 import {
+  NewOffer,
   NewOfferApplicationLog,
   NewOfferBenefit,
   NewOfferRange,
@@ -42,6 +43,7 @@ import {
   offerRanges,
   offers,
   offerUsages,
+  UpdateOffer,
   UpdateOfferBenefit,
   UpdateOfferRange,
 } from '../schemas'
@@ -313,6 +315,15 @@ class OfferRangeService {
             },
           },
         },
+        excludedCategories: {
+          with: { category: { columns: { id: true, name: true } } },
+        },
+        excludedBrands: {
+          with: { brand: { columns: { id: true, name: true } } },
+        },
+        excludedProductClasses: {
+          with: { productClass: { columns: { id: true, name: true } } },
+        },
       },
     })
     if (!offer) {
@@ -327,6 +338,11 @@ class OfferRangeService {
       includedProductClasses: offer.includedProductClasses.map(
         (pc: any) => pc.productClass,
       ),
+      excludedCategories: offer.excludedCategories.map((c: any) => c.category),
+      excludedBrands: offer.excludedBrands.map((b: any) => b.brand),
+      excludedProductClasses: offer.excludedProductClasses.map(
+        (pc: any) => pc.productClass,
+      ),
     }
   }
 
@@ -337,6 +353,9 @@ class OfferRangeService {
         .set({ ...data, updatedAt: new Date().toISOString() })
         .where(eq(offerRanges.id, id))
         .returning()
+      if (!offerRange) {
+        throw new NotFoundError(`Offer range not found: ${id}`)
+      }
       if (data.includedProducts) {
         await tx
           .delete(offerRangeIncludedProducts)
@@ -446,7 +465,14 @@ class OfferRangeService {
   }
 
   async delete(id: number) {
-    return await this.db.delete(offerRanges).where(eq(offerRanges.id, id))
+    const [offerRange] = await this.db
+      .delete(offerRanges)
+      .where(eq(offerRanges.id, id))
+      .returning()
+    if (!offerRange) {
+      throw new NotFoundError(`Offer range not found: ${id}`)
+    }
+    return offerRange
   }
 
   async list<F extends OfferRangeListFilter = {}>(filters: Exact<F, OfferRangeListFilter>) {
@@ -513,11 +539,21 @@ class OfferBenefitService {
       })
       .where(eq(offerBenefits.id, id))
       .returning()
+    if (!offerBenefit) {
+      throw new NotFoundError(`Offer benefit not found: ${id}`)
+    }
     return offerBenefit
   }
 
   async delete(id: number) {
-    return await this.db.delete(offerBenefits).where(eq(offerBenefits.id, id))
+    const [offerBenefit] = await this.db
+      .delete(offerBenefits)
+      .where(eq(offerBenefits.id, id))
+      .returning()
+    if (!offerBenefit) {
+      throw new NotFoundError(`Offer benefit not found: ${id}`)
+    }
+    return offerBenefit
   }
 
   async list<F extends OfferBenefitListFilter = {}>(filters: Exact<F, OfferBenefitListFilter>) {
@@ -586,13 +622,21 @@ class OfferConditionService {
       .set({ ...data, updatedAt: new Date().toISOString() })
       .where(eq(offerConditions.id, id))
       .returning()
+    if (!offerCondition) {
+      throw new NotFoundError(`Offer condition not found: ${id}`)
+    }
     return offerCondition
   }
 
   async delete(id: number) {
-    return await this.db
+    const [offerCondition] = await this.db
       .delete(offerConditions)
       .where(eq(offerConditions.id, id))
+      .returning()
+    if (!offerCondition) {
+      throw new NotFoundError(`Offer condition not found: ${id}`)
+    }
+    return offerCondition
   }
 
   async list<F extends OfferConditionListFilter = {}>(filters: Exact<F, OfferConditionListFilter>) {
@@ -638,6 +682,17 @@ interface ActiveUserOfferListFilter {
   isFeatured?: boolean
 }
 
+// Every voucher has a code, the one buyers enter; other offers apply on their
+// own and have none
+const checkVoucherCode = (offer: { type?: string; voucherCode?: string | null }) => {
+  if (offer.type === 'voucher' && !offer.voucherCode) {
+    throw new ValidationError('A voucher needs a voucher code')
+  }
+  if (offer.type !== 'voucher' && offer.voucherCode) {
+    throw new ValidationError('Only vouchers have a voucher code')
+  }
+}
+
 class OfferService {
   private db: Database
 
@@ -645,14 +700,20 @@ class OfferService {
     this.db = dbInstance as Database
   }
 
-  async create(data: any) {
+  async create(data: NewOffer) {
+    checkVoucherCode(data)
     const [offer] = await this.db.insert(offers).values(data).returning()
     return offer
   }
 
+  // The offer with its condition and benefit
   async get(id: number) {
     return await this.db.query.offers.findFirst({
       where: eq(offers.id, id),
+      with: {
+        condition: true,
+        benefit: true,
+      },
     })
   }
 
@@ -669,17 +730,29 @@ class OfferService {
     })
   }
 
-  async update(id: number, data: any) {
-    const [offer] = await this.db
-      .update(offers)
-      .set({ ...data, updatedAt: new Date().toISOString() })
-      .where(eq(offers.id, id))
-      .returning()
-    return offer
+  async update(id: number, data: UpdateOffer) {
+    return await this.db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(offers).where(eq(offers.id, id)).for('update')
+      if (!existing) {
+        throw new NotFoundError(`Offer not found: ${id}`)
+      }
+      // Checked as the offer will be after the change
+      checkVoucherCode({ ...existing, ...data })
+      const [offer] = await tx
+        .update(offers)
+        .set({ ...data, updatedAt: new Date().toISOString() })
+        .where(eq(offers.id, id))
+        .returning()
+      return offer
+    })
   }
 
   async delete(id: number) {
-    return await this.db.delete(offers).where(eq(offers.id, id))
+    const [offer] = await this.db.delete(offers).where(eq(offers.id, id)).returning()
+    if (!offer) {
+      throw new NotFoundError(`Offer not found: ${id}`)
+    }
+    return offer
   }
 
   async list<F extends OfferListFilter = {}>(filters: Exact<F, OfferListFilter>) {

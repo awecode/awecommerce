@@ -1,0 +1,7 @@
+import { OfferRangeService } from '@awecommerce/service/apps/offer/services/offer'
+
+export default defineServiceHandler(async (event) => {
+  const { id } = await getValidatedRouterParams(event, idParams.parse)
+  const body = await readValidatedBody(event, updateOfferRangeSchema.parse)
+  return await new OfferRangeService(useDb()).update(id, body)
+})
