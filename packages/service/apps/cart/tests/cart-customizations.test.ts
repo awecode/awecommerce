@@ -287,3 +287,118 @@ test('should flag lines whose answers no longer fit in the cart summary', async 
   expect(errors[jerseyLine.id]).toBe('Missing required field: Initials')
   expect(errors[mugLine.id]).toBeNull()
 })
+
+test('should add up simultaneous adds of the same item on one line', async () => {
+  const jersey = await createJersey()
+  const mug = await productService.create({
+    name: 'Mug',
+    slug: `mug-${++count}`,
+    sku: `mug-${count}`,
+    price: '10',
+  })
+  const cart = await cartService.create('custom-race-user')
+
+  await Promise.all([
+    ...Array.from({ length: 5 }, () =>
+      cartService.addToCart(cart.id, jersey.variants[0].id, 1, { 'Print name': 'Dipesh' }),
+    ),
+    ...Array.from({ length: 5 }, () => cartService.addToCart(cart.id, mug.variants[0].id, 1)),
+  ])
+
+  const lines = await linesOf(cart.id)
+  expect(lines.map((l) => [l.variantId, l.quantity]).sort()).toEqual(
+    [
+      [jersey.variants[0].id, 5],
+      [mug.variants[0].id, 5],
+    ].sort(),
+  )
+})
+
+test('should replace the answers on a line', async () => {
+  const jersey = await createJersey()
+  const cart = await cartService.create('custom-replace-user')
+  const line = await cartService.addToCart(cart.id, jersey.variants[0].id, 2, {
+    'Print name': 'Dipesh',
+  })
+
+  const updated = await cartService.updateCustomizations(cart.id, line.id, {
+    'Print name': ' Ram ',
+    Number: '7',
+  })
+
+  expect(updated.id).toBe(line.id)
+  expect(updated.quantity).toBe(2)
+  expect(updated.customizations).toEqual({ 'Print name': 'Ram', Number: '7' })
+})
+
+test('should reject invalid replacement answers and keep the line as it was', async () => {
+  const jersey = await createJersey()
+  const cart = await cartService.create('custom-replace-invalid-user')
+  const line = await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
+    'Print name': 'Dipesh',
+  })
+
+  await expect(
+    cartService.updateCustomizations(cart.id, line.id, { Number: '7' }),
+  ).rejects.toThrow('Missing required field: Print name')
+  await expect(
+    cartService.updateCustomizations(cart.id, line.id, { 'Print name': 'Bartholomew Jr' }),
+  ).rejects.toThrow('Field is too long: Print name (max 12 characters)')
+
+  const [after] = await linesOf(cart.id)
+  expect(after.customizations).toEqual({ 'Print name': 'Dipesh' })
+})
+
+test('should merge into a line that already has the new answers', async () => {
+  const jersey = await createJersey()
+  const variantId = jersey.variants[0].id
+  const cart = await cartService.create('custom-replace-merge-user')
+  const dipesh = await cartService.addToCart(cart.id, variantId, 2, { 'Print name': 'Dipesh' })
+  const ram = await cartService.addToCart(cart.id, variantId, 1, { 'Print name': 'Ram' })
+
+  const merged = await cartService.updateCustomizations(cart.id, ram.id, {
+    'Print name': 'Dipesh',
+  })
+
+  expect(merged.id).toBe(dipesh.id)
+  expect(merged.quantity).toBe(3)
+  const lines = await linesOf(cart.id)
+  expect(lines.map((l) => [l.id, l.quantity])).toEqual([[dipesh.id, 3]])
+})
+
+test('should reject replacing answers on a line from another cart', async () => {
+  const jersey = await createJersey()
+  const cart = await cartService.create('custom-replace-owner-user')
+  const otherCart = await cartService.create('custom-replace-other-user')
+  const line = await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
+    'Print name': 'Dipesh',
+  })
+
+  await expect(
+    cartService.updateCustomizations(otherCart.id, line.id, { 'Print name': 'Ram' }),
+  ).rejects.toThrow(`Cart line not found: ${line.id}`)
+})
+
+test('should let checkout succeed after outdated answers are replaced', async () => {
+  const jersey = await createJersey()
+  const cart = await cartService.create('custom-replace-checkout-user')
+  const line = await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
+    'Print name': 'Dipesh',
+  })
+  await productService.update(jersey.id, {
+    customFields: [...jerseyFields, { label: 'Initials', required: true, maxLength: 3 }],
+  })
+  await expect(new OrderService(db).createFromCart(cart.id)).rejects.toThrow(
+    CustomizationsNoLongerValidError,
+  )
+
+  await cartService.updateCustomizations(cart.id, line.id, {
+    'Print name': 'Dipesh',
+    Initials: 'DA',
+  })
+  const summary = await cartService.getCartSummary(cart.sessionId)
+  expect(summary.lines[0].customizationsError).toBeNull()
+  const order = await new OrderService(db).createFromCart(cart.id)
+  const [orderLine] = await db.select().from(orderLines).where(eq(orderLines.orderId, order.id))
+  expect(orderLine.customizations).toEqual({ 'Print name': 'Dipesh', Initials: 'DA' })
+})

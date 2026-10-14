@@ -11,6 +11,7 @@ import {
   timestamp,
   uuid,
   primaryKey,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 
 export const cartStatus = pgEnum('cart_status', ['Open', 'Frozen', 'Cancelled', 'Merged'])
@@ -51,7 +52,12 @@ export const cartLines = pgTable('cart_line', {
   customizations: jsonb().notNull().default({}).$type<Record<string, string>>(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
-})
+}, (t) => [
+  // One line per item: the same variant with the same answers adds to the
+  // quantity instead of making a second line
+  uniqueIndex('cart_line_item_unique').on(t.cartId, t.variantId, t.customizations),
+])
+
 
 export const cartAppliedVoucherOfferRelations = relations(cartAppliedVoucherOffers, ({ one }) => ({
   cart: one(carts, {

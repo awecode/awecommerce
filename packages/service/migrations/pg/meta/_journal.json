@@ -71,6 +71,20 @@
       "when": 1791945311783,
       "tag": "0009_line_customizations",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791947636752,
+      "tag": "0010_merge_duplicate_cart_lines",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791947637234,
+      "tag": "0011_cart_line_item_unique",
+      "breakpoints": true
     }
   ]
 }

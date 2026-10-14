@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import {
   optionValuesWithOption,
   withVariantOptions,
@@ -142,22 +142,7 @@ class CartService {
     }
     const customizations = validateCustomizations(row.customFields, answers)
 
-    const existingLines = await this.db
-      .select()
-      .from(cartLines)
-      .where(and(eq(cartLines.cartId, cartId), eq(cartLines.variantId, variantId)))
-    const existing = existingLines.find((line) =>
-      sameLine(line, { variantId, customizations }),
-    )
-    if (existing) {
-      const [updated] = await this.db
-        .update(cartLines)
-        .set({ quantity: sql`${cartLines.quantity} + ${quantity}` })
-        .where(eq(cartLines.id, existing.id))
-        .returning()
-      return updated
-    }
-
+    // One statement, so simultaneous adds of the same item cannot make two lines
     const result = await this.db
       .insert(cartLines)
       .values({
@@ -166,9 +151,66 @@ class CartService {
         quantity,
         customizations,
       })
+      .onConflictDoUpdate({
+        target: [cartLines.cartId, cartLines.variantId, cartLines.customizations],
+        set: { quantity: sql`${cartLines.quantity} + excluded."quantity"` },
+      })
       .returning()
 
     return result[0]
+  }
+
+  // Replaces the buyer's answers on a line, for example after checkout or the
+  // cart summary reports they no longer fit the product's fields. If another
+  // line already has the new answers, this line's quantity moves onto it.
+  async updateCustomizations(
+    cartId: number,
+    cartLineId: number,
+    answers: Record<string, string>,
+  ) {
+    return await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ line: cartLines, customFields: products.customFields })
+        .from(cartLines)
+        .innerJoin(productVariants, eq(productVariants.id, cartLines.variantId))
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .where(and(eq(cartLines.id, cartLineId), eq(cartLines.cartId, cartId)))
+        .for('update', { of: cartLines })
+      if (!row) {
+        throw new Error(`Cart line not found: ${cartLineId}`)
+      }
+      const { line } = row
+      const customizations = validateCustomizations(row.customFields, answers)
+
+      const [matching] = await tx
+        .select()
+        .from(cartLines)
+        .where(
+          and(
+            eq(cartLines.cartId, cartId),
+            eq(cartLines.variantId, line.variantId),
+            eq(cartLines.customizations, customizations),
+            ne(cartLines.id, line.id),
+          ),
+        )
+        .for('update')
+      if (matching) {
+        await tx.delete(cartLines).where(eq(cartLines.id, line.id))
+        const [merged] = await tx
+          .update(cartLines)
+          .set({ quantity: sql`${cartLines.quantity} + ${line.quantity}` })
+          .where(eq(cartLines.id, matching.id))
+          .returning()
+        return merged
+      }
+
+      const [updated] = await tx
+        .update(cartLines)
+        .set({ customizations, updatedAt: new Date().toISOString() })
+        .where(eq(cartLines.id, line.id))
+        .returning()
+      return updated
+    })
   }
 
   async updateQuantity(cartId: number, cartLineId: number, quantity: number) {
