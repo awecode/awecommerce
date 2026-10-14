@@ -251,6 +251,20 @@ try {
 - **Status changes:** `changeStatus(orderId, newStatus, changedBy?)` records the order's current status as the previous status in its history. It throws `Order not found: <id>`, `Order is cancelled: <id>` (cancelled orders cannot change), `Order is already <status>: <id>`, and `Use cancel() to cancel an order` for `'Cancelled'`.
 - **Cancelling:** `cancel(orderId, cancelledBy, reason, remarks?)` records the order's current status as the previous status in its history, and gives back the usage of the order's offers, so their limits can be used again (guest orders give back only the overall count), and gives back any loyalty points redeemed for the order. It throws `Order is already cancelled: <id>` for an order that is already cancelled, including when two cancels run at the same moment, so usage is never given back twice.
 
+### Lists
+
+The `list()` methods (products, brands, categories, product classes, offers, offer ranges, conditions and benefits, orders) take a filter with an optional `pagination: { page, size }`:
+
+```ts
+const all = await productService.list({ isActive: true })
+// all: Product[]
+
+const page = await productService.list({ isActive: true, pagination: { page: 2, size: 20 } })
+// page: { results: Product[]; pagination: { page, size, total, pages } }
+```
+
+The return type follows the filter: an array without `pagination`, a page with it, and either one when the filter's type allows both, for example a `pagination` that may be `undefined`. Unknown filter fields are type errors.
+
 ### Services and import paths
 
 | Import path | Exports |

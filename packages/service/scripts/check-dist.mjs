@@ -35,6 +35,7 @@ const expectedExports = {
     'CategoryService',
   ],
   'core/errors': ['NotFoundError', 'ValidationError'],
+  'core/pagination': ['paginate'],
   'apps/cart/schemas': ['carts', 'cartLines'],
   'apps/offer/schemas': ['offers'],
   'apps/order/schemas': ['orders'],

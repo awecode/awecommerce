@@ -1,3 +1,4 @@
+import { Exact, paginate } from '../../../core/pagination'
 import { ValidationError } from '../../../core/errors'
 import { CartContent, Database } from '../../types'
 import {
@@ -448,7 +449,7 @@ class OfferRangeService {
     return await this.db.delete(offerRanges).where(eq(offerRanges.id, id))
   }
 
-  async list(filters: OfferRangeListFilter) {
+  async list<F extends OfferRangeListFilter = {}>(filters: Exact<F, OfferRangeListFilter>) {
     const where: SQL[] = []
 
     if (filters.q) {
@@ -464,25 +465,11 @@ class OfferRangeService {
       .from(offerRanges)
       .where(and(...where))
       .orderBy(desc(offerRanges.createdAt))
-    if (!filters.pagination) {
-      return await query
-    }
-
-    const { page, size } = filters.pagination
-
-    const results = await query.limit(size).offset((page - 1) * size)
-
-    const total = await this.db.$count(offerRanges, and(...where))
-
-    return {
-      results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filters as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(offerRanges, and(...where)),
+    )
   }
 }
 
@@ -533,7 +520,7 @@ class OfferBenefitService {
     return await this.db.delete(offerBenefits).where(eq(offerBenefits.id, id))
   }
 
-  async list(filters: OfferBenefitListFilter) {
+  async list<F extends OfferBenefitListFilter = {}>(filters: Exact<F, OfferBenefitListFilter>) {
     const where: SQL[] = []
 
     if (filters.q) {
@@ -553,25 +540,11 @@ class OfferBenefitService {
       .from(offerBenefits)
       .where(and(...where))
       .orderBy(desc(offerBenefits.createdAt))
-    if (!filters.pagination) {
-      return await query
-    }
-
-    const { page, size } = filters.pagination
-
-    const results = await query.limit(size).offset((page - 1) * size)
-
-    const total = await this.db.$count(offerBenefits, and(...where))
-
-    return {
-      results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filters as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(offerBenefits, and(...where)),
+    )
   }
 }
 
@@ -622,7 +595,7 @@ class OfferConditionService {
       .where(eq(offerConditions.id, id))
   }
 
-  async list(filters: OfferConditionListFilter) {
+  async list<F extends OfferConditionListFilter = {}>(filters: Exact<F, OfferConditionListFilter>) {
     const where: SQL[] = []
 
     if (filters.type) {
@@ -638,25 +611,11 @@ class OfferConditionService {
       .from(offerConditions)
       .where(and(...where))
       .orderBy(desc(offerConditions.createdAt))
-    if (!filters.pagination) {
-      return await query
-    }
-
-    const { page, size } = filters.pagination
-
-    const results = await query.limit(size).offset((page - 1) * size)
-
-    const total = await this.db.$count(offerConditions, and(...where))
-
-    return {
-      results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filters as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(offerConditions, and(...where)),
+    )
   }
 }
 
@@ -723,7 +682,7 @@ class OfferService {
     return await this.db.delete(offers).where(eq(offers.id, id))
   }
 
-  async list(filters: OfferListFilter) {
+  async list<F extends OfferListFilter = {}>(filters: Exact<F, OfferListFilter>) {
     const where: SQL[] = []
 
     if (filters.q) {
@@ -755,25 +714,11 @@ class OfferService {
       .from(offers)
       .where(and(...where))
       .orderBy(desc(offers.createdAt))
-    if (!filters.pagination) {
-      return await query
-    }
-
-    const { page, size } = filters.pagination
-
-    const results = await query.limit(size).offset((page - 1) * size)
-
-    const total = await this.db.$count(offers, and(...where))
-
-    return {
-      results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filters as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(offers, and(...where)),
+    )
   }
 
   async markAsActive(id: number) {

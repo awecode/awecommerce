@@ -1,3 +1,4 @@
+import { Exact, paginate, PaginationArgs } from '../../../core/pagination'
 import { NotFoundError, ValidationError } from '../../../core/errors'
 import {
   and,
@@ -65,10 +66,6 @@ const validateCustomFields = (fields: CustomField[]) => {
   })
 }
 
-type PaginationArgs = {
-  page: number
-  size: number
-}
 
 interface ProductFilter {
   brands?: number[]
@@ -277,7 +274,7 @@ class ProductService {
     return result[0]
   }
 
-  async list(filter: ProductFilter) {
+  async list<F extends ProductFilter = {}>(filter: Exact<F, ProductFilter>) {
     const where: SQL[] = []
 
     if (filter.getFilters) {
@@ -382,35 +379,25 @@ class ProductService {
       .orderBy(orderBy)
       .where(and(...where))
 
-    if (!filter.pagination) {
-      return await query
-    }
-
-    const { page, size } = filter.pagination
-    const results = await query.limit(size).offset((page - 1) * size)
-    const total = Number(
-      (
-        await this.db
-          .select({ count: sql<number>`count(*)` })
-          .from(products)
-          .leftJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(categories, eq(products.categoryId, categories.id))
-          .leftJoin(
-            productClasses,
-            eq(products.productClassId, productClasses.id),
-          )
-          .where(and(...where))
-      )[0]!.count,
+    return await paginate(
+      filter as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      async () =>
+        Number(
+          (
+            await this.db
+              .select({ count: sql<number>`count(*)` })
+              .from(products)
+              .leftJoin(brands, eq(products.brandId, brands.id))
+              .leftJoin(categories, eq(products.categoryId, categories.id))
+              .leftJoin(
+                productClasses,
+                eq(products.productClassId, productClasses.id),
+              )
+              .where(and(...where))
+          )[0]!.count,
+        ),
     )
-    return {
-      results: results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
   }
 
   async markAsFeatured(productId: number) {
@@ -579,7 +566,7 @@ class BrandService {
     return result.length > 0
   }
 
-  async list(filter: BrandFilter) {
+  async list<F extends BrandFilter = {}>(filter: Exact<F, BrandFilter>) {
     const where: SQL[] = []
 
     if (filter.q) {
@@ -643,22 +630,11 @@ class BrandService {
         desc(brands.createdAt)
       )
 
-    if (!filter.pagination) {
-      return await query
-    }
-
-    const { page, size } = filter.pagination
-    const results = await query.limit(size).offset((page - 1) * size)
-    const total = await this.db.$count(brands, and(...where))
-    return {
-      results: results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filter as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(brands, and(...where)),
+    )
   }
 
   async markAsActive(brandId: number) {
@@ -745,7 +721,7 @@ class ProductClassService {
     return result.length > 0
   }
 
-  async list(filter?: ProductClassFilter) {
+  async list<F extends ProductClassFilter = {}>(filter?: Exact<F, ProductClassFilter>) {
     const where: SQL[] = []
 
     if (filter?.q) {
@@ -769,22 +745,11 @@ class ProductClassService {
       .where(and(...where))
       .orderBy(desc(productClasses.createdAt))
 
-    if (!filter?.pagination) {
-      return await query
-    }
-
-    const { page, size } = filter.pagination
-    const results = await query.limit(size).offset((page - 1) * size)
-    const total = await this.db.$count(productClasses, and(...where))
-    return {
-      results: results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filter as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(productClasses, and(...where)),
+    )
   }
 
   async markAsActive(productClassId: number) {
@@ -881,7 +846,7 @@ class CategoryService {
     return result > 0
   }
 
-  async list(filter?: CategoryFilter) {
+  async list<F extends CategoryFilter = {}>(filter?: Exact<F, CategoryFilter>) {
     const where: SQL[] = []
 
     if (filter?.q) {
@@ -981,22 +946,11 @@ class CategoryService {
       .where(and(...where))
       .orderBy(desc(categories.createdAt))
 
-    if (!filter?.pagination) {
-      return await query
-    }
-
-    const { page, size } = filter.pagination
-    const results = await query.limit(size).offset((page - 1) * size)
-    const total = await this.db.$count(categories, and(...where))
-    return {
-      results: results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+    return await paginate(
+      filter as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(categories, and(...where)),
+    )
   }
 
   async markAsActive(categoryId: number) {

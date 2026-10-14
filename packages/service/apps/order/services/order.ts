@@ -1,3 +1,4 @@
+import { Exact, paginate } from '../../../core/pagination'
 import { NotFoundError, ValidationError } from '../../../core/errors'
 import {
   and,
@@ -678,7 +679,7 @@ class OrderService {
     return order
   }
 
-  async list(filters?: OrderListFilter) {
+  async list<F extends OrderListFilter = {}>(filters?: Exact<F, OrderListFilter>) {
     const where: SQL[] = []
 
     if (filters?.q) {
@@ -722,44 +723,23 @@ class OrderService {
       where.push(...filters.extraFilters)
     }
 
-    if (!filters?.pagination) {
-      return await this.db.query.orders.findMany( {
-      with: {
-        lines: {
+    return await paginate(
+      filters as F | undefined,
+      (page) =>
+        this.db.query.orders.findMany({
           with: {
-            product: true,
+            lines: {
+              with: {
+                product: true,
+              },
+            },
           },
-        },
-      },
-      where: and(...where),
-    })
-    }
-
-    const { page, size } = filters.pagination
-    const results = await this.db.query.orders.findMany({
-      with: {
-        lines: {
-          with: {
-            product: true,
-          },
-        },
-      },
-      where: and(...where),
-      orderBy: desc(orders.createdAt),
-      offset: (page - 1) * size,
-      limit: size,
-    })
-
-    const total = await this.db.$count(orders, and(...where))
-    return {
-      results: results,
-      pagination: {
-        page,
-        size,
-        total,
-        pages: Math.ceil(total / size),
-      },
-    }
+          where: and(...where),
+          orderBy: desc(orders.createdAt),
+          ...page,
+        }),
+      () => this.db.$count(orders, and(...where)),
+    )
   }
 
   async delete(orderId: number) {
