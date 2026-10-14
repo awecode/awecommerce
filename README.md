@@ -22,6 +22,23 @@ pnpm dev:storefront
 pnpm dev:backoffice
 ```
 
+## Store API
+
+The cart is found by the `awe_cart` cookie (httpOnly), which holds the cart's `sessionId`. It is set on the first add; a checked-out cart counts as no cart, so the next add starts a new one. Every change returns the cart summary (`CartService.getCartSummary`).
+
+| Route | Body | Does |
+|---|---|---|
+| `GET /api/store/cart` | | The cart summary, or 204 with no body before the first add |
+| `POST /api/store/cart/lines` | `{ variantId, quantity, customizations? }` | Adds a variant, creating the cart |
+| `PATCH /api/store/cart/lines/:id` | `{ quantity?, customizations? }` | Changes the line; both or neither are saved |
+| `DELETE /api/store/cart/lines/:id` | | Removes the line |
+| `POST /api/store/cart/vouchers` | `{ code }` | Applies a voucher |
+| `DELETE /api/store/cart/vouchers/:code` | | Removes a voucher |
+
+The body schemas are in `packages/api-store/shared/utils/cart.ts` and are auto-imported in the apps too, for forms. A body of the wrong shape gives 400.
+
+`pnpm test:api` runs the route tests: it builds the layer and calls it over HTTP, against a temporary Postgres (or `TEST_POSTGRES_URL`).
+
 ## API errors
 
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:

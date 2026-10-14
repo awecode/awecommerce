@@ -39,6 +39,12 @@ test('missing records throw NotFoundError', async () => {
     'Cart line not found: 999999',
   )
   await rejectsWith(
+    cartService.updateQuantity(cart.id, 999999, 2),
+    NotFoundError,
+    'Cart line not found: 999999',
+  )
+  await rejectsWith(cartService.removeFromCart(cart.id, 999999), NotFoundError, 'Cart line not found: 999999')
+  await rejectsWith(
     cartService.getCartContentForSession('00000000-0000-0000-0000-000000000000'),
     NotFoundError,
     'Cart not found for session: 00000000-0000-0000-0000-000000000000',

@@ -76,6 +76,14 @@ for (const file of listFiles(join(root, 'dist'))) {
     failures.push(`unexpected file in dist: ${path}`)
   }
 }
+// Type imports must use package names. A path into node_modules only resolves
+// inside this repo; for an installed app the types silently become `any`.
+for (const file of listFiles(join(root, 'dist')).filter((f) => f.endsWith('.d.ts'))) {
+  const count = (readFileSync(file, 'utf8').match(/["']node_modules\//g) ?? []).length
+  if (count) {
+    failures.push(`${relative(join(root, 'dist'), file)}: ${count} type imports through node_modules/`)
+  }
+}
 for (const subpath of subpaths) {
   const specifier = `${name}/${subpath}`
   for (const [format, load] of [

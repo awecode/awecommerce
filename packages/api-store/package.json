@@ -4,11 +4,20 @@
   "type": "module",
   "description": "Nuxt layer: storefront API under /api/store",
   "main": "./nuxt.config.ts",
+  "scripts": {
+    "test": "node ../service/scripts/test-pg.mjs --if-available"
+  },
   "dependencies": {
     "@awecommerce/api-core": "workspace:*",
-    "@awecommerce/service": "workspace:*"
+    "@awecommerce/service": "workspace:*",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "nuxt": "^4.6.1"
+    "nuxt": "^4.6.1",
+    "@nuxt/test-utils": "^4.3.3",
+    "@types/pg": "^8.23.1",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
+    "vitest": "^5.0.4"
   }
 }

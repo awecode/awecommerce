@@ -223,6 +223,9 @@ class CartService {
       .set({ quantity })
       .where(and(eq(cartLines.id, cartLineId), eq(cartLines.cartId, cartId)))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Cart line not found: ${cartLineId}`)
+    }
     return result[0]
   }
 
@@ -231,6 +234,9 @@ class CartService {
       .delete(cartLines)
       .where(and(eq(cartLines.id, cartLineId), eq(cartLines.cartId, cartId)))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Cart line not found: ${cartLineId}`)
+    }
     return result[0]
   }
 
