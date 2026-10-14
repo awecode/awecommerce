@@ -31,6 +31,11 @@ export const findOrCreateCart = async (event: H3Event) => {
   return created
 }
 
+// After checkout the cart is closed; the next add starts a new one
+export const forgetCart = (event: H3Event) => {
+  deleteCookie(event, CART_COOKIE, { path: '/' })
+}
+
 // The buyer's open cart, or a 404 when there is none
 export const requireCart = async (event: H3Event) => {
   const cart = await findCart(event)
@@ -40,7 +45,12 @@ export const requireCart = async (event: H3Event) => {
   return cart
 }
 
-export const cartSummary = async (cart: { sessionId: string }) =>
-  await new CartService(useDb()).getCartSummary(cart.sessionId)
+export const cartSummary = async (cart: { sessionId: string }, shippingMethodId?: number) =>
+  await new CartService(useDb()).getCartSummary(cart.sessionId, { shippingMethodId })
 
 export const cartLineParams = z.object({ id: z.coerce.number().int() })
+
+export const cartQuery = z.object({
+  // Includes this method's charge and its tax in the totals
+  shippingMethodId: z.coerce.number().int().optional(),
+})

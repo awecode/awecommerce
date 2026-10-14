@@ -1,110 +1,13 @@
-import { fileURLToPath } from 'node:url'
-import { fetch, setup } from '@nuxt/test-utils/e2e'
-import { eq } from 'drizzle-orm'
-import { drizzle } from 'drizzle-orm/node-postgres'
-import pg from 'pg'
-import { afterAll, describe, expect, test } from 'vitest'
-import * as schema from '@awecommerce/service/core/db/pg/schema'
-import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import {
-  offerBenefits,
-  offerConditions,
-  offerRangeIncludedProducts,
-  offerRanges,
-  offers,
-} from '@awecommerce/service/apps/offer/schemas'
-
-const url = process.env.TEST_POSTGRES_URL
+import { fetch } from '@nuxt/test-utils/e2e'
+import { describe, expect, test } from 'vitest'
+import { buyer, createProduct, createVoucher, setupApi, url } from './helpers'
 
 describe.skipIf(!url)('store cart API', async () => {
-  // The built server reads the database from here
-  process.env.NUXT_POSTGRES_URL = url
-  await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
-
-  const pool = new pg.Pool({ connectionString: url })
-  const db = drizzle(pool, { schema })
-  afterAll(() => pool.end())
-
-  let count = 0
-  const unique = (prefix: string) => `${prefix}-${Date.now()}-${++count}`
-
-  const createProduct = async (price: string, customFields: schema.CustomField[] = []) => {
-    const slug = unique('cart-api')
-    const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price, customFields })
-    return product.variants[0]!.id
-  }
-
-  const first = <T>(rows: T[]) => rows[0]!
-
-  const createVoucher = async (variantId: number, percent: string) => {
-    const variant = first(
-      await db.select().from(schema.productVariants).where(eq(schema.productVariants.id, variantId)),
-    )
-    const range = first(
-      await db
-        .insert(offerRanges)
-        .values({
-          name: unique('range'),
-          inclusiveFilter: true,
-          includeAllProducts: false,
-          includeAllBrands: true,
-          includeAllCategories: true,
-          includeAllProductClasses: true,
-        })
-        .returning(),
-    )
-    await db
-      .insert(offerRangeIncludedProducts)
-      .values({ rangeId: range.id, productId: variant.productId })
-    const condition = first(
-      await db
-        .insert(offerConditions)
-        .values({ rangeId: range.id, type: 'basket_quantity', value: '1' })
-        .returning(),
-    )
-    const benefit = first(
-      await db
-        .insert(offerBenefits)
-        .values({ name: unique('benefit'), type: 'percentage', value: percent })
-        .returning(),
-    )
-    const code = unique('CODE').toUpperCase()
-    await db.insert(offers).values({
-      name: code,
-      type: 'voucher',
-      voucherCode: code,
-      includeAllUsers: true,
-      conditionId: condition.id,
-      benefitId: benefit.id,
-    })
-    return code
-  }
-
-  // A browser: keeps the cart cookie between requests
-  const buyer = () => {
-    let cookie = ''
-    const request = async (path: string, options: { method?: string; body?: unknown } = {}) => {
-      const response = await fetch(path, {
-        method: options.method ?? 'GET',
-        headers: {
-          cookie,
-          ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
-        },
-        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-      })
-      const setCookie = response.headers.get('set-cookie')
-      if (setCookie) {
-        cookie = setCookie.split(';')[0]!
-      }
-      const text = await response.text()
-      return { status: response.status, body: text ? JSON.parse(text) : null, setCookie }
-    }
-    return request
-  }
+  const db = await setupApi()
 
   test('a new buyer has no cart until the first add, which sets the cookie', async () => {
     const request = buyer()
-    const variantId = await createProduct('10')
+    const variantId = await createProduct(db, '10')
 
     // No cart: 204 with no body
     expect((await request('/api/store/cart')).status).toBe(204)
@@ -129,7 +32,7 @@ describe.skipIf(!url)('store cart API', async () => {
 
   test('changes quantity and answers, merges matching lines, and removes lines', async () => {
     const request = buyer()
-    const variantId = await createProduct('5', [{ label: 'Name', required: true, maxLength: 10 }])
+    const variantId = await createProduct(db, '5', [{ label: 'Name', required: true, maxLength: 10 }])
     await request('/api/store/cart/lines', {
       method: 'POST',
       body: { variantId, quantity: 1, customizations: { Name: 'Ann' } },
@@ -158,7 +61,7 @@ describe.skipIf(!url)('store cart API', async () => {
 
   test('a rejected answer leaves the quantity unchanged', async () => {
     const request = buyer()
-    const variantId = await createProduct('5', [{ label: 'Name', required: true, maxLength: 3 }])
+    const variantId = await createProduct(db, '5', [{ label: 'Name', required: true, maxLength: 3 }])
     const added = await request('/api/store/cart/lines', {
       method: 'POST',
       body: { variantId, quantity: 1, customizations: { Name: 'Ann' } },
@@ -175,8 +78,8 @@ describe.skipIf(!url)('store cart API', async () => {
 
   test('applies and removes a voucher', async () => {
     const request = buyer()
-    const variantId = await createProduct('100')
-    const code = await createVoucher(variantId, '10')
+    const variantId = await createProduct(db, '100')
+    const { code } = await createVoucher(db, variantId, '10')
     await request('/api/store/cart/lines', { method: 'POST', body: { variantId, quantity: 1 } })
 
     const applied = await request('/api/store/cart/vouchers', { method: 'POST', body: { code } })
@@ -194,7 +97,7 @@ describe.skipIf(!url)('store cart API', async () => {
 
   test('maps errors to 400, 404 and 422', async () => {
     const request = buyer()
-    const variantId = await createProduct('10')
+    const variantId = await createProduct(db, '10')
 
     // Malformed body
     expect((await request('/api/store/cart/lines', { method: 'POST', body: { variantId: 'x' } })).status).toBe(400)
@@ -215,7 +118,7 @@ describe.skipIf(!url)('store cart API', async () => {
   test('another buyer cannot change a cart they do not hold', async () => {
     const owner = buyer()
     const other = buyer()
-    const variantId = await createProduct('10')
+    const variantId = await createProduct(db, '10')
     const added = await owner('/api/store/cart/lines', { method: 'POST', body: { variantId, quantity: 1 } })
     await other('/api/store/cart/lines', { method: 'POST', body: { variantId, quantity: 1 } })
 

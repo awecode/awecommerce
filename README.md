@@ -28,14 +28,27 @@ The cart is found by the `awe_cart` cookie (httpOnly), which holds the cart's `s
 
 | Route | Body | Does |
 |---|---|---|
-| `GET /api/store/cart` | | The cart summary, or 204 with no body before the first add |
+| `GET /api/store/cart?shippingMethodId=` | | The cart summary, with that method's charge and tax when given, or 204 with no body before the first add |
 | `POST /api/store/cart/lines` | `{ variantId, quantity, customizations? }` | Adds a variant, creating the cart |
 | `PATCH /api/store/cart/lines/:id` | `{ quantity?, customizations? }` | Changes the line; both or neither are saved |
 | `DELETE /api/store/cart/lines/:id` | | Removes the line |
 | `POST /api/store/cart/vouchers` | `{ code }` | Applies a voucher |
 | `DELETE /api/store/cart/vouchers/:code` | | Removes a voucher |
 
-The body schemas are in `packages/api-store/shared/utils/cart.ts` and are auto-imported in the apps too, for forms. A body of the wrong shape gives 400.
+Checkout is for guests until sign-in exists:
+
+| Route | Body | Does |
+|---|---|---|
+| `GET /api/store/shipping-methods` | | The shipping methods |
+| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress, guestUser }` | Places the order and clears the cart cookie. Returns the order with its `hash`. |
+| `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page. A wrong hash gives 404. |
+
+- `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.
+- The other 409s: `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
+- `shippingAddress` needs `line1`, `city` and `country`; `line2`, `houseNo`, `province`, `postalCode`, `countryCode` and `instructions` are optional. `guestUser` needs `name` and `email`; `phone` is optional. Other fields are dropped.
+- The storefront needs `ORDER_HASH_SECRET` (see its `.env.example`) to sign order links.
+
+The body schemas are in `packages/api-store/shared/utils/cart.ts` and `checkout.ts`, and are auto-imported in the apps too, for forms. A body of the wrong shape gives 400.
 
 `pnpm test:api` runs the route tests: it builds the layer and calls it over HTTP, against a temporary Postgres (or `TEST_POSTGRES_URL`).
 
