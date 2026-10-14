@@ -80,7 +80,7 @@ Signed in, the buyer gets their own open cart on every device. A guest cart stil
 |---|---|---|
 | `GET /api/store/shipping-methods` | | The shipping methods |
 | `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress or shippingAddressId, guestUser?, redeemPoints? }` | Places the order and clears the cart cookie. Returns the order with its `hash`. |
-| `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page. A wrong hash gives 404. |
+| `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page, for whoever holds the link. A wrong hash gives 404. |
 
 - `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.
 - The other 409s: `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
@@ -98,6 +98,8 @@ Signed in, the buyer gets their own open cart on every device. A guest cart stil
 | `POST /api/store/addresses` | address fields, `isDefault?` | Saves one; a default replaces the previous default |
 | `PATCH /api/store/addresses/:id` | any address fields, `isDefault?` | Changes one (404 if it is not the buyer's) |
 | `DELETE /api/store/addresses/:id` | | Deletes one (404 if it is not the buyer's) |
+| `GET /api/store/orders?page=&size=` | | The buyer's orders, newest first, one page at a time (`size` at most 100) |
+| `GET /api/store/orders/:id` | | One of the buyer's orders, without a hash (404 if it is not theirs) |
 | `GET /api/store/loyalty` | | `{ canRedeem, redeemRate, points, value }`: the points that can be redeemed now and their worth |
 
 The body schemas are in `packages/api-store/shared/utils/cart.ts` and `checkout.ts`, and are auto-imported in the apps too, for forms. A body of the wrong shape gives 400.

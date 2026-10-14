@@ -127,6 +127,40 @@ describe.skipIf(!url)('signed-in store API', async () => {
     expect(both.status).toBe(400)
   })
 
+  test('lists the buyer orders and shows each without a hash, only to its owner', async () => {
+    const owner = buyer()
+    owner.signIn((await createUser(db)).token)
+    const placeOrder = async () => {
+      await addLine(owner, await createProduct(db, '10'), 1)
+      const { total } = (await owner('/api/store/cart')).body
+      return (await owner('/api/store/checkout', {
+        method: 'POST',
+        body: { expectedTotal: total, shippingAddress: address },
+      })).body
+    }
+    const first = await placeOrder()
+    const second = await placeOrder()
+
+    const page = await owner('/api/store/orders?page=1&size=1')
+    expect(page.body.results.map((o: any) => o.id)).toEqual([second.id])
+    expect(page.body.pagination).toMatchObject({ total: 2, pages: 2 })
+    expect((await owner('/api/store/orders?page=2&size=1')).body.results.map((o: any) => o.id)).toEqual([first.id])
+
+    const shown = await owner(`/api/store/orders/${first.id}`)
+    expect(shown.status).toBe(200)
+    expect(shown.body.id).toBe(first.id)
+
+    const other = buyer()
+    other.signIn((await createUser(db)).token)
+    expect((await other('/api/store/orders')).body.results).toEqual([])
+    expect((await other(`/api/store/orders/${first.id}`)).status).toBe(404)
+    // Signed out: a hash still works, no hash needs sign-in
+    expect((await buyer()(`/api/store/orders/${first.id}`)).status).toBe(401)
+    expect((await buyer()('/api/store/orders')).status).toBe(401)
+    const byHash = await buyer()(`/api/store/orders/${first.id}?hash=${encodeURIComponent(first.hash)}`)
+    expect(byHash.body.id).toBe(first.id)
+  })
+
   test('shows loyalty points, previews their value and redeems them at checkout', async () => {
     await new LoyaltyService(db).updateSettings({ isEnabled: true, redeemRate: '0.5' })
     const { userId, token } = await createUser(db)

@@ -63,7 +63,8 @@ describe.skipIf(!url)('store checkout API', async () => {
     expect(shown.body.id).toBe(id)
     expect(Number(shown.body.total)).toBe(95)
     expect((await request(`/api/store/orders/${id}?hash=wrong`)).status).toBe(404)
-    expect((await request(`/api/store/orders/${id}`)).status).toBe(400)
+    // A guest without the hash would need to sign in
+    expect((await request(`/api/store/orders/${id}`)).status).toBe(401)
   })
 
   test('refuses a total that changed, with the new total, and keeps the cart', async () => {
