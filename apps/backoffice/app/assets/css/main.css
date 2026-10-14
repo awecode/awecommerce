@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@import "@fontsource-variable/inter";
+
+/* Classes used by the auth layer's components */
+@source "../../../../../packages/auth/app";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  /* Slightly tighter corners than Nuxt UI's default, for a denser look */
+  --ui-radius: 0.375rem;
+  /* Panel and sidebar headers: 48px instead of 64px */
+  --ui-header-height: 3rem;
+}
+
+body {
+  /* Tabular figures keep prices and stock aligned in columns */
+  font-feature-settings: "cv11", "tnum";
+  @apply antialiased;
+}
