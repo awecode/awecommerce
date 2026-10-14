@@ -41,6 +41,7 @@ export const createProduct = async (
 ) => {
   const slug = unique('store-api')
   const product = await new ProductService(db).create({
+    stockQuantity: 1000,
     name: slug,
     slug,
     sku: slug,

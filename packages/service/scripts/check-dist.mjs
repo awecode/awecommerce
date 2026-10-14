@@ -34,6 +34,7 @@ const expectedExports = {
     'ProductVariantService',
     'ProductOptionService',
     'CategoryService',
+    'OutOfStockError',
   ],
   'core/errors': ['NotFoundError', 'ValidationError'],
   'core/pagination': ['paginate'],

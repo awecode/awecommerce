@@ -5,13 +5,16 @@ import {
   OrderTotalMismatchError,
   VoucherNoLongerValidError,
 } from '@awecommerce/service/apps/order/services/order'
+import { OutOfStockError } from '@awecommerce/service/apps/product/services/product'
 import { NotFoundError, ValidationError } from '@awecommerce/service/core/errors'
 
-// Errors the buyer can fix (refresh the cart, change answers, drop a voucher)
+// Errors the buyer can fix (refresh the cart, change answers, drop a voucher,
+// lower a quantity)
 const conflictErrors = [
   CustomizationsNoLongerValidError,
   OfferLimitReachedError,
   OrderTotalMismatchError,
+  OutOfStockError,
   VoucherNoLongerValidError,
 ]
 
@@ -25,7 +28,7 @@ const postgresError = (error: unknown) => {
 }
 
 // Turns a service error into an HTTP error. The error's fields (offerId,
-// cartLineId, expectedTotal, ...) and its name, as `code`, go in `data`.
+// cartLineId, expectedTotal, available, ...) and its name, as `code`, go in `data`.
 export const toHttpError = (error: unknown) => {
   if (isError(error)) {
     return error

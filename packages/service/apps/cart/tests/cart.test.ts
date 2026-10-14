@@ -25,6 +25,7 @@ const variantService = new ProductVariantService(db)
 
 const createProduct = async () => {
   return await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: faker.commerce.productName(),
     slug: faker.string.uuid(),
@@ -391,6 +392,7 @@ test('should keep two variants of one product as separate lines', async () => {
     options: { Color: 'Red' },
   })
   const blue = await variantService.create(product.id, {
+    stockQuantity: 1000,
     sku: faker.string.uuid(),
     price: '20',
     options: { Color: 'Blue' },

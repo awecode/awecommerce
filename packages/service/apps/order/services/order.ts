@@ -17,7 +17,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { cartAppliedVoucherOffers, carts } from '../../cart/schemas'
 import { CartService, customizationsError } from '../../cart/services/cart'
-import { ProductService } from '../../product/services/product'
+import { ProductService, ProductVariantService } from '../../product/services/product'
 import { priceCart } from '../../cart/services/pricing'
 import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
@@ -33,7 +33,7 @@ import {
   paymentEvents,
   transactions,
 } from '../schemas'
-import { products } from '../../product/schemas'
+import { products, productVariants } from '../../product/schemas'
 import { Database } from '../../types'
 
 type CreateFromCartOptions = {
@@ -230,6 +230,15 @@ class OrderService {
         }
       }
 
+      // Locked until the order is placed, so two checkouts cannot sell the
+      // same stock
+      const wanted = new Map<number, number>()
+      for (const line of content.lines) {
+        wanted.set(line.variantId, (wanted.get(line.variantId) ?? 0) + line.quantity)
+      }
+      const stock = await new ProductVariantService(tx).checkStock(wanted, { lock: true })
+      const tracked = (variantId: number) => stock.get(variantId)?.stock !== null
+
       const loyaltyDiscount =
         redeemPoints !== undefined
           ? await new LoyaltyService(tx).redemptionValue(cart.userId, redeemPoints)
@@ -292,8 +301,20 @@ class OrderService {
       await tx
         .insert(orderLines)
         .values(
-          pricing.lines.map(({ cartLineId, ...line }) => ({ ...line, orderId: order.id })),
+          pricing.lines.map(({ cartLineId, ...line }) => ({
+            ...line,
+            orderId: order.id,
+            stockTaken: tracked(line.variantId),
+          })),
         )
+      for (const [variantId, quantity] of wanted) {
+        if (tracked(variantId)) {
+          await tx
+            .update(productVariants)
+            .set({ stockQuantity: sql`${productVariants.stockQuantity} - ${quantity}` })
+            .where(eq(productVariants.id, variantId))
+        }
+      }
       const lines = await tx.query.orderLines.findMany({
         where: eq(orderLines.orderId, order.id),
         with: {
@@ -647,6 +668,17 @@ class OrderService {
       const offerIds = new Set((order.offers ?? []).map((offer) => offer.id as number))
       for (const offerId of offerIds) {
         await offerService.decreaseUsage(offerId, order.userId)
+      }
+      // Gives back the stock the order took
+      const taken = await tx
+        .select({ variantId: orderLines.variantId, quantity: orderLines.quantity })
+        .from(orderLines)
+        .where(and(eq(orderLines.orderId, orderId), eq(orderLines.stockTaken, true)))
+      for (const line of taken) {
+        await tx
+          .update(productVariants)
+          .set({ stockQuantity: sql`${productVariants.stockQuantity} + ${line.quantity}` })
+          .where(eq(productVariants.id, line.variantId))
       }
       // Gives back loyalty points redeemed for the order
       if (order.userId) {

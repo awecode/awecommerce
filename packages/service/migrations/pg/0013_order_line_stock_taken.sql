@@ -1,0 +1,1 @@
+ALTER TABLE "order_line" ADD COLUMN "stockTaken" boolean DEFAULT false NOT NULL;

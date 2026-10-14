@@ -206,7 +206,19 @@ const order = await new OrderService(db).createFromCart(cart.id, {
 
 A line with `isAvailable: false` is no longer for sale (its variant is inactive or its product is not listed, see Product variants); checkout fails with `Product variant is not available: <sku>` until the buyer removes it, so warn on the cart page. Totals still include it.
 
+Each line also has `stockLeft` (what is left of its variant, or `null` when stock is not counted) and `isInStock`, false when the cart holds more of the variant, over all its lines, than is left. Checkout fails with `OutOfStockError` until the buyer lowers the quantity (see Stock).
+
 It does not place an order, use up offers, or redeem points (`redeemPoints` only previews their value, with the same checks as checkout). Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied.
+
+### Stock
+
+A variant's `stockQuantity` is counted when its product's class has `trackStock` (the default), and for products without a class. For a class with `trackStock: false`, stock is ignored and the variant can always be bought.
+
+- `addToCart` and `updateQuantity` throw `OutOfStockError` when the cart would hold more of a variant, over all its lines, than is in stock. Its message is `Only 2 left of <sku>`, or `<sku> is out of stock`; its fields are `variantId`, `sku` and `available`.
+- `createFromCart` locks the variants, throws the same error (leaving everything unchanged) when stock ran out after the buyer added the item, and otherwise takes the ordered quantity from `stockQuantity`. Each order line records it in `stockTaken`.
+- `cancel` puts back what the order took, by `stockTaken`, so a class that started or stopped tracking stock since then does not matter.
+- `ProductService.list()` rows have `inStock`: stock is not counted, or an active variant has some. `ProductService.get()` includes the class's `trackStock`.
+- `ProductVariantService.stockLevels(variantIds)` and `checkStock(wanted)` are the helpers behind these.
 
 ### Signing in with a guest cart
 
@@ -325,6 +337,7 @@ The services throw:
 - `NotFoundError` when a record asked for by id does not exist, such as `Cart not found: <id>` or `Product variant not found: <id>`.
 - `ValidationError` when the input, or the record's current state, does not allow the operation, such as `Quantity must be at least 1`, `Invalid voucher code`, `Insufficient loyalty points` or `Order is already cancelled: <id>`. The message says why and can be shown to the user.
 - The checkout errors described in [Placing an order](#placing-an-order).
+- `OutOfStockError` from adding to the cart, changing a quantity or checkout (see [Stock](#stock)).
 - A plain `Error` for setup problems (`POSTGRES_URL is not set`, `ORDER_HASH_SECRET is not set`) and for anything unexpected, such as a database failure.
 
 Check them with `instanceof`, or by `name`, which matches the class name.

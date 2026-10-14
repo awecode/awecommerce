@@ -26,6 +26,7 @@ beforeAll(() => {
 const createProduct = (prefix: string, fields: Partial<NewProduct> = {}) => {
   const slug = unique(prefix)
   return productService.create({
+    stockQuantity: 1000,
     name: slug,
     slug,
     sku: slug,

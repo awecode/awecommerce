@@ -44,6 +44,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
   test('concurrent checkouts of one cart create exactly one order', async () => {
     const slug = `concurrent-checkout-${Date.now()}`
     const product = await new ProductService(db).create({
+      stockQuantity: 1000,
       status: 'Published',
       name: slug,
       slug,
@@ -73,6 +74,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
   test('concurrent cancels of one order cancel it once and give usage back once', async () => {
     const slug = `concurrent-cancel-${Date.now()}`
     const product = await new ProductService(db).create({
+      stockQuantity: 1000,
       status: 'Published',
       name: slug,
       slug,
@@ -146,6 +148,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
   test('concurrent status changes to the same status record it once', async () => {
     const slug = `concurrent-status-${Date.now()}`
     const product = await new ProductService(db).create({
+      stockQuantity: 1000,
       status: 'Published',
       name: slug,
       slug,
@@ -221,6 +224,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
   // Carts that all have the voucher applied, before anyone checks out
   const cartsWithVoucher = async (code: string, userIds: string[]) => {
     const product = await new ProductService(db).create({
+      stockQuantity: 1000,
       status: 'Published',
       name: code,
       slug: code,
@@ -300,6 +304,7 @@ describe.skipIf(!url)('orders under real concurrency', () => {
       .set({ type: 'user', voucherCode: null, includeAllUsers: false, includedUserIds: userIds })
       .where(eq(offers.id, voucher.id))
     const product = await new ProductService(db).create({
+      stockQuantity: 1000,
       status: 'Published',
       name: code,
       slug: code,

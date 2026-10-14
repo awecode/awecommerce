@@ -57,6 +57,7 @@ test('should throw when the secret is not set', () => {
 
 const createCartWithProduct = async (userId: string, slug: string) => {
   const product = await new ProductService(db).create({
+    stockQuantity: 1000,
     status: 'Published',
     name: slug,
     slug,

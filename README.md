@@ -68,8 +68,8 @@ Buyers see, and can buy, only listed products: active and `Published`, with an a
 
 | Route | Does |
 |---|---|
-| `GET /api/store/products` | One page of products. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
-| `GET /api/store/products/:slug` | A product with its active variants, options, images and listed related products |
+| `GET /api/store/products` | One page of products, each with `inStock`. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
+| `GET /api/store/products/:slug` | A product with its active variants (each with `inStock`), options, images and listed related products |
 | `GET /api/store/settings` | The store's `name`, `currency` and `locale`, for showing prices |
 | `GET /api/store/categories` | Active categories with a listed product in them or below them, each with its `parent`. Categories under an inactive category are left out. |
 | `GET /api/store/brands` | Active brands with a listed product |
@@ -91,6 +91,8 @@ Signed in, the buyer gets their own open cart on every device. A guest cart stil
 | `POST /api/store/cart/vouchers` | `{ code }` | Applies a voucher |
 | `DELETE /api/store/cart/vouchers/:code` | | Removes a voucher |
 
+Adding more than is in stock, or raising a quantity past it, gives 409 with `data.code` `OutOfStockError` and `data.available`. Each line in the summary has `isInStock` and `stockLeft`; warn while `isInStock` is false (see Stock in the library README).
+
 ### Checkout
 
 | Route | Body | Does |
@@ -100,7 +102,7 @@ Signed in, the buyer gets their own open cart on every device. A guest cart stil
 | `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page, for whoever holds the link. A wrong hash gives 404. |
 
 - `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.
-- The other 409s: `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
+- The other 409s: `OutOfStockError`, `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
 - `shippingAddress` needs `line1`, `city` and `country`; `line2`, `houseNo`, `province`, `postalCode`, `countryCode` and `instructions` are optional. Signed-in buyers can pass `shippingAddressId` (one of their saved addresses) instead; its fields are copied onto the order. Pass one of the two.
 - Guests must pass `guestUser` (`name` and `email`; `phone` is optional). Signed in, the order belongs to the user and `guestUser` is ignored.
 - `redeemPoints` (signed in) redeems loyalty points; preview them with the same value in `GET /api/store/cart?redeemPoints=`. Guests get 422.
@@ -200,7 +202,7 @@ The user routes go through Better Auth's admin plugin; its errors keep their sta
 
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:
 
-- `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError` and `CustomizationsNoLongerValidError` give 409, with the error name as `data.code` and the error's fields (such as `cartLineId`) in `data`.
+- `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError`, `CustomizationsNoLongerValidError` and `OutOfStockError` give 409, with the error name as `data.code` and the error's fields (such as `cartLineId`) in `data`.
 - `NotFoundError` gives 404 and `ValidationError` gives 422, with the error's message.
 - Database rules give Postgres's own detail as the message: a duplicate (such as a slug or SKU) gives 409 with `data.code` `AlreadyExists`; deleting a record that others still point at gives 409 `InUse`; pointing at a record that does not exist (such as a `categoryId`) gives 422 `MissingReference`.
 - Anything else gives 500.

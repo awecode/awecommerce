@@ -32,6 +32,7 @@ const createProduct = async (price: string, discountedPrice?: string) => {
   productCount++
   const slug = `offer-discount-product-${productCount}`
   return await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: slug,
     slug,
@@ -222,6 +223,7 @@ test('should discount each variant of a product on its own line', async () => {
   const userId = 'discount-variants-user'
   const product = await createProduct('100')
   const large = await variantService.create(product.id, {
+    stockQuantity: 1000,
     sku: `${product.slug}-large`,
     price: '200',
     discountedPrice: '150',

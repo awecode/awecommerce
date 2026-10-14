@@ -37,6 +37,7 @@ const createProduct = async (price: string | undefined, discountedPrice?: string
   productCount++
   const slug = `from-cart-product-${productCount}`
   return await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: `From Cart Product ${productCount}`,
     slug,
@@ -247,6 +248,7 @@ test('should price each variant of a product on its own line', async () => {
     options: { Size: 'S' },
   })
   const large = await variantService.create(product.id, {
+    stockQuantity: 1000,
     sku: `${product.slug}-L`,
     price: '150',
     discountedPrice: '120',

@@ -172,6 +172,37 @@ const totalStock = sql<number>`(
   AND ${productVariants.isActive} = true
 )`
 
+// Whether the product's stock is counted: by its class, and always without one
+const tracksStock = sql<boolean>`COALESCE((
+  SELECT ${productClasses.trackStock} FROM ${productClasses}
+  WHERE ${productClasses.id} = ${products.productClassId}
+), true)`
+
+// Whether the product can be bought: stock is not counted, or an active
+// variant has some
+const inStock = sql<boolean>`(NOT ${tracksStock} OR EXISTS (
+  SELECT 1 FROM ${productVariants}
+  WHERE ${productVariants.productId} = ${products.id}
+  AND ${productVariants.isActive} = true
+  AND ${productVariants.stockQuantity} > 0
+))`
+
+// More of a variant was asked for than is in stock. `available` is what is
+// left, so the buyer can be told.
+class OutOfStockError extends Error {
+  constructor(
+    public variantId: number,
+    public sku: string,
+    public available: number,
+  ) {
+    super(available > 0 ? `Only ${available} left of ${sku}` : `${sku} is out of stock`)
+    this.name = 'OutOfStockError'
+  }
+}
+
+// A variant's stock: `stock` is null when its stock is not counted
+type StockLevel = { variantId: number; sku: string; stock: number | null }
+
 type SingleVariant = {
   id: number
   sku: string
@@ -325,6 +356,7 @@ class ProductService {
             id: true,
             name: true,
             slug: true,
+            trackStock: true,
           },
         },
         images: true,
@@ -531,6 +563,7 @@ class ProductService {
         variantCount,
         totalStock,
         singleVariant,
+        inStock,
         brand: getTableColumns(brands),
         category: getTableColumns(categories),
         productClass: getTableColumns(productClasses),
@@ -1370,6 +1403,49 @@ class ProductVariantService {
     return await this.update(variantId, { isActive: false })
   }
 
+  // The stock of the given variants, by id. With `lock`, the rows stay locked
+  // until the transaction ends (in id order, so checkouts cannot deadlock).
+  async stockLevels(variantIds: number[], { lock = false } = {}) {
+    if (!variantIds.length) {
+      return new Map<number, StockLevel>()
+    }
+    let query = this.db
+      .select({
+        variantId: productVariants.id,
+        sku: productVariants.sku,
+        stockQuantity: productVariants.stockQuantity,
+        tracked: tracksStock,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(inArray(productVariants.id, variantIds))
+      .orderBy(asc(productVariants.id))
+      .$dynamic()
+    if (lock) {
+      query = query.for('update', { of: productVariants })
+    }
+    const rows = await query
+    return new Map(
+      rows.map((row) => [
+        row.variantId,
+        { variantId: row.variantId, sku: row.sku, stock: row.tracked ? (row.stockQuantity ?? 0) : null },
+      ]),
+    )
+  }
+
+  // Throws OutOfStockError for the first variant asked for beyond its stock.
+  // `wanted` is the total quantity of each variant, by id.
+  async checkStock(wanted: Map<number, number>, options: { lock?: boolean } = {}) {
+    const levels = await this.stockLevels([...wanted.keys()], options)
+    for (const [variantId, quantity] of wanted) {
+      const level = levels.get(variantId)
+      if (level && level.stock !== null && quantity > level.stock) {
+        throw new OutOfStockError(variantId, level.sku, Math.max(level.stock, 0))
+      }
+    }
+    return levels
+  }
+
   // Creates a variant for every combination of the option values that the
   // product does not have yet, such as { Size: ['S', 'M'], Colour: ['Red'] }.
   // New variants copy the first variant's prices, start with no stock, and
@@ -1655,6 +1731,7 @@ class RelatedProductService {
 
 export {
   listedProduct,
+  OutOfStockError,
   BrandService,
   CategoryService,
   ProductClassService,

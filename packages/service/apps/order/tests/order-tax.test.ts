@@ -31,7 +31,7 @@ const createProduct = async (
   options: { discountedPrice?: string; productClassId?: number } = {},
 ) => {
   const slug = unique('tax-product')
-  return await productService.create({ name: slug, slug, sku: slug, price, status: 'Published', ...options })
+  return await productService.create({ stockQuantity: 1000, name: slug, slug, sku: slug, price, status: 'Published', ...options })
 }
 
 const createProductClass = async (taxRate: string | null) => {

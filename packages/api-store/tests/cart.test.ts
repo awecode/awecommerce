@@ -1,5 +1,7 @@
 import { fetch } from '@nuxt/test-utils/e2e'
 import { describe, expect, test } from 'vitest'
+import { eq } from 'drizzle-orm'
+import { productVariants } from '@awecommerce/service/apps/product/schemas'
 import { buyer, createProduct, createVoucher, setupApi, url } from './helpers'
 
 describe.skipIf(!url)('store cart API', async () => {
@@ -29,6 +31,33 @@ describe.skipIf(!url)('store cart API', async () => {
     expect(again.setCookie).toBeNull()
     expect(again.body.lines.map((l: any) => l.quantity)).toEqual([3])
     expect((await request('/api/store/cart')).body.id).toBe(added.body.id)
+  })
+
+  test('refuses more than is in stock, and checkout fails when stock runs out', async () => {
+    const request = buyer()
+    const variantId = await createProduct(db, '10')
+    await db.update(productVariants).set({ stockQuantity: 2 }).where(eq(productVariants.id, variantId))
+
+    const tooMany = await request('/api/store/cart/lines', { method: 'POST', body: { variantId, quantity: 3 } })
+    expect(tooMany.status).toBe(409)
+    expect(tooMany.body.message).toMatch(/^Only 2 left of /)
+    expect(tooMany.body.data).toMatchObject({ code: 'OutOfStockError', variantId, available: 2 })
+
+    await request('/api/store/cart/lines', { method: 'POST', body: { variantId, quantity: 2 } })
+    await db.update(productVariants).set({ stockQuantity: 1 }).where(eq(productVariants.id, variantId))
+    const cart = (await request('/api/store/cart')).body
+    expect(cart.lines[0]).toMatchObject({ isInStock: false, stockLeft: 1 })
+
+    const placed = await request('/api/store/checkout', {
+      method: 'POST',
+      body: {
+        expectedTotal: cart.total,
+        shippingAddress: { line1: '1 Main St', city: 'Kathmandu', country: 'Nepal' },
+        guestUser: { name: 'Ann', email: 'ann@example.com' },
+      },
+    })
+    expect(placed.status).toBe(409)
+    expect(placed.body.data).toMatchObject({ code: 'OutOfStockError', available: 1 })
   })
 
   test('changes quantity and answers, merges matching lines, and removes lines', async () => {

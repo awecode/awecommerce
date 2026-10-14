@@ -4,6 +4,7 @@ import {
   listedProduct,
   optionValuesWithOption,
   ProductService,
+  ProductVariantService,
   withVariantOptions,
 } from '../../product/services/product'
 import { CustomField, products, productVariants } from '../../product/schemas'
@@ -149,6 +150,10 @@ class CartService {
       throw new ValidationError('Product price not found')
     }
     const customizations = validateCustomizations(row.product.customFields, answers)
+    // Counts the variant's other lines in the cart too
+    await new ProductVariantService(this.db).checkStock(
+      new Map([[variantId, (await this.quantityInCart(cartId, variantId)) + quantity]]),
+    )
 
     // One statement, so simultaneous adds of the same item cannot make two lines
     const result = await this.db
@@ -225,6 +230,16 @@ class CartService {
     if (quantity < 1) {
       throw new ValidationError('Quantity must be at least 1')
     }
+    const [line] = await this.db
+      .select()
+      .from(cartLines)
+      .where(and(eq(cartLines.id, cartLineId), eq(cartLines.cartId, cartId)))
+    if (!line) {
+      throw new NotFoundError(`Cart line not found: ${cartLineId}`)
+    }
+    await new ProductVariantService(this.db).checkStock(
+      new Map([[line.variantId, (await this.quantityInCart(cartId, line.variantId)) - line.quantity + quantity]]),
+    )
     const result = await this.db
       .update(cartLines)
       .set({ quantity })
@@ -234,6 +249,15 @@ class CartService {
       throw new NotFoundError(`Cart line not found: ${cartLineId}`)
     }
     return result[0]
+  }
+
+  // How many of the variant the cart holds, over all its lines
+  private async quantityInCart(cartId: number, variantId: number) {
+    const [{ quantity }] = await this.db
+      .select({ quantity: sql<number>`COALESCE(SUM(${cartLines.quantity}), 0)::int` })
+      .from(cartLines)
+      .where(and(eq(cartLines.cartId, cartId), eq(cartLines.variantId, variantId)))
+    return quantity
   }
 
   async removeFromCart(cartId: number, cartLineId: number) {
@@ -303,6 +327,14 @@ class CartService {
         content.lines.map((line) => line.variant.productId),
       ),
     )
+    const stock = await new ProductVariantService(this.db).stockLevels(
+      content.lines.map((line) => line.variantId),
+    )
+    const stockLeft = (variantId: number) => stock.get(variantId)?.stock ?? null
+    const inCart = new Map<number, number>()
+    for (const line of content.lines) {
+      inCart.set(line.variantId, (inCart.get(line.variantId) ?? 0) + line.quantity)
+    }
     return {
       ...content,
       lines: content.lines.map((line, index) => ({
@@ -312,6 +344,11 @@ class CartService {
         // Checkout fails while this is false; the buyer needs to remove the line.
         // Same rule as checkout: an active variant of a listed product.
         isAvailable: line.variant.isActive && listedIds.has(line.variant.productId),
+        // What is left of the variant (null when its stock is not counted), and
+        // whether that covers all of it in the cart. Checkout fails while
+        // isInStock is false; the buyer needs to lower the quantity.
+        stockLeft: stockLeft(line.variantId),
+        isInStock: stockLeft(line.variantId) === null || inCart.get(line.variantId)! <= stockLeft(line.variantId)!,
         // Checkout fails while this is set; the buyer needs to update the line
         customizationsError: customizationsError(
           line.variant.product.customFields,

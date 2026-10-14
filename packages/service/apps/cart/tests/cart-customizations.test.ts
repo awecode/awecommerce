@@ -23,6 +23,7 @@ let count = 0
 const createJersey = async (customFields = jerseyFields) => {
   const slug = `jersey-${++count}`
   return await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: 'Jersey',
     slug,
@@ -44,6 +45,7 @@ test('should let a product declare custom fields', async () => {
   expect(jersey.customFields).toEqual(jerseyFields)
 
   const plain = await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
@@ -110,6 +112,7 @@ test('should keep different answers on separate lines and add up matching ones',
 
 test('should add up the quantity of a product without fields', async () => {
   const mug = await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
@@ -245,7 +248,7 @@ test('should reject invalid custom fields when creating or updating a product', 
   for (const [customFields, message] of invalid) {
     const slug = `invalid-fields-${++count}`
     await expect(
-      productService.create({ name: 'X', slug, sku: slug, price: '1', customFields: customFields as any }),
+      productService.create({ stockQuantity: 1000, name: 'X', slug, sku: slug, price: '1', customFields: customFields as any }),
     ).rejects.toThrow(message)
     expect(await productService.getBySlug(slug)).toBeUndefined()
   }
@@ -267,6 +270,7 @@ test('should trim custom field labels', async () => {
 test('should flag lines whose answers no longer fit in the cart summary', async () => {
   const jersey = await createJersey()
   const mug = await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,
@@ -295,6 +299,7 @@ test('should flag lines whose answers no longer fit in the cart summary', async 
 test('should add up simultaneous adds of the same item on one line', async () => {
   const jersey = await createJersey()
   const mug = await productService.create({
+    stockQuantity: 1000,
     status: 'Published',
     name: 'Mug',
     slug: `mug-${++count}`,

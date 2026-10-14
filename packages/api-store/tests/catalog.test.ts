@@ -17,6 +17,7 @@ describe.skipIf(!url)('store catalog API', async () => {
   const createProduct = async (prefix: string, fields: Partial<NewProduct> = {}) => {
     const slug = unique(prefix)
     return await new ProductService(db).create({
+      stockQuantity: 1000,
       name: slug,
       slug,
       sku: slug,
@@ -122,6 +123,21 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect(Number(body.variants[0].price)).toBe(10)
     expect(body.relatedProducts.map((p: any) => p.id)).toEqual([related.id])
     expect((await request(`/api/store/products/${draft.slug}`)).status).toBe(404)
+  })
+
+  test('says which products and variants are in stock', async () => {
+    const prefix = unique('stock')
+    const product = await createProduct(prefix, { stockQuantity: 0 })
+    const variantService = new ProductVariantService(db)
+    await variantService.update(product.variants[0]!.id, { options: { Size: 'S' } })
+    await variantService.create(product.id, { sku: unique('sku'), price: '10', stockQuantity: 3, options: { Size: 'M' } })
+    const soldOut = await createProduct(prefix, { stockQuantity: 0 })
+
+    const detail = (await request(`/api/store/products/${product.slug}`)).body
+    expect(detail.variants.map((v: any) => [v.options[0].value, v.inStock])).toEqual([['S', false], ['M', true]])
+    const list = (await request(`/api/store/products?q=${prefix}`)).body.results
+    const inStock = Object.fromEntries(list.map((p: any) => [p.id, p.inStock]))
+    expect([inStock[product.id], inStock[soldOut.id]]).toEqual([true, false])
   })
 
   test('the product page follows the same rule as the list', async () => {
