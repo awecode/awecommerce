@@ -1,12 +1,21 @@
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 
-// Lists every product, active or not
+// Every product, drafts and inactive ones included, one page at a time
 export default defineServiceHandler(async (event) => {
-  const query = getQuery(event)
+  const query = await getValidatedQuery(event, productListQuery.parse)
   return await new ProductService(useDb()).list({
-    pagination: {
-      page: Number(query.page) || 1,
-      size: Number(query.size) || 20,
-    },
+    q: query.q,
+    status: query.status,
+    isActive: query.active,
+    categories: query.categories,
+    brands: query.brands,
+    productClass: query.productClass,
+    isFeatured: query.featured,
+    isBestSeller: query.bestSeller,
+    sortBy: query.sortBy,
+    includeInactiveBrands: true,
+    includeInactiveCategories: true,
+    includeInactiveProductClasses: true,
+    pagination: { page: query.page, size: query.size },
   })
 })

@@ -12,6 +12,8 @@ export const seedProduct = async () => {
     sku: 'TEST-PRODUCT',
     description: 'Test Description',
     price: '100',
+    // Published, so the storefront shows it
+    status: 'Published',
   })
   console.log('Product seeded:', product)
 }

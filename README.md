@@ -107,12 +107,35 @@ The body schemas are in `packages/api-store/shared/utils/cart.ts` and `checkout.
 
 `pnpm test:api` runs the route tests: it builds the layer and calls it over HTTP, against a temporary Postgres (or `TEST_POSTGRES_URL`).
 
+## Admin API
+
+Every `/api/admin` route needs a signed-in admin (see Sign-in). The body schemas are in `packages/api-admin/shared/utils/catalog.ts`, auto-imported in the backoffice for forms. Money is a decimal string (`"12.50"`).
+
+### Catalog
+
+| Route | Body or query | Does |
+|---|---|---|
+| `GET /api/admin/products` | `q`, `status`, `active`, `categories`, `brands`, `productClass`, `featured`, `bestSeller`, `sortBy`, `page`, `size` | Every product, drafts, inactive ones and those under inactive brands, categories or classes included |
+| `POST /api/admin/products` | product fields, plus the first variant's `sku`, `price`, `discountedPrice`, `inventoryCost`, `stockQuantity` | Creates a product (as `Draft`) with its first variant |
+| `GET /api/admin/products/:id` | | The product with all variants (costs included), options, images and related products |
+| `PATCH /api/admin/products/:id` | any product fields, `status`, flags, `images`, `relatedProducts`, `customFields` | Changes it; publish with `status: 'Published'` |
+| `DELETE /api/admin/products/:id` | | Deletes it with its variants |
+| `POST /api/admin/products/:id/variants` | variant fields with `options` such as `{ Size: 'L' }` | Adds a variant |
+| `PATCH`, `DELETE /api/admin/variants/:id` | variant fields | Changes or deletes a variant |
+| `PATCH`, `DELETE /api/admin/options/:id` | `{ name }` | Renames or deletes an option (removed from every variant) |
+| `PATCH`, `DELETE /api/admin/option-values/:id` | `{ value }` | Renames or deletes an option value |
+| `GET`, `POST /api/admin/brands`, `.../categories`, `.../product-classes` | `q`, `active`, `page`, `size` | Lists (inactive ones included) or creates |
+| `GET`, `PATCH`, `DELETE /api/admin/brands/:id` (and the same for categories and product classes) | | Shows, changes or deletes one |
+
+Something still in use (an ordered product or variant, a brand, class or category with products, a category with subcategories) cannot be deleted: 409 with `data.code` `InUse`. Deactivate it instead.
+
 ## API errors
 
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:
 
 - `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError` and `CustomizationsNoLongerValidError` give 409, with the error name as `data.code` and the error's fields (such as `cartLineId`) in `data`.
 - `NotFoundError` gives 404 and `ValidationError` gives 422, with the error's message.
+- Database rules give Postgres's own detail as the message: a duplicate (such as a slug or SKU) gives 409 with `data.code` `AlreadyExists`; deleting a record that others still point at gives 409 `InUse`; pointing at a record that does not exist (such as a `categoryId`) gives 422 `MissingReference`.
 - Anything else gives 500.
 
 Unknown `/api` paths give a JSON 404.

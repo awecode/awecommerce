@@ -321,6 +321,9 @@ class ProductService {
         })
         .where(eq(products.id, productId))
         .returning()
+      if (!result[0]) {
+        throw new NotFoundError(`Product not found: ${productId}`)
+      }
       if (images) {
         const productImageService = new ProductImageService(tx)
         await productImageService.setImages(productId, images)
@@ -338,6 +341,9 @@ class ProductService {
       .delete(products)
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -483,6 +489,9 @@ class ProductService {
       .set({ isFeatured: true })
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -492,6 +501,9 @@ class ProductService {
       .set({ isFeatured: false })
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -501,6 +513,9 @@ class ProductService {
       .set({ isBestSeller: true })
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -510,6 +525,9 @@ class ProductService {
       .set({ isBestSeller: false })
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -519,6 +537,9 @@ class ProductService {
       .set({ isActive: true })
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -528,6 +549,9 @@ class ProductService {
       .set({ isActive: false })
       .where(eq(products.id, productId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product not found: ${productId}`)
+    }
     return result[0]
   }
 
@@ -626,6 +650,9 @@ class BrandService {
       })
       .where(eq(brands.id, brandId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Brand not found: ${brandId}`)
+    }
     return result[0]
   }
 
@@ -634,6 +661,9 @@ class BrandService {
       .delete(brands)
       .where(eq(brands.id, brandId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Brand not found: ${brandId}`)
+    }
     return result[0]
   }
 
@@ -733,6 +763,9 @@ class BrandService {
       .set({ isActive: true })
       .where(eq(brands.id, brandId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Brand not found: ${brandId}`)
+    }
     return result[0]
   }
 
@@ -742,6 +775,9 @@ class BrandService {
       .set({ isActive: false })
       .where(eq(brands.id, brandId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Brand not found: ${brandId}`)
+    }
     return result[0]
   }
 }
@@ -792,6 +828,9 @@ class ProductClassService {
       })
       .where(eq(productClasses.id, productClassId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product class not found: ${productClassId}`)
+    }
     return result[0]
   }
 
@@ -800,6 +839,9 @@ class ProductClassService {
       .delete(productClasses)
       .where(eq(productClasses.id, productClassId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product class not found: ${productClassId}`)
+    }
     return result[0]
   }
 
@@ -848,6 +890,9 @@ class ProductClassService {
       .set({ isActive: true })
       .where(eq(productClasses.id, productClassId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product class not found: ${productClassId}`)
+    }
     return result[0]
   }
 
@@ -857,6 +902,9 @@ class ProductClassService {
       .set({ isActive: false })
       .where(eq(productClasses.id, productClassId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product class not found: ${productClassId}`)
+    }
     return result[0]
   }
 }
@@ -914,6 +962,9 @@ class CategoryService {
       })
       .where(eq(categories.id, categoryId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Category not found: ${categoryId}`)
+    }
     return result[0]
   }
 
@@ -922,6 +973,9 @@ class CategoryService {
       .delete(categories)
       .where(eq(categories.id, categoryId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Category not found: ${categoryId}`)
+    }
     return result[0]
   }
 
@@ -1062,6 +1116,9 @@ class CategoryService {
       .set({ isActive: true })
       .where(eq(categories.id, categoryId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Category not found: ${categoryId}`)
+    }
     return result[0]
   }
 
@@ -1071,6 +1128,9 @@ class CategoryService {
       .set({ isActive: false })
       .where(eq(categories.id, categoryId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Category not found: ${categoryId}`)
+    }
     return result[0]
   }
 }
@@ -1197,6 +1257,9 @@ class ProductVariantService {
       .delete(productVariants)
       .where(eq(productVariants.id, variantId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product variant not found: ${variantId}`)
+    }
     return result[0]
   }
 
@@ -1316,6 +1379,9 @@ class ProductOptionService {
       .set({ name })
       .where(eq(productOptions.id, optionId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product option not found: ${optionId}`)
+    }
     return result[0]
   }
 
@@ -1325,6 +1391,9 @@ class ProductOptionService {
       .delete(productOptions)
       .where(eq(productOptions.id, optionId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product option not found: ${optionId}`)
+    }
     return result[0]
   }
 
@@ -1334,6 +1403,9 @@ class ProductOptionService {
       .set({ value })
       .where(eq(productOptionValues.id, optionValueId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product option value not found: ${optionValueId}`)
+    }
     return result[0]
   }
 
@@ -1343,6 +1415,9 @@ class ProductOptionService {
       .delete(productOptionValues)
       .where(eq(productOptionValues.id, optionValueId))
       .returning()
+    if (!result[0]) {
+      throw new NotFoundError(`Product option value not found: ${optionValueId}`)
+    }
     return result[0]
   }
 }

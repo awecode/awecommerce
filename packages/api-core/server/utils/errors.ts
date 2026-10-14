@@ -15,6 +15,15 @@ const conflictErrors = [
   VoucherNoLongerValidError,
 ]
 
+// The Postgres error behind a failed query, if any. Drizzle wraps it as `cause`.
+const postgresError = (error: unknown) => {
+  for (let e: any = error; e; e = e.cause) {
+    if (typeof e.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code)) {
+      return e as { code: string; detail?: string; constraint?: string }
+    }
+  }
+}
+
 // Turns a service error into an HTTP error. The error's fields (offerId,
 // cartLineId, expectedTotal, ...) and its name, as `code`, go in `data`.
 export const toHttpError = (error: unknown) => {
@@ -30,6 +39,27 @@ export const toHttpError = (error: unknown) => {
   }
   if (error instanceof ValidationError) {
     return createError({ statusCode: 422, statusMessage: 'Unprocessable Entity', message: error.message })
+  }
+  // Database rules, with Postgres's own detail, such as
+  // `Key (slug)=(mug) already exists.`
+  const pg = postgresError(error)
+  if (pg?.code === '23505') {
+    return createError({
+      statusCode: 409,
+      statusMessage: 'Conflict',
+      message: pg.detail ?? 'Already exists',
+      data: { code: 'AlreadyExists', constraint: pg.constraint },
+    })
+  }
+  if (pg?.code === '23503') {
+    // Deleting a record others still point at, or pointing at a missing one
+    const inUse = pg.detail?.includes('is still referenced') ?? false
+    return createError({
+      statusCode: inUse ? 409 : 422,
+      statusMessage: inUse ? 'Conflict' : 'Unprocessable Entity',
+      message: pg.detail ?? 'Referenced record problem',
+      data: { code: inUse ? 'InUse' : 'MissingReference', constraint: pg.constraint },
+    })
   }
   return error
 }
