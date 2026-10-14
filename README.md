@@ -5,7 +5,8 @@ Monorepo for Awecommerce: the library, the API layers, and the storefront and ba
 | Package | Path | Role |
 |---|---|---|
 | `@awecommerce/service` | `packages/service` | Headless e-commerce library for Node.js and PostgreSQL |
-| `@awecommerce/api-core` | `packages/api-core` | Nuxt layer: database pool (`useDb`), service error mapping (`defineServiceHandler`), `/health` |
+| `@awecommerce/auth` | `packages/auth` | Nuxt layer: magic link sign-in with Better Auth ([upstream](https://github.com/awecode/nuxt-better-auth-layer), copied in and adapted) |
+| `@awecommerce/api-core` | `packages/api-core` | Nuxt layer: database pool (`useDb`), service error mapping (`defineServiceHandler`), `/health`; extends auth |
 | `@awecommerce/api-store` | `packages/api-store` | Nuxt layer: storefront API under `/api/store`, extends api-core |
 | `@awecommerce/api-admin` | `packages/api-admin` | Nuxt layer: backoffice API under `/api/admin`, extends api-core |
 | `@awecommerce/storefront` | `apps/storefront` | Nuxt app (SSR), extends api-store |
@@ -15,12 +16,33 @@ Each app extends one API layer, so it serves only that API and `useFetch` knows 
 
 ## Run the apps
 
-Each app reads the database from `NUXT_POSTGRES_URL` (see the app's `.env.example`). Migrate the database first with `pnpm migrate` (see [packages/service/README.md](packages/service/README.md)).
+Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`) and `BETTER_AUTH_SECRET`. Migrate the database first, for the library's tables and the auth tables:
+
+```sh
+pnpm migrate        # library tables (see packages/service/README.md)
+pnpm migrate:auth   # users, sessions, accounts, verifications (POSTGRES_URL, or packages/auth/.env)
+```
+
+Then:
 
 ```sh
 pnpm dev:storefront
 pnpm dev:backoffice
 ```
+
+## Sign-in
+
+Customers and staff sign in the same way, with a magic link, and share one `users` table. Staff are users with `role: 'admin'`; emails listed in `NUXT_AUTH_ADMIN_EMAILS` get it when they first sign in. Without SES settings, development prints the sign-in email to the console.
+
+- Every `/api/admin` route needs an admin (401 signed out, 403 for customers), set in `packages/api-admin/server/middleware/admin.ts` rather than through an environment variable.
+- The storefront's pages are public (`authRequiredByDefault: false`); a page that needs a customer sets `definePageMeta({ auth: true })`. The backoffice's pages need sign-in by default and send guests to `/login`.
+- In routes, `getUser(event)`, `requireAuthenticated(event)` and `requireAdmin(event)` come from the auth layer (see `packages/auth/README.md`).
+- The auth tables have their own `drizzle-kit` schema and migrations in `packages/auth` (`pnpm generate:auth`, `pnpm migrate:auth`), recorded in `__drizzle_migrations_auth`, apart from the library's.
+- Its login components use Tailwind classes; the apps do not have Tailwind yet.
+
+Changes from the upstream layer: it takes `useDb` from api-core, adds the auth tables to its schema, mounts the email template as `assets:auth` (so no copying into each app), sets the admin role from `NUXT_AUTH_ADMIN_EMAILS`, keeps the plugins' types (`role`, the magic link endpoints), and drops the demo pages.
+
+`pnpm test:auth` runs the layer's own tests.
 
 ## Store API
 

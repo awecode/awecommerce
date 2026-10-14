@@ -1,6 +1,11 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
-import * as schema from '@awecommerce/service/core/db/pg/schema'
+import * as librarySchema from '@awecommerce/service/core/db/pg/schema'
+import * as authSchema from '../../../auth/server/db/schema'
+
+// The library's tables and the auth layer's (users, sessions, ...), which
+// Better Auth's Drizzle adapter looks up here
+const schema = { ...librarySchema, ...authSchema }
 
 let pool: pg.Pool | undefined
 let db: ReturnType<typeof drizzle<typeof schema>> | undefined

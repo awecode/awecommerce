@@ -1,0 +1,25 @@
+{
+  "name": "@awecommerce/auth",
+  "private": true,
+  "type": "module",
+  "description": "Nuxt layer: magic link sign-in with Better Auth, for customers and staff",
+  "main": "./nuxt.config.ts",
+  "scripts": {
+    "test": "vitest run",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20",
+    "better-auth": "^1.7.7",
+    "defu": "^6.1.7",
+    "drizzle-orm": "^0.45.4",
+    "ufo": "^1.6.4",
+    "vue-router": "^5.4.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.11",
+    "nuxt": "^4.6.1",
+    "vitest": "^5.0.4"
+  }
+}
