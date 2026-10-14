@@ -517,4 +517,4 @@ class CartService {
   }
 }
 
-export { CartService }
+export { CartService, validateCustomizations }

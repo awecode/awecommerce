@@ -13,7 +13,7 @@ import {
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { Decimal } from 'decimal.js'
 import { cartAppliedVoucherOffers, carts } from '../../cart/schemas'
-import { CartService } from '../../cart/services/cart'
+import { CartService, validateCustomizations } from '../../cart/services/cart'
 import { priceCart } from '../../cart/services/pricing'
 import { offers, offerUsages } from '../../offer/schemas'
 import { OfferService } from '../../offer/services/offer'
@@ -52,6 +52,17 @@ class OfferLimitReachedError extends Error {
   ) {
     super(`Offer usage limit reached: ${offerName}`)
     this.name = 'OfferLimitReachedError'
+  }
+}
+
+class CustomizationsNoLongerValidError extends Error {
+  constructor(
+    public cartLineId: number,
+    public productName: string,
+    public reason: string,
+  ) {
+    super(`Customizations are no longer valid for ${productName}: ${reason}`)
+    this.name = 'CustomizationsNoLongerValidError'
   }
 }
 
@@ -196,6 +207,20 @@ class OrderService {
           droppedVoucher.id,
           droppedVoucher.voucherCode,
         )
+      }
+      // The product's custom fields may have changed since the buyer answered
+      // them. Fail instead of placing an order with answers it no longer asks for.
+      for (const line of content.lines) {
+        const { product } = line.variant
+        try {
+          validateCustomizations(product.customFields, line.customizations)
+        } catch (error) {
+          throw new CustomizationsNoLongerValidError(
+            line.id,
+            product.name,
+            (error as Error).message,
+          )
+        }
       }
 
       const loyaltyDiscount =
@@ -754,6 +779,7 @@ class OrderService {
 }
 
 export {
+  CustomizationsNoLongerValidError,
   OfferLimitReachedError,
   OrderService,
   OrderTotalMismatchError,

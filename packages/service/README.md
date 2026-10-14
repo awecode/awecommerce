@@ -157,6 +157,7 @@ await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
 - **Validation:** it throws `Missing required field: <label>`, `Field is too long: <label> (max <n> characters)`, `Unknown field: <label>` for a label the product does not declare, and `Field must be text: <label>`. Nothing is added in these cases.
 - **Lines:** the same variant with the same answers adds to that line's quantity; different answers make a separate line. So two jerseys with different names are two lines. Merging a guest cart into the user's cart follows the same rule.
 - **Orders:** checkout copies each line's answers onto the order line's `customizations`. That copy is the record: changing or removing the product's `customFields` later does not change orders already placed.
+- **Fields changed while in the cart:** checkout checks the answers again against the product's current `customFields`. If they no longer fit (a new required field, a shorter `maxLength`, or a removed field that was answered), `createFromCart` throws `CustomizationsNoLongerValidError` (with `cartLineId`, `productName` and `reason`) and writes nothing; ask the buyer to update that line.
 
 ### Cart summary
 
@@ -230,7 +231,7 @@ try {
 | `@awecommerce/service/apps/product/services/product` | `ProductService`, `ProductVariantService`, `ProductOptionService`, `BrandService`, `CategoryService`, `ProductClassService`, `ProductImageService`, `RelatedProductService` |
 | `@awecommerce/service/apps/cart/services/cart` | `CartService` |
 | `@awecommerce/service/apps/offer/services/offer` | `OfferService`, `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` |
-| `@awecommerce/service/apps/order/services/order` | `OrderService`, `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError` |
+| `@awecommerce/service/apps/order/services/order` | `OrderService`, `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError`, `CustomizationsNoLongerValidError` |
 | `@awecommerce/service/apps/order/services/shipping-address` | `ShippingAddressService` |
 | `@awecommerce/service/apps/order/services/shipping-method` | `ShippingMethodService` |
 | `@awecommerce/service/apps/loyalty/services/loyalty` | `LoyaltyService` |

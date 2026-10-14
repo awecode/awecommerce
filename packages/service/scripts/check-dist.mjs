@@ -24,6 +24,7 @@ const expectedExports = {
     'OrderTotalMismatchError',
     'OfferLimitReachedError',
     'VoucherNoLongerValidError',
+    'CustomizationsNoLongerValidError',
   ],
   'apps/order/services/shipping-address': ['ShippingAddressService'],
   'apps/order/services/shipping-method': ['ShippingMethodService'],

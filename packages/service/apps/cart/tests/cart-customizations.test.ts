@@ -3,10 +3,13 @@ import { eq } from 'drizzle-orm'
 
 import { db } from 'core/db'
 import { CartService } from 'apps/cart/services/cart'
-import { OrderService } from 'apps/order/services/order'
+import {
+  CustomizationsNoLongerValidError,
+  OrderService,
+} from 'apps/order/services/order'
 import { ProductService } from 'apps/product/services/product'
-import { cartLines } from 'apps/cart/schemas'
-import { orderLines } from 'apps/order/schemas'
+import { cartLines, carts } from 'apps/cart/schemas'
+import { orderLines, orders } from 'apps/order/schemas'
 
 const cartService = new CartService(db)
 const productService = new ProductService(db)
@@ -172,4 +175,43 @@ test('should keep different answers apart when merging a guest cart', async () =
     ['Hari', 2],
     ['Ram', 2],
   ])
+})
+
+test('should fail checkout when the answers no longer fit the product fields', async () => {
+  const changes = [
+    {
+      customFields: [...jerseyFields, { label: 'Initials', required: true, maxLength: 3 }],
+      reason: 'Missing required field: Initials',
+    },
+    {
+      customFields: [{ label: 'Print name', required: true, maxLength: 4 }, jerseyFields[1]],
+      reason: 'Field is too long: Print name (max 4 characters)',
+    },
+    {
+      customFields: [jerseyFields[0]],
+      reason: 'Unknown field: Number',
+    },
+  ]
+  for (const [index, change] of changes.entries()) {
+    const jersey = await createJersey()
+    const cart = await cartService.create(`custom-changed-user-${index}`)
+    const line = await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
+      'Print name': 'Dipesh',
+      Number: '10',
+    })
+    await productService.update(jersey.id, { customFields: change.customFields })
+
+    const error = await new OrderService(db).createFromCart(cart.id).catch((e) => e)
+
+    expect(error).toBeInstanceOf(CustomizationsNoLongerValidError)
+    expect(error.message).toBe(`Customizations are no longer valid for Jersey: ${change.reason}`)
+    expect([error.cartLineId, error.productName, error.reason]).toEqual([
+      line.id,
+      'Jersey',
+      change.reason,
+    ])
+    expect(await db.select().from(orders).where(eq(orders.cartId, cart.id))).toEqual([])
+    const [cartAfter] = await db.select().from(carts).where(eq(carts.id, cart.id))
+    expect(cartAfter.status).toBe('Open')
+  }
 })
