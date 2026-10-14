@@ -45,8 +45,13 @@ export const requireCart = async (event: H3Event) => {
   return cart
 }
 
-export const cartSummary = async (cart: { sessionId: string }, shippingMethodId?: number) =>
-  await new CartService(useDb()).getCartSummary(cart.sessionId, { shippingMethodId })
+export const cartSummary = async (cart: { sessionId: string }, shippingMethodId?: number) => {
+  const summary = await new CartService(useDb()).getCartSummary(cart.sessionId, { shippingMethodId })
+  return {
+    ...summary,
+    lines: summary.lines.map((line) => ({ ...line, variant: storeVariant(line.variant) })),
+  }
+}
 
 export const cartLineParams = z.object({ id: z.coerce.number().int() })
 

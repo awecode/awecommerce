@@ -24,6 +24,21 @@ pnpm dev:backoffice
 
 ## Store API
 
+### Catalog
+
+Buyers see only products that are active and `Published`, only active variants, and never a variant's `inventoryCost` (not in product pages, not in the cart).
+
+| Route | Does |
+|---|---|
+| `GET /api/store/products` | One page of products. Query: `q`, `categories` and `brands` (ids, `1,2` or repeated), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
+| `GET /api/store/products/:slug` | A product with its active variants, options, images and listed related products |
+| `GET /api/store/categories` | Active categories, each with its `parent` |
+| `GET /api/store/brands` | Active brands that have active products |
+
+The query schema is `productListQuery` in `packages/api-store/shared/utils/catalog.ts`.
+
+### Cart
+
 The cart is found by the `awe_cart` cookie (httpOnly), which holds the cart's `sessionId`. It is set on the first add; a checked-out cart counts as no cart, so the next add starts a new one. Every change returns the cart summary (`CartService.getCartSummary`).
 
 | Route | Body | Does |
