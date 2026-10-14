@@ -1,6 +1,9 @@
+import { inArray } from 'drizzle-orm'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
+import { products } from '@awecommerce/service/apps/product/schemas'
 
-// A listed product with its active variants and listed related products. Each
+// A listed product with its active variants and listed related products (as
+// product list rows, with their prices and stock, for product cards). Each
 // variant says whether it is in stock: its stock is not counted (the product
 // class does not track stock), or some is left.
 export default defineServiceHandler(async (event) => {
@@ -11,9 +14,10 @@ export default defineServiceHandler(async (event) => {
   if (!product) {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Product not found' })
   }
-  const listedRelated = new Set(
-    await productService.listedProductIds(product.relatedProducts.map((related) => related.id)),
-  )
+  const relatedIds = product.relatedProducts.map((related) => related.id)
+  const relatedProducts = relatedIds.length
+    ? await productService.list({ listedOnly: true, extraFilters: [inArray(products.id, relatedIds)] })
+    : []
   return {
     ...product,
     variants: product.variants
@@ -22,6 +26,6 @@ export default defineServiceHandler(async (event) => {
         ...storeVariant(variant),
         inStock: product.productClass?.trackStock === false || (variant.stockQuantity ?? 0) > 0,
       })),
-    relatedProducts: product.relatedProducts.filter((related) => listedRelated.has(related.id)),
+    relatedProducts,
   }
 })

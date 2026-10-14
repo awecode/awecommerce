@@ -30,6 +30,21 @@ body {
   @apply antialiased;
 }
 
-h1, h2, h3 {
-  @apply font-serif text-highlighted;
+@layer base {
+  /* In the base layer, so classes on a heading can still change it */
+  h1, h2, h3 {
+    @apply font-serif text-highlighted;
+  }
+}
+
+/* Descriptions written in the backoffice's rich text editor */
+.rich-text {
+  @apply space-y-3 leading-relaxed text-pretty;
+  & h2 { @apply text-xl font-medium; }
+  & h3 { @apply text-lg font-medium; }
+  & ul { @apply list-disc space-y-1 pl-5; }
+  & ol { @apply list-decimal space-y-1 pl-5; }
+  & strong { @apply font-semibold text-highlighted; }
+  & blockquote { @apply border-l-2 border-default pl-4 italic text-muted; }
+  & a { @apply underline underline-offset-2; }
 }
