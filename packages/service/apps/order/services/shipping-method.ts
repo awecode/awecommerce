@@ -1,6 +1,7 @@
 import { desc, eq } from 'drizzle-orm';
 import { NewShippingMethod, shippingMethods, UpdateShippingMethod } from '../schemas';
 import { Database } from '../../types';
+import { NotFoundError } from '../../../core/errors';
 
 class ShippingMethodService {
     private db: Database;
@@ -18,6 +19,9 @@ class ShippingMethodService {
         const [method] = await this.db.update(shippingMethods).set(data).where(
             eq(shippingMethods.id, id)
         ).returning();
+        if (!method) {
+            throw new NotFoundError(`Shipping method not found: ${id}`);
+        }
         return method;
     }
 
@@ -32,10 +36,15 @@ class ShippingMethodService {
         return res;
     }
 
+    // Orders keep their own copy of the method they used, so deleting is allowed
     async delete(id: number) {
-        return await this.db.delete(shippingMethods).where(
+        const [method] = await this.db.delete(shippingMethods).where(
             eq(shippingMethods.id, id)
-        );
+        ).returning();
+        if (!method) {
+            throw new NotFoundError(`Shipping method not found: ${id}`);
+        }
+        return method;
     }
 }
 

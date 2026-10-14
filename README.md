@@ -148,6 +148,17 @@ An offer is built from parts, created first: a range (which products), a conditi
 - A part still used cannot be deleted (409 `InUse`): delete the offer, then its benefit and condition, then the range. Orders keep their own copy of the offers they used, so deleting an offer does not change them.
 - `usageCount` is not settable; checkout and cancelling keep it.
 
+### Settings and shipping
+
+Body schemas are in `packages/api-admin/shared/utils/settings.ts`.
+
+| Route | Body | Does |
+|---|---|---|
+| `GET`, `PATCH /api/admin/settings/tax` | any of `pricesIncludeTax`, `defaultRate`, `taxShipping` | Reads or changes the tax settings; `PATCH` returns all of them. Placed orders keep their tax. |
+| `GET`, `PATCH /api/admin/settings/loyalty` | any of `isEnabled`, `earnRate`, `redeemRate`, `expiresAfterInDays` | Reads or changes the loyalty settings. Points can be redeemed only while enabled with a `redeemRate`. |
+| `GET`, `POST /api/admin/shipping-methods` | `{ name, price, metadata? }` | Lists (newest first) or creates shipping methods |
+| `GET`, `PATCH`, `DELETE /api/admin/shipping-methods/:id` | | Shows, changes or deletes one. Placed orders keep their own copy of the method. |
+
 ## API errors
 
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:
