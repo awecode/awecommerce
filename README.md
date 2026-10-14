@@ -27,7 +27,7 @@ pnpm dev:backoffice
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:
 
 - `OrderTotalMismatchError`, `OfferLimitReachedError`, `VoucherNoLongerValidError` and `CustomizationsNoLongerValidError` give 409, with the error name as `data.code` and the error's fields (such as `cartLineId`) in `data`.
-- Errors whose message says `not found: <id>` give 404.
+- `NotFoundError` gives 404 and `ValidationError` gives 422, with the error's message.
 - Anything else gives 500.
 
 Unknown `/api` paths give a JSON 404.

@@ -34,6 +34,7 @@ const expectedExports = {
     'ProductOptionService',
     'CategoryService',
   ],
+  'core/errors': ['NotFoundError', 'ValidationError'],
   'apps/cart/schemas': ['carts', 'cartLines'],
   'apps/offer/schemas': ['offers'],
   'apps/order/schemas': ['orders'],

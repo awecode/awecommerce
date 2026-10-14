@@ -1,3 +1,4 @@
+import { NotFoundError, ValidationError } from '../../../core/errors'
 import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import {
   optionValuesWithOption,
@@ -28,24 +29,24 @@ const validateCustomizations = (
   const labels = new Set(fields.map((field) => field.label))
   for (const label of Object.keys(answers)) {
     if (!labels.has(label)) {
-      throw new Error(`Unknown field: ${label}`)
+      throw new ValidationError(`Unknown field: ${label}`)
     }
   }
   const customizations: Record<string, string> = {}
   for (const field of fields) {
     const answer = answers[field.label]
     if (answer !== undefined && typeof answer !== 'string') {
-      throw new Error(`Field must be text: ${field.label}`)
+      throw new ValidationError(`Field must be text: ${field.label}`)
     }
     const text = (answer ?? '').trim()
     if (!text) {
       if (field.required) {
-        throw new Error(`Missing required field: ${field.label}`)
+        throw new ValidationError(`Missing required field: ${field.label}`)
       }
       continue
     }
     if (text.length > field.maxLength) {
-      throw new Error(
+      throw new ValidationError(
         `Field is too long: ${field.label} (max ${field.maxLength} characters)`,
       )
     }
@@ -123,7 +124,7 @@ class CartService {
     answers: Record<string, string> = {},
   ) {
     if (quantity < 1) {
-      throw new Error('Quantity must be at least 1')
+      throw new ValidationError('Quantity must be at least 1')
     }
     const [row] = await this.db
       .select({ variant: productVariants, customFields: products.customFields })
@@ -132,13 +133,13 @@ class CartService {
       .where(eq(productVariants.id, variantId))
     const variant = row?.variant
     if (!variant) {
-      throw new Error(`Product variant not found: ${variantId}`)
+      throw new NotFoundError(`Product variant not found: ${variantId}`)
     }
     if (!variant.isActive) {
-      throw new Error(`Product variant is not available: ${variantId}`)
+      throw new ValidationError(`Product variant is not available: ${variantId}`)
     }
     if (!variant.discountedPrice && !variant.price) {
-      throw new Error('Product price not found')
+      throw new ValidationError('Product price not found')
     }
     const customizations = validateCustomizations(row.customFields, answers)
 
@@ -177,7 +178,7 @@ class CartService {
         .where(and(eq(cartLines.id, cartLineId), eq(cartLines.cartId, cartId)))
         .for('update', { of: cartLines })
       if (!row) {
-        throw new Error(`Cart line not found: ${cartLineId}`)
+        throw new NotFoundError(`Cart line not found: ${cartLineId}`)
       }
       const { line } = row
       const customizations = validateCustomizations(row.customFields, answers)
@@ -215,7 +216,7 @@ class CartService {
 
   async updateQuantity(cartId: number, cartLineId: number, quantity: number) {
     if (quantity < 1) {
-      throw new Error('Quantity must be at least 1')
+      throw new ValidationError('Quantity must be at least 1')
     }
     const result = await this.db
       .update(cartLines)
@@ -329,7 +330,7 @@ class CartService {
       where: eq(carts.sessionId, sessionId),
     })
     if(!content) {
-      throw new Error(`Cart not found for session: ${sessionId}`)
+      throw new NotFoundError(`Cart not found for session: ${sessionId}`)
     }
     const {appliedVoucherOffers, ...rest} = content
     let cartContent: CartContent = {

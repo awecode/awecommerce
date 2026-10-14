@@ -1,3 +1,4 @@
+import { ValidationError } from '../../../core/errors'
 import { CartContent, Database } from '../../types'
 import {
   and,
@@ -1460,7 +1461,7 @@ class OfferService {
         new Date(voucherOffer.startDate) > new Date()) ||
       (voucherOffer.endDate && new Date(voucherOffer.endDate) < new Date())
     ) {
-      throw new Error('Invalid voucher code')
+      throw new ValidationError('Invalid voucher code')
     }
 
     if (
@@ -1468,12 +1469,12 @@ class OfferService {
       voucherOffer.usageCount &&
       voucherOffer.usageCount >= voucherOffer.overallLimit
     ) {
-      throw new Error('Voucher code usage limit exceeded')
+      throw new ValidationError('Voucher code usage limit exceeded')
     }
 
     if (voucherOffer.limitPerUser) {
       if (!userId) {
-        throw new Error('User id is required to validate voucher code')
+        throw new ValidationError('User id is required to validate voucher code')
       }
       const userUsageCount = await this.db.query.offerUsages.findFirst({
         where: and(
@@ -1485,7 +1486,7 @@ class OfferService {
         userUsageCount && userUsageCount.usageCount &&
         userUsageCount.usageCount >= voucherOffer.limitPerUser
       ) {
-        throw new Error('Voucher code usage limit exceeded')
+        throw new ValidationError('Voucher code usage limit exceeded')
       }
     }
 
@@ -1497,7 +1498,7 @@ class OfferService {
         ),
       })
     ) {
-      throw new Error('Voucher code already used in this cart')
+      throw new ValidationError('Voucher code already used in this cart')
     }
 
     if (!voucherOffer.benefit.isActive) {
@@ -1512,21 +1513,21 @@ class OfferService {
     )
 
     if (productIdsInOfferRange.length === 0) {
-      throw new Error(
+      throw new ValidationError(
         'Voucher code is not applicable to any product in the cart',
       )
     }
 
     if (voucherOffer.benefit.type === 'free_shipping') {
       if (hasFreeShipping(cartContent)) {
-        throw new Error('Free shipping already applied')
+        throw new ValidationError('Free shipping already applied')
       }
     } else if (isFullyDiscounted(cartContent, productIdsInOfferRange)) {
-      throw new Error('Discount already applied to all applicable products')
+      throw new ValidationError('Discount already applied to all applicable products')
     }
 
     if (!applyBenefit(voucherOffer, cartContent, productIdsInOfferRange, 'voucher')) {
-      throw new Error(
+      throw new ValidationError(
         'Voucher code is not applicable to any product in the cart',
       )
     }

@@ -268,8 +268,20 @@ try {
 | `@awecommerce/service/core/db` | `db`, the package's database instance |
 | `@awecommerce/service/core/db/pg/db` | `closeDb`, `initializeDb`, `getClient` |
 | `@awecommerce/service/apps/types` | Shared types such as `CartContent` and `Database` |
+| `@awecommerce/service/core/errors` | `NotFoundError`, `ValidationError` |
 
 Every path works with both `import` and `require`, and includes TypeScript types.
+
+### Errors
+
+The services throw:
+
+- `NotFoundError` when a record asked for by id does not exist, such as `Cart not found: <id>` or `Product variant not found: <id>`.
+- `ValidationError` when the input, or the record's current state, does not allow the operation, such as `Quantity must be at least 1`, `Invalid voucher code`, `Insufficient loyalty points` or `Order is already cancelled: <id>`. The message says why and can be shown to the user.
+- The checkout errors described in [Placing an order](#placing-an-order).
+- A plain `Error` for setup problems (`POSTGRES_URL is not set`, `ORDER_HASH_SECRET is not set`) and for anything unexpected, such as a database failure.
+
+Check them with `instanceof`, or by `name`, which matches the class name.
 
 ## Tax
 

@@ -1,3 +1,4 @@
+import { NotFoundError, ValidationError } from '../../../core/errors'
 import {
   and,
   asc,
@@ -164,10 +165,10 @@ class OrderService {
         .where(eq(carts.id, cartId))
         .for('update')
       if (!cart) {
-        throw new Error(`Cart not found: ${cartId}`)
+        throw new NotFoundError(`Cart not found: ${cartId}`)
       }
       if (cart.status !== 'Open') {
-        throw new Error(`Cart is not open: ${cartId}`)
+        throw new ValidationError(`Cart is not open: ${cartId}`)
       }
 
       // Lock the cart's vouchers before they are re-applied below. Re-applying
@@ -187,11 +188,11 @@ class OrderService {
         true,
       )
       if (!content.lines.length) {
-        throw new Error('Cannot create an order without lines')
+        throw new ValidationError('Cannot create an order without lines')
       }
       const inactiveLine = content.lines.find((line) => !line.variant.isActive)
       if (inactiveLine) {
-        throw new Error(
+        throw new ValidationError(
           `Product variant is not available: ${inactiveLine.variant.sku}`,
         )
       }
@@ -321,7 +322,7 @@ class OrderService {
   async changeStatus(orderId: number, newStatus: OrderStatus, changedBy?: string) {
     if (newStatus === 'Cancelled') {
       // cancel() also records who cancelled and why, and gives offer usage back
-      throw new Error('Use cancel() to cancel an order')
+      throw new ValidationError('Use cancel() to cancel an order')
     }
     return await this.db.transaction(async (tx) => {
       // Locked so the previous status cannot change before it is recorded
@@ -331,13 +332,13 @@ class OrderService {
         .where(eq(orders.id, orderId))
         .for('update')
       if (!order) {
-        throw new Error(`Order not found: ${orderId}`)
+        throw new NotFoundError(`Order not found: ${orderId}`)
       }
       if (order.status === 'Cancelled') {
-        throw new Error(`Order is cancelled: ${orderId}`)
+        throw new ValidationError(`Order is cancelled: ${orderId}`)
       }
       if (order.status === newStatus) {
-        throw new Error(`Order is already ${newStatus}: ${orderId}`)
+        throw new ValidationError(`Order is already ${newStatus}: ${orderId}`)
       }
       await new OrderService(tx).recordStatusChange(
         orderId,
@@ -602,10 +603,10 @@ class OrderService {
         .where(eq(orders.id, orderId))
         .for('update')
       if (!order) {
-        throw new Error(`Order not found: ${orderId}`)
+        throw new NotFoundError(`Order not found: ${orderId}`)
       }
       if (order.status === 'Cancelled') {
-        throw new Error(`Order is already cancelled: ${orderId}`)
+        throw new ValidationError(`Order is already cancelled: ${orderId}`)
       }
       await tx
         .update(orders)

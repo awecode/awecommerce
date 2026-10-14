@@ -1,3 +1,4 @@
+import { ValidationError } from '../../../core/errors'
 import { and, asc, desc, eq, gt, isNull, lt, or } from 'drizzle-orm'
 import {
   InsertLoyaltyLogs,
@@ -172,7 +173,7 @@ class LoyaltyService {
     return await this.db.transaction(async (tx) => {
       const loyaltyService = new LoyaltyService(tx)
       if (!(points > 0)) {
-        throw new Error('Points must be greater than zero')
+        throw new ValidationError('Points must be greater than zero')
       }
       await loyaltyService.lockUserPoints(userId)
       const pointsToRedeem = points
@@ -194,7 +195,7 @@ class LoyaltyService {
         new Decimal(0),
       )
       if (availablePoints.lt(pointsToRedeem)) {
-        throw new Error('Insufficient loyalty points')
+        throw new ValidationError('Insufficient loyalty points')
       }
       for (const point of pointsData) {
         if (pointsToDeduct <= 0) {
@@ -239,17 +240,17 @@ class LoyaltyService {
   // Checks that a user can redeem the points now and returns their value
   async redemptionValue(userId: string | null, points: number) {
     if (!userId) {
-      throw new Error('Guests cannot redeem loyalty points')
+      throw new ValidationError('Guests cannot redeem loyalty points')
     }
     if (!(points > 0)) {
-      throw new Error('Points must be greater than zero')
+      throw new ValidationError('Points must be greater than zero')
     }
     const settings = await this.getSettings()
     if (!settings.isEnabled || !settings.redeemRate) {
-      throw new Error('Loyalty points cannot be redeemed')
+      throw new ValidationError('Loyalty points cannot be redeemed')
     }
     if (new Decimal(await this.getTotalRedeemablePoints(userId)).lt(points)) {
-      throw new Error('Insufficient loyalty points')
+      throw new ValidationError('Insufficient loyalty points')
     }
     return new Decimal(points).mul(settings.redeemRate)
   }
@@ -270,7 +271,7 @@ class LoyaltyService {
     return await this.db.transaction(async (tx) => {
       const loyaltyService = new LoyaltyService(tx)
       if (!(points > 0)) {
-        throw new Error('Points must be greater than zero')
+        throw new ValidationError('Points must be greater than zero')
       }
       await loyaltyService.lockUserPoints(userId)
       const unredeemablePoints = await loyaltyService.redeemedPointsForOrder(
@@ -278,7 +279,7 @@ class LoyaltyService {
         orderId,
       )
       if (unredeemablePoints.lt(points)) {
-        throw new Error(
+        throw new ValidationError(
           'Cannot unredeem more points than were redeemed for this order',
         )
       }

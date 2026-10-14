@@ -1,3 +1,4 @@
+import { NotFoundError, ValidationError } from '../../../core/errors'
 import { eq, inArray } from 'drizzle-orm'
 import { Decimal } from 'decimal.js'
 import { productClasses } from '../../product/schemas'
@@ -23,7 +24,7 @@ const priceCart = async (
       .from(shippingMethods)
       .where(eq(shippingMethods.id, shippingMethodId))
     if (!shippingMethod) {
-      throw new Error(`Shipping method not found: ${shippingMethodId}`)
+      throw new NotFoundError(`Shipping method not found: ${shippingMethodId}`)
     }
   }
 
@@ -66,7 +67,7 @@ const priceCart = async (
   const loyalty = new Decimal(loyaltyDiscount)
   const productsTotal = lineAmounts.reduce((sum, line) => sum.add(line.amount), new Decimal(0))
   if (loyalty.gt(productsTotal)) {
-    throw new Error("Points are worth more than the order's products")
+    throw new ValidationError("Points are worth more than the order's products")
   }
   const lastIndex = lineAmounts.map((line) => line.amount.gt(0)).lastIndexOf(true)
   let loyaltyLeft = loyalty

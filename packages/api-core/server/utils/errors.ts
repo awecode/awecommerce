@@ -5,6 +5,7 @@ import {
   OrderTotalMismatchError,
   VoucherNoLongerValidError,
 } from '@awecommerce/service/apps/order/services/order'
+import { NotFoundError, ValidationError } from '@awecommerce/service/core/errors'
 
 // Errors the buyer can fix (refresh the cart, change answers, drop a voucher)
 const conflictErrors = [
@@ -22,10 +23,13 @@ export const toHttpError = (error: unknown) => {
   }
   if (conflictErrors.some((ErrorClass) => error instanceof ErrorClass)) {
     const { name, message, ...fields } = error as Error
-    return createError({ statusCode: 409, message, data: { code: name, ...fields } })
+    return createError({ statusCode: 409, statusMessage: 'Conflict', message, data: { code: name, ...fields } })
   }
-  if (error instanceof Error && / not found: /.test(error.message)) {
-    return createError({ statusCode: 404, message: error.message })
+  if (error instanceof NotFoundError) {
+    return createError({ statusCode: 404, statusMessage: 'Not Found', message: error.message })
+  }
+  if (error instanceof ValidationError) {
+    return createError({ statusCode: 422, statusMessage: 'Unprocessable Entity', message: error.message })
   }
   return error
 }

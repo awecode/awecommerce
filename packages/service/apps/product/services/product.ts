@@ -1,3 +1,4 @@
+import { NotFoundError, ValidationError } from '../../../core/errors'
 import {
   and,
   asc,
@@ -48,17 +49,17 @@ const validateCustomFields = (fields: CustomField[]) => {
   return fields.map((field) => {
     const label = typeof field.label === 'string' ? field.label.trim() : ''
     if (!label) {
-      throw new Error('Custom field label is required')
+      throw new ValidationError('Custom field label is required')
     }
     if (labels.has(label)) {
-      throw new Error(`Duplicate custom field label: ${label}`)
+      throw new ValidationError(`Duplicate custom field label: ${label}`)
     }
     labels.add(label)
     if (typeof field.required !== 'boolean') {
-      throw new Error(`Custom field required must be true or false: ${label}`)
+      throw new ValidationError(`Custom field required must be true or false: ${label}`)
     }
     if (!Number.isInteger(field.maxLength) || field.maxLength < 1) {
-      throw new Error(`Custom field maxLength must be a positive whole number: ${label}`)
+      throw new ValidationError(`Custom field maxLength must be a positive whole number: ${label}`)
     }
     return { label, required: field.required, maxLength: field.maxLength }
   })
@@ -1119,7 +1120,7 @@ class ProductVariantService {
         .from(productVariants)
         .where(eq(productVariants.id, variantId))
       if (!existing) {
-        throw new Error(`Product variant not found: ${variantId}`)
+        throw new NotFoundError(`Product variant not found: ${variantId}`)
       }
       await variantService.checkImage(existing.productId, variantData.imageId)
       const [result] = await tx
@@ -1159,7 +1160,7 @@ class ProductVariantService {
       .from(productImages)
       .where(and(eq(productImages.id, imageId), eq(productImages.productId, productId)))
     if (!image) {
-      throw new Error(`Image does not belong to the product: ${imageId}`)
+      throw new ValidationError(`Image does not belong to the product: ${imageId}`)
     }
   }
 
@@ -1216,7 +1217,7 @@ class ProductVariantService {
           key(other.optionValues.map((v) => v.optionValueId)) === key(optionValueIds),
       )
     ) {
-      throw new Error('A variant with these options already exists')
+      throw new ValidationError('A variant with these options already exists')
     }
 
     await this.db
