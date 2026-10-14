@@ -38,9 +38,10 @@ pnpm dev:backoffice   # backoffice only
 - **Look:** zinc neutrals with a blue accent, Inter (bundled, no font service), compact controls (Nuxt UI's small sizes, set in `app/app.config.ts`), 48px headers. Light or dark follows the system and can be switched in the user menu.
 - **Shell** (`app/layouts/default.vue`): collapsible, resizable sidebar with the store name, ⌘K (Ctrl+K) palette, and the user menu (appearance, sign out).
 - **Sign-in:** `/login` (email, then a link or a pasted token), `/auth/confirm` (where the emailed link lands) and `/auth/error` replace the auth layer's pages. A signed-in user without the admin role gets `/no-access`.
+- **Catalog** (`/catalog/categories`, `/catalog/brands`, `/catalog/product-classes`): one list page each, built on `app/components/catalog/CatalogPage.vue`. Search (`/` focuses it), the status filter and the page are kept in the URL. Rows open a side panel to edit; the slug fills itself from a new name; save with the button or ⌘S, and closing with unsaved changes asks first. The row menu activates, deactivates or deletes; deleting one that products still use offers to deactivate it instead. A category's parent picker leaves out the category and everything under it. `?new=1` opens a new one (the ⌘K palette links there).
 - **Prices:** `useMoney()` formats decimal strings in the store's currency and locale (`/api/admin/settings/store`).
 
-`pnpm test:backoffice` runs browser tests: it builds the app, starts it against a temporary Postgres, and drives Chromium (sign-in, staff and customer access, dark mode). It uses Playwright's Chromium (install it with `pnpm --filter @awecommerce/backoffice exec playwright-core install chromium-headless-shell`) or, with `CHROMIUM_PATH` set (for example `CHROMIUM_PATH=/usr/bin/chromium`), a browser already on the machine.
+`pnpm test:backoffice` runs browser tests: it builds the app, starts it against a temporary Postgres, and drives Chromium (sign-in, staff and customer access, dark mode, the catalog screens). It uses Playwright's Chromium (install it with `pnpm --filter @awecommerce/backoffice exec playwright-core install chromium-headless-shell`) or, with `CHROMIUM_PATH` set (for example `CHROMIUM_PATH=/usr/bin/chromium`), a browser already on the machine.
 
 ## Sign-in
 
@@ -203,7 +204,5 @@ Wrap route handlers in `defineServiceHandler` so service errors become HTTP erro
 - Anything else gives 500.
 
 Unknown `/api` paths give a JSON 404.
-
-The API has no authentication yet, so `/api/admin` is open. Don't deploy the backoffice until it does.
 
 Other scripts at the repo root run the same command in `@awecommerce/service`.

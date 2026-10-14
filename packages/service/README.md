@@ -279,7 +279,7 @@ The return type follows the filter: an array without `pagination`, a page with i
 
 ### Categories
 
-Categories form a tree through `parentId`.
+Categories form a tree through `parentId`. `CategoryService.update` refuses (with a `ValidationError`) a parent that is the category itself or a category under it.
 
 - `ProductService.list({ categories, includeSubcategories: true })` matches products in those categories and in every category under them, at any depth. Without `includeSubcategories`, only the categories themselves.
 - `ProductService.list()` leaves out products whose category is inactive or under an inactive category. Pass `includeInactiveCategories: true` to include them.
