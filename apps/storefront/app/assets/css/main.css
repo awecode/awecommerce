@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/fraunces";
+
+/* Classes used by the auth layer's components */
+@source "../../../../../packages/auth/app";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Headings and prices */
+  --font-serif: "Fraunces Variable", ui-serif, Georgia, serif;
+}
+
+/* The theme: near-black on warm white, with stone greys. Change these (and
+   the colours in app.config.ts) to rebrand. */
+:root {
+  --ui-primary: var(--color-stone-900);
+  --ui-text: var(--color-stone-800);
+  --ui-text-highlighted: var(--color-stone-950);
+  --ui-text-muted: var(--color-stone-500);
+  --ui-bg: #fbfaf7;
+  --ui-bg-muted: #f5f3ee;
+  --ui-bg-elevated: #f1eee8;
+  --ui-radius: 0.25rem;
+  --ui-header-height: 4rem;
+}
+
+body {
+  @apply antialiased;
+}
+
+h1, h2, h3 {
+  @apply font-serif text-highlighted;
+}

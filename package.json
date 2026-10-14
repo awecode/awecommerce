@@ -19,7 +19,8 @@
     "test:auth": "pnpm --filter @awecommerce/auth test",
     "migrate:auth": "pnpm --filter @awecommerce/auth migrate",
     "generate:auth": "pnpm --filter @awecommerce/auth generate",
-    "test:backoffice": "pnpm --filter @awecommerce/backoffice test"
+    "test:backoffice": "pnpm --filter @awecommerce/backoffice test",
+    "test:storefront": "pnpm --filter @awecommerce/storefront test"
   },
   "packageManager": "pnpm@9.4.0+sha1.9217c800d4ab947a7aee520242a7b70d64fc7638",
   "pnpm": {

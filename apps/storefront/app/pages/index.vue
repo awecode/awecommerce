@@ -1,11 +1,10 @@
 <script setup lang="ts">
-const { data } = await useFetch('/api/store/products')
+// The home page. The product sections (shop by category, featured, best
+// sellers) come with the listings.
+const { store } = useAppConfig()
+useSeoMeta({ description: store.description })
 </script>
 
 <template>
-  <ul>
-    <li v-for="product in data?.results" :key="product.id">
-      {{ product.name }}
-    </li>
-  </ul>
+  <HomeHero />
 </template>

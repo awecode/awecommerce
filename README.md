@@ -45,6 +45,18 @@ pnpm dev:backoffice   # backoffice only
 
 `pnpm test:backoffice` runs browser tests: it builds the app, starts it against a temporary Postgres, and drives Chromium (sign-in, staff and customer access, dark mode, the catalog screens, the product list and page). It uses Playwright's Chromium (install it with `pnpm --filter @awecommerce/backoffice exec playwright-core install chromium-headless-shell`) or, with `CHROMIUM_PATH` set (for example `CHROMIUM_PATH=/usr/bin/chromium`), a browser already on the machine.
 
+## Storefront
+
+`apps/storefront` is the shop: Nuxt UI 4 on Tailwind 4, server rendered, meant as a starter to copy and rebrand.
+
+- **Look:** an editorial theme, near-black on warm white with stone greys, Fraunces for headings and prices and Inter for text (both bundled). Light only. The colours are at the top of `app/assets/css/main.css` and in `app/app.config.ts`.
+- **Content without an admin screen yet** is in `app/app.config.ts` under `store`: `logo` (an image URL; the store name is shown without one), `tagline`, the default `description`, the home page `hero` (title, text, image, button) and the footer's `links`. The store's name, currency and locale come from the store settings (`/api/store/settings`).
+- **Layout** (`app/layouts/default.vue`): the header has the name or logo, the category menu (top-level categories with a panel of their subcategories; a drawer on small screens), search (a dialog that goes to `/search?q=`), the account menu or Sign in, and the cart with its item count. The footer lists the top-level categories and the configured links.
+- **Composables:** `useStoreSettings()`, `useMoney()` (prices in the store's currency and locale), `useCategoryMenu()` and `useCart()` (the cart summary and its item count).
+- **SEO defaults** (`app/app.vue`): titles as `Page · Store`, the default description, Open Graph and Twitter tags, `<html lang>` from the store's locale, and a canonical link without the query, built from `NUXT_PUBLIC_SITE_URL` (the request's address when unset).
+
+`pnpm test:storefront` runs its browser tests, like the backoffice's (same Chromium setup).
+
 ## Sign-in
 
 Customers and staff sign in the same way, with a magic link, and share one `users` table. Staff are users with `role: 'admin'`; emails listed in `NUXT_AUTH_ADMIN_EMAILS` get it when they first sign in. Without SES settings, development prints the sign-in email to the console.
@@ -54,7 +66,7 @@ Customers and staff sign in the same way, with a magic link, and share one `user
 - In routes, `getUser(event)`, `requireAuthenticated(event)` and `requireAdmin(event)` come from the auth layer (see `packages/auth/README.md`).
 - To run code after every sign-in, call `onSignedIn(({ user }) => ...)` from a Nitro plugin. The store uses it to link the orders a buyer placed as a guest with the same email (`packages/api-store/server/plugins/claim-guest-orders.ts`), only when that email is verified, which magic link sign-in does.
 - The auth tables have their own `drizzle-kit` schema and migrations in `packages/auth` (`pnpm generate:auth`, `pnpm migrate:auth`), recorded in `__drizzle_migrations_auth`, apart from the library's.
-- Its login components use Tailwind classes; the storefront does not have Tailwind yet (the backoffice has its own sign-in pages).
+- Its login components use Tailwind classes. The storefront uses the layer's sign-in pages for now; the backoffice has its own.
 
 Changes from the upstream layer: it takes `useDb` from api-core, adds the auth tables to its schema, mounts the email template as `assets:auth` (so no copying into each app), sets the admin role from `NUXT_AUTH_ADMIN_EMAILS`, keeps the plugins' types (`role`, the magic link endpoints), and drops the demo pages.
 

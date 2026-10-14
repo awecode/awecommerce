@@ -7,16 +7,30 @@
     "build": "nuxt build",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "test": "node ../../packages/service/scripts/test-pg.mjs --if-available"
   },
   "dependencies": {
     "@awecommerce/api-store": "workspace:*",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@iconify-json/lucide": "^1.2.144",
+    "@nuxt/ui": "^4.11.3",
     "nuxt": "^4.6.1",
+    "tailwindcss": "^4.3.3",
     "vue": "^3.5.44",
-    "vue-router": "^5.4.0"
+    "vue-router": "^5.4.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@awecommerce/service": "workspace:^",
+    "@nuxt/test-utils": "^4.3.3",
+    "@types/pg": "^8.23.1",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1",
+    "playwright-core": "^1.64.1",
     "typescript": "^5.9.3",
+    "vitest": "^5.0.4",
     "vue-tsc": "^3.3.13"
   }
 }
