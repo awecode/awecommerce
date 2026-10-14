@@ -47,11 +47,13 @@ export type CartContent = Cart & {
   lines: Array<
     CartLine & {
       variant: CartLineVariant
+      siteOfferDiscounts: OfferDiscount[]
       userOfferDiscounts: OfferDiscount[]
       voucherOfferDiscounts: VoucherOfferDiscount[]
       totalOfferDiscount: number
     }
   >
+  siteOfferDiscounts: OfferDiscount[]
   userOfferDiscounts: OfferDiscount[]
   voucherOfferDiscounts: VoucherOfferDiscount[]
   totalOfferDiscount: number

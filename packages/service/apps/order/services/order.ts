@@ -225,6 +225,7 @@ class OrderService {
       const pricing = await priceCart(tx, content, shippingMethodId, loyaltyDiscount)
       const { shippingMethod } = pricing
       const appliedOffers = [
+        ...content.siteOfferDiscounts,
         ...content.userOfferDiscounts,
         ...content.voucherOfferDiscounts,
       ]

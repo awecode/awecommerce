@@ -161,6 +161,31 @@ await cartService.addToCart(cart.id, jersey.variants[0].id, 1, {
 - **Orders:** checkout copies each line's answers onto the order line's `customizations`. That copy is the record: changing or removing the product's `customFields` later does not change orders already placed.
 - **Fields changed while in the cart:** checkout checks the answers again against the product's current `customFields`. If they no longer fit (a new required field, a shorter `maxLength`, or a removed field that was answered), `createFromCart` throws `CustomizationsNoLongerValidError` (with `cartLineId`, `productName` and `reason`) and writes nothing; ask the buyer to update that line with `updateCustomizations`. `getCartSummary` shows the same problem ahead of checkout: each line has `customizationsError`, `null` when its answers fit, otherwise the reason (for example `Missing required field: Initials`).
 
+### Offers
+
+An offer has a range (the products it covers), a condition and a benefit. Reading a cart with offers (`getCartContentForSession(sessionId, true)` or `getCartSummary`) applies them in this order, each on what the earlier ones left:
+
+1. **Site offers** (`type: 'site'`): every cart, guests included. Their user targeting (`includeAllUsers`, `includedUserIds`) is ignored.
+2. **User offers** (`type: 'user'`): carts of the users they target.
+3. **Vouchers** (`type: 'voucher'`): only after the buyer applies the code with `OfferService.applyVoucherCode`.
+
+The applied offers are listed in `siteOfferDiscounts`, `userOfferDiscounts` and `voucherOfferDiscounts`, on the cart and on each line.
+
+Conditions are checked against the cart lines in the offer's range:
+
+- `basket_quantity`: a product's quantity, across its variants, reaches the value. Only that product's lines get the benefit.
+- `basket_total`: the lines' total at selling price, before other offers, reaches the value.
+- `distinct_items`: the number of different products reaches the value.
+
+Benefits apply per unit, to at most `maxAffectedItems` units per line when it is set, and never take a line below zero:
+
+- `fixed_amount`: the value off each unit.
+- `percentage`: the value percent off each unit's selling price.
+- `fixed_price`: each unit sells at the value. Units already cheaper are not discounted.
+- `free_shipping`: the shipping charge is waived, in the summary and the order. It adds a discount of `0` to the offer lists, so the offer still counts towards its limits. A cart gets free shipping once: a second free shipping voucher throws `Free shipping already applied`.
+
+A voucher that gives nothing throws `Voucher code is not applicable to any product in the cart`.
+
 ### Cart summary
 
 `CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax` and `taxRate`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:

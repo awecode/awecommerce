@@ -336,15 +336,18 @@ class CartService {
       ...rest,
       lines: rest.lines.map((line) => ({
         ...withLineVariant(line),
+        siteOfferDiscounts: [],
         userOfferDiscounts: [],
         voucherOfferDiscounts: [],
         totalOfferDiscount: 0,
       })),
+      siteOfferDiscounts: [],
       userOfferDiscounts: [],
       voucherOfferDiscounts: [],
       totalOfferDiscount: 0,
     }
     if (withOffersInfo) {
+      cartContent = await this.applySiteOffers(cartContent)
       if (cartContent.userId) {
         cartContent = await this.applyUserOffers(
           cartContent,
@@ -563,14 +566,23 @@ class CartService {
       .where(eq(cartAppliedVoucherOffers.cartId, cartId))
   }
 
+  // Site offers apply to every cart, guests included
+  async applySiteOffers(cartContent: CartContent) {
+    const offerService = new OfferService(this.db)
+    let offers = await offerService.getActiveUserOffers(cartContent.userId, {
+      type: 'site',
+    })
+    offers = offers.filter((offer) => offer.benefit?.isActive)
+    for (const offer of offers) {
+      cartContent = await offerService.applyUserOffer(offer, cartContent, 'site')
+    }
+    return cartContent
+  }
+
   async applyUserOffers(cartContent: CartContent, userId: string) {
     const offerService = new OfferService(this.db)
     let offers = await offerService.getActiveUserOffers(userId)
     offers = offers.filter((offer) => offer.benefit?.isActive)
-    offers = offers.filter(
-      (offer) => offer.condition?.type === 'basket_quantity',
-    )
-    // TODO: Implement other offer types
     for (const offer of offers) {
       cartContent = await offerService.applyUserOffer(offer, cartContent)
     }

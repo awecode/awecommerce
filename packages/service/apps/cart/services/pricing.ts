@@ -2,6 +2,7 @@ import { eq, inArray } from 'drizzle-orm'
 import { Decimal } from 'decimal.js'
 import { productClasses } from '../../product/schemas'
 import { shippingMethods } from '../../order/schemas'
+import { hasFreeShipping } from '../../offer/services/offer'
 import { calculateTax, TaxService } from '../../tax/services/tax'
 import { CartContent, Database } from '../../types'
 
@@ -108,7 +109,10 @@ const priceCart = async (
   })
 
   const offerDiscount = new Decimal(content.totalOfferDiscount)
-  const shippingCharge = new Decimal(shippingMethod?.price ?? 0)
+  // A free shipping offer waives the charge; the order still records the method
+  const shippingCharge = hasFreeShipping(content)
+    ? new Decimal(0)
+    : new Decimal(shippingMethod?.price ?? 0)
   // A line without any price counts as zero
   const subtotal = lines.reduce(
     (sum, line) =>
