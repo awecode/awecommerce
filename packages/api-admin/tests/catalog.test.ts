@@ -114,6 +114,21 @@ describe.skipIf(!url)('admin catalog API', async () => {
     expect(missing.body.data.code).toBe('MissingReference')
   })
 
+  test('the category filter also matches products in subcategories', async () => {
+    const prefix = unique('admin-tree')
+    const category = async (parentId?: number) =>
+      (await admin('/api/admin/categories', { method: 'POST', body: { name: unique('c'), slug: unique('c'), parentId } })).body
+    const parent = await category()
+    const child = await category(parent.id)
+    const other = await category()
+    const inParent = (await admin('/api/admin/products', { method: 'POST', body: newProduct({ name: `${prefix}-p`, categoryId: parent.id }) })).body
+    const inChild = (await admin('/api/admin/products', { method: 'POST', body: newProduct({ name: `${prefix}-c`, categoryId: child.id }) })).body
+    await admin('/api/admin/products', { method: 'POST', body: newProduct({ name: `${prefix}-o`, categoryId: other.id }) })
+
+    const ids = (await admin(`/api/admin/products?q=${prefix}&categories=${parent.id}`)).body.results.map((p: any) => p.id)
+    expect(ids.sort()).toEqual([inParent.id, inChild.id].sort())
+  })
+
   test('list rows carry a variant summary and sort by name', async () => {
     const prefix = unique('admin-summary')
     const b = (await admin('/api/admin/products', { method: 'POST', body: newProduct({ name: `${prefix}-b`, stockQuantity: 3 }) })).body

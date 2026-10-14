@@ -1,6 +1,7 @@
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 
-// Every product, drafts and inactive ones included, one page at a time
+// Every product, drafts and inactive ones included, one page at a time. A
+// category also matches the products in the categories under it.
 export default defineServiceHandler(async (event) => {
   const query = await getValidatedQuery(event, productListQuery.parse)
   return await new ProductService(useDb()).list({
@@ -8,6 +9,7 @@ export default defineServiceHandler(async (event) => {
     status: query.status,
     isActive: query.active,
     categories: query.categories,
+    includeSubcategories: true,
     brands: query.brands,
     productClass: query.productClass,
     isFeatured: query.featured,
