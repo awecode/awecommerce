@@ -526,11 +526,24 @@ class OrderService {
   //     }, 0);
   // }
 
-  async changePaymentStatus(orderId: number, newStatus: OrderPaymentStatus) {
-    await this.db
-      .update(orders)
-      .set({ paymentStatus: newStatus })
-      .where(eq(orders.id, orderId))
+  // Sets the payment status by hand (for example cash on delivery) and logs it
+  async changePaymentStatus(
+    orderId: number,
+    newStatus: OrderPaymentStatus,
+    changedBy?: string | null,
+  ) {
+    return await this.db.transaction(async (tx) => {
+      const [order] = await tx
+        .update(orders)
+        .set({ paymentStatus: newStatus, updatedAt: new Date().toISOString() })
+        .where(eq(orders.id, orderId))
+        .returning()
+      if (!order) {
+        throw new NotFoundError(`Order not found: ${orderId}`)
+      }
+      await new OrderService(tx).createLog(orderId, `Payment ${newStatus}`, changedBy)
+      return order
+    })
   }
 
   async createPaymentEvent(paymentEvent: NewPaymentEvent) {
@@ -710,11 +723,13 @@ class OrderService {
   async list<F extends OrderListFilter = {}>(filters?: Exact<F, OrderListFilter>) {
     const where: SQL[] = []
 
+    // An order id, a user id, or part of the guest's email
     if (filters?.q) {
       where.push(
         or(
           Number(filters.q) ? eq(orders.id, Number(filters.q)) : undefined,
           eq(orders.userId, filters.q),
+          sql`${orders.guestUser}->>'email' ILIKE ${`%${filters.q}%`}`,
         )!,
       )
     }

@@ -159,6 +159,24 @@ Body schemas are in `packages/api-admin/shared/utils/settings.ts`.
 | `GET`, `POST /api/admin/shipping-methods` | `{ name, price, metadata? }` | Lists (newest first) or creates shipping methods |
 | `GET`, `PATCH`, `DELETE /api/admin/shipping-methods/:id` | | Shows, changes or deletes one. Placed orders keep their own copy of the method. |
 
+### Orders and users
+
+Body schemas are in `packages/api-admin/shared/utils/orders.ts`. Each change records the signed-in admin.
+
+| Route | Body or query | Does |
+|---|---|---|
+| `GET /api/admin/orders` | `q` (order id, user id or part of the guest email), `status`, `tab` (`Active`, `Inactive`, `Cancelled`, `Completed`), `paymentStatus`, `userId`, `createdAt` (`YYYY-MM-DD`), `page`, `size` | Orders, newest first |
+| `GET /api/admin/orders/:id` | | The order with its lines, payments and `logs` (what changed, when and by whom) |
+| `POST /api/admin/orders/:id/status` | `{ status }` | Moves it to another status. Not `Cancelled` (400): cancel it instead. A cancelled order cannot change (422). |
+| `POST /api/admin/orders/:id/cancel` | `{ reason, remarks? }` | Cancels it, giving back its offer usage and redeemed loyalty points |
+| `POST /api/admin/orders/:id/payment-status` | `{ paymentStatus }` | Sets `Pending`, `Paid` or `Refunded` by hand, for example for cash on delivery |
+| `GET /api/admin/users` | `q` (part of the email), `role` (`admin` or `user`), `page`, `size` | Customers and staff, newest first |
+| `PATCH /api/admin/users/:id` | `{ role }` | Makes a user staff (`admin`) or a customer (`user`). You cannot remove your own admin role (422). |
+| `POST /api/admin/users/:id/ban` | `{ reason?, days? }` | Bans a user (forever without `days`) and signs them out everywhere. You cannot ban yourself (400). |
+| `POST /api/admin/users/:id/unban` | | Lifts a ban |
+
+The user routes go through Better Auth's admin plugin; its errors keep their status and message.
+
 ## API errors
 
 Wrap route handlers in `defineServiceHandler` so service errors become HTTP errors:

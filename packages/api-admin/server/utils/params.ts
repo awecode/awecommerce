@@ -60,6 +60,28 @@ export const offerListQuery = z.object({
   ...pageFields,
 })
 
+export const orderListQuery = z.object({
+  // An order id, a user id, or part of the guest's email
+  q: z.string().trim().min(1).optional(),
+  status: z.enum(['Pending', 'Confirmed', 'Processing', 'Processed', 'Couriered', 'Shipped', 'Delivered', 'Returned', 'Cancelled', 'Completed']).optional(),
+  // Active: not completed or cancelled; Inactive: completed or cancelled
+  tab: z.enum(['Active', 'Inactive', 'Cancelled', 'Completed']).optional(),
+  paymentStatus: z.enum(['Pending', 'Paid', 'Refunded']).optional(),
+  userId: z.string().min(1).optional(),
+  // Orders placed on this day, as YYYY-MM-DD
+  createdAt: z.iso.date().optional(),
+  ...pageFields,
+})
+
+export const userListQuery = z.object({
+  // Part of the email
+  q: z.string().trim().min(1).optional(),
+  role: z.enum(['admin', 'user']).optional(),
+  ...pageFields,
+})
+
+export const userParams = z.object({ id: z.string().min(1) })
+
 // A record, or a 404 when there is none
 export const orNotFound = <T>(record: T | null | undefined, message: string): T => {
   if (!record) {

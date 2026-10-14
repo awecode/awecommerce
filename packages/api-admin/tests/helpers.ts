@@ -31,9 +31,14 @@ let count = 0
 export const unique = (prefix: string) => `${prefix}-${Date.now()}-${++count}`
 
 // A signed-in user; returns their session token, sent as a Bearer token
-export const createUser = async (db: TestDb, role: string | null) => {
+export const createUser = async (db: TestDb, role: string | null, email?: string) => {
+  return (await createSignedInUser(db, role, email)).token
+}
+
+// Like createUser, with the user's id too
+export const createSignedInUser = async (db: TestDb, role: string | null, email?: string) => {
   const userId = randomUUID()
-  await db.insert(authSchema.users).values({ id: userId, name: 'Staff', email: `${userId}@example.com`, role })
+  await db.insert(authSchema.users).values({ id: userId, name: 'Staff', email: email ?? `${userId}@example.com`, role })
   const token = randomUUID()
   await db.insert(authSchema.sessions).values({
     id: randomUUID(),
@@ -41,7 +46,7 @@ export const createUser = async (db: TestDb, role: string | null) => {
     userId,
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   })
-  return token
+  return { userId, token }
 }
 
 // JSON requests, signed in with the token when given
