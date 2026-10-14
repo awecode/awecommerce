@@ -1,0 +1,16 @@
+{
+  "name": "@awecommerce/api-core",
+  "private": true,
+  "type": "module",
+  "description": "Nuxt layer: database, services and error mapping shared by the API layers",
+  "main": "./nuxt.config.ts",
+  "dependencies": {
+    "@awecommerce/service": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "nuxt": "^4.6.1"
+  }
+}

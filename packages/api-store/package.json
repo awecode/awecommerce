@@ -1,0 +1,14 @@
+{
+  "name": "@awecommerce/api-store",
+  "private": true,
+  "type": "module",
+  "description": "Nuxt layer: storefront API under /api/store",
+  "main": "./nuxt.config.ts",
+  "dependencies": {
+    "@awecommerce/api-core": "workspace:*",
+    "@awecommerce/service": "workspace:*"
+  },
+  "devDependencies": {
+    "nuxt": "^4.6.1"
+  }
+}

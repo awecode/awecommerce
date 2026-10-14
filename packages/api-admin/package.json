@@ -1,0 +1,14 @@
+{
+  "name": "@awecommerce/api-admin",
+  "private": true,
+  "type": "module",
+  "description": "Nuxt layer: backoffice API under /api/admin",
+  "main": "./nuxt.config.ts",
+  "dependencies": {
+    "@awecommerce/api-core": "workspace:*",
+    "@awecommerce/service": "workspace:*"
+  },
+  "devDependencies": {
+    "nuxt": "^4.6.1"
+  }
+}
