@@ -64,7 +64,7 @@ const commit = async () => {
     :highlight="invalid"
     :loading="saving"
     inputmode="decimal"
-    class="w-24"
+    :class="kind === 'money' ? 'w-24' : 'w-20'"
     @click.stop
     @keydown.enter.prevent="commit"
     @keydown.esc.stop.prevent="editing = false"

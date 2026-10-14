@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // The product's images as pasted URLs, in order, and which one is the
-// thumbnail shown in lists.
+// thumbnail shown in lists: the first image added, until another is chosen.
 const images = defineModel<string[]>('images', { required: true })
 const thumbnail = defineModel<string | null>('thumbnail', { required: true })
 
@@ -8,11 +8,12 @@ const url = ref('')
 const add = () => {
   const value = url.value.trim()
   if (value && !images.value.includes(value)) images.value = [...images.value, value]
+  if (value && !thumbnail.value) thumbnail.value = value
   url.value = ''
 }
 const remove = (image: string) => {
   images.value = images.value.filter((i) => i !== image)
-  if (thumbnail.value === image) thumbnail.value = null
+  if (thumbnail.value === image) thumbnail.value = images.value[0] ?? null
 }
 const move = (index: number, step: number) => {
   const next = [...images.value]

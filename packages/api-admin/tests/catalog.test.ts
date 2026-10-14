@@ -74,6 +74,25 @@ describe.skipIf(!url)('admin catalog API', async () => {
     expect((await admin(`/api/admin/products/${product.id}`)).body.variants).toHaveLength(1)
   })
 
+  test('deletes an option value with its variants, and an option once one value is left', async () => {
+    const product = (await admin('/api/admin/products', { method: 'POST', body: newProduct() })).body
+    await admin(`/api/admin/products/${product.id}/variants/generate`, { method: 'POST', body: { options: { Size: ['S', 'M'] } } })
+    const size = (await admin(`/api/admin/products/${product.id}`)).body.options[0]
+
+    const inUse = await admin(`/api/admin/options/${size.id}`, { method: 'DELETE' })
+    expect(inUse.status).toBe(422)
+    expect(inUse.body.message).toBe('Size has more than one value in use; delete its values until one is left')
+
+    const medium = size.values.find((v: any) => v.value === 'M')
+    expect((await admin(`/api/admin/option-values/${medium.id}`, { method: 'DELETE' })).status).toBe(200)
+    const small = size.values.find((v: any) => v.value === 'S')
+    expect((await admin(`/api/admin/option-values/${small.id}`, { method: 'DELETE' })).status).toBe(422)
+    expect((await admin(`/api/admin/options/${size.id}`, { method: 'DELETE' })).status).toBe(200)
+    const after = (await admin(`/api/admin/products/${product.id}`)).body
+    expect(after.options).toEqual([])
+    expect(after.variants.map((v: any) => v.options)).toEqual([[]])
+  })
+
   test('manages brands, categories and product classes', async () => {
     for (const [path, extra] of [
       ['/api/admin/brands', { order: 2 }],

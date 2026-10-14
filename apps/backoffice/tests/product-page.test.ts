@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { CategoryService, ProductService } from '@awecommerce/service/apps/product/services/product'
+import { CategoryService, ProductService, ProductVariantService } from '@awecommerce/service/apps/product/services/product'
 import { STAFF_EMAIL, setupBackoffice, signedInPage, url } from './helpers'
 
 describe.skipIf(!url)('product page', async () => {
@@ -58,7 +58,8 @@ describe.skipIf(!url)('product page', async () => {
     await page.getByRole('option', { name: 'Published' }).click()
     await page.getByLabel('Image URL').fill(image)
     await page.getByRole('button', { name: 'Add image' }).click()
-    await page.getByRole('button', { name: 'Use as thumbnail' }).click()
+    // The first image becomes the thumbnail
+    await page.getByText('Thumbnail', { exact: true }).waitFor()
     await page.getByText('Unsaved changes').waitFor()
     await page.keyboard.press('ControlOrMeta+s')
 
@@ -111,6 +112,52 @@ describe.skipIf(!url)('product page', async () => {
     expect(Number(bySize.M.price)).toBe(22)
     expect(bySize.S.stockQuantity).toBe(7)
     expect(bySize.S.sku).toBe(saved.variants[0].sku)
+  })
+
+  test('renames and deletes options and their values', async () => {
+    const saved = await product(unique('polo'))
+    await new ProductVariantService(db).generateVariants(saved.id, { Size: ['S', 'M'], Colour: ['Red', 'Blue'] })
+    const page = await open(`/products/${saved.id}`)
+    const choose = async (button: string, item: string) => {
+      await page.getByRole('button', { name: button, exact: true }).click()
+      await page.getByRole('menuitem', { name: item }).click()
+    }
+
+    // Deleting a value deletes the variants that have it
+    await choose('Size: M', 'Delete')
+    await page.getByText('This deletes the 2 variants with M.').waitFor()
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await page.getByText('Deleted the value and its variants').first().waitFor()
+    await expect.poll(async () => (await products.get(saved.id))!.variants.length).toBe(2)
+
+    // Colour still has two values in use, so it cannot go yet
+    await page.getByRole('button', { name: 'Colour option' }).click()
+    expect(await page.getByRole('menuitem', { name: /Delete/ }).isDisabled()).toBe(true)
+    await page.keyboard.press('Escape')
+
+    await choose('Size option', 'Rename')
+    await page.getByRole('dialog').getByRole('textbox').fill('Fit')
+    await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click()
+    await page.getByText('Renamed to Fit').first().waitFor()
+
+    await choose('Colour: Blue', 'Delete')
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await page.getByText('Deleted the value and its variants').first().waitFor()
+    await choose('Colour option', 'Delete')
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+    await page.getByText('Deleted the option').first().waitFor()
+
+    const after = (await products.get(saved.id))!
+    expect(after.options.map((o: any) => o.name)).toEqual(['Fit'])
+    expect(after.variants.map((v: any) => v.options)).toEqual([[{ name: 'Fit', value: 'S' }]])
+  })
+
+  test('says when a product does not exist', async () => {
+    const page = await open('/products/999999')
+    await page.getByText('No such product').waitFor()
+    expect(await page.getByRole('button', { name: /^Save/ }).count()).toBe(0)
+    await page.getByRole('link', { name: 'Back to products' }).last().click()
+    await page.waitForURL(/\/products$/)
   })
 
   test('the list beside the product opens other products', async () => {

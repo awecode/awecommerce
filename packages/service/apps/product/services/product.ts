@@ -1554,16 +1554,30 @@ class ProductOptionService {
     return result[0]
   }
 
-  // Also removes the option from every variant that uses it
+  // Also removes the option from every variant that uses it. Refused while
+  // more than one of its values is used, as the variants would then be left
+  // with the same options.
   async delete(optionId: number) {
-    const result = await this.db
+    const [option] = await this.db
+      .select()
+      .from(productOptions)
+      .where(eq(productOptions.id, optionId))
+    if (!option) {
+      throw new NotFoundError(`Product option not found: ${optionId}`)
+    }
+    const used = await this.db
+      .selectDistinct({ id: productVariantOptionValues.optionValueId })
+      .from(productVariantOptionValues)
+      .innerJoin(productOptionValues, eq(productOptionValues.id, productVariantOptionValues.optionValueId))
+      .where(eq(productOptionValues.optionId, optionId))
+    if (used.length > 1) {
+      throw new ValidationError(`${option.name} has more than one value in use; delete its values until one is left`)
+    }
+    const [result] = await this.db
       .delete(productOptions)
       .where(eq(productOptions.id, optionId))
       .returning()
-    if (!result[0]) {
-      throw new NotFoundError(`Product option not found: ${optionId}`)
-    }
-    return result[0]
+    return result!
   }
 
   async renameValue(optionValueId: number, value: string) {
@@ -1578,16 +1592,40 @@ class ProductOptionService {
     return result[0]
   }
 
-  // Also removes the value from every variant that uses it
+  // Also deletes the variants that use the value, all or none: a variant that
+  // was ordered cannot be deleted (a foreign key error). Refused when it would
+  // delete every variant of the product; delete the option then.
   async deleteValue(optionValueId: number) {
-    const result = await this.db
-      .delete(productOptionValues)
-      .where(eq(productOptionValues.id, optionValueId))
-      .returning()
-    if (!result[0]) {
-      throw new NotFoundError(`Product option value not found: ${optionValueId}`)
-    }
-    return result[0]
+    return await this.db.transaction(async (tx) => {
+      const [value] = await tx
+        .select({ value: productOptionValues.value, productId: productOptions.productId })
+        .from(productOptionValues)
+        .innerJoin(productOptions, eq(productOptions.id, productOptionValues.optionId))
+        .where(eq(productOptionValues.id, optionValueId))
+      if (!value) {
+        throw new NotFoundError(`Product option value not found: ${optionValueId}`)
+      }
+      const using = await tx
+        .select({ id: productVariantOptionValues.variantId })
+        .from(productVariantOptionValues)
+        .where(eq(productVariantOptionValues.optionValueId, optionValueId))
+      const variantIds = using.map((row) => row.id)
+      if (variantIds.length) {
+        const [{ count }] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(productVariants)
+          .where(eq(productVariants.productId, value.productId))
+        if (count <= variantIds.length) {
+          throw new ValidationError(`Deleting ${value.value} would delete every variant; delete the option instead`)
+        }
+        await tx.delete(productVariants).where(inArray(productVariants.id, variantIds))
+      }
+      const [result] = await tx
+        .delete(productOptionValues)
+        .where(eq(productOptionValues.id, optionValueId))
+        .returning()
+      return result!
+    })
   }
 }
 

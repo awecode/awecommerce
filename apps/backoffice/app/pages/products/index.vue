@@ -107,10 +107,16 @@ const columnMenu = computed<DropdownMenuItem[]>(() =>
   })),
 )
 
+const editable: Record<string, { class: { th: string; td: string } }> = {
+  price: { class: { th: 'min-w-32', td: 'min-w-32' } },
+  sale: { class: { th: 'min-w-32', td: 'min-w-32' } },
+  stock: { class: { th: 'min-w-28', td: 'min-w-28' } },
+}
 const columns: TableColumn<Product>[] = [
   { id: 'select', meta: { class: { th: 'w-8', td: 'w-8' } } },
   { id: 'name', header: 'Name' },
-  ...optionalColumns.map(({ id, label }) => ({ id, header: label })),
+  // Wide enough for their inputs, so editing in place does not shift the columns
+  ...optionalColumns.map(({ id, label }) => ({ id, header: label, meta: editable[id] })),
   { id: 'actions', meta: { class: { td: 'text-right w-10' } } },
 ]
 

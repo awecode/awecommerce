@@ -79,7 +79,11 @@ describe.skipIf(!url)('product list', async () => {
     await db.update(productVariants).set({ price: '30' }).where(eq(productVariants.sku, `${several.name}-M`))
     const page = await openList(`?q=${prefix}`)
 
+    // The columns keep their place while a value is edited
+    const header = page.getByRole('columnheader', { name: 'Stock' })
+    const before = await header.boundingBox()
     await page.getByRole('button', { name: `Price of ${single.name}` }).click()
+    expect(await header.boundingBox()).toEqual(before)
     await page.getByRole('textbox', { name: `Price of ${single.name}` }).fill('19.50')
     await page.keyboard.press('Enter')
     await page.getByRole('button', { name: `Stock of ${single.name}` }).click()

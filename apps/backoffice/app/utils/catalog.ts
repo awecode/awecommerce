@@ -16,3 +16,6 @@ export const apiErrorMessage = (error: unknown) =>
 
 // Whether the request failed because the record is still used elsewhere
 export const isInUse = (error: unknown) => (error as ApiError)?.data?.data?.code === 'InUse'
+
+// Whether the request failed because the record does not exist
+export const isNotFound = (error: unknown) => (error as { statusCode?: number })?.statusCode === 404

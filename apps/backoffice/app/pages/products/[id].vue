@@ -133,24 +133,49 @@ const keepEnter = (event: KeyboardEvent) => {
   if ((event.target as HTMLElement).tagName === 'INPUT') event.preventDefault()
 }
 
-// ---- variants from options
+// ---- options and variants from them: changed at once on the server, so
+// pending changes are saved first
 const generating = ref(false)
-const generate = async (options: Record<string, string[]>) => {
+const whenSaved = async (action: () => Promise<string>, failure: string) => {
   if (dirty.value) {
-    const go = await confirm({ title: 'Save your changes first?', description: 'Generating variants saves the product first.', confirmLabel: 'Save and generate' })
+    const go = await confirm({ title: 'Save your changes first?', description: 'This changes the saved product, so your changes are saved first.', confirmLabel: 'Save and continue' })
     if (!go || !(await save())) return
   }
   generating.value = true
   try {
-    const made = await api<unknown[]>(`/api/admin/products/${productId.value}/variants/generate`, { method: 'POST', body: { options } })
-    toast.add({ title: `Created ${made.length} variant${made.length === 1 ? '' : 's'}`, color: 'success', icon: 'i-lucide-check' })
+    toast.add({ title: await action(), color: 'success', icon: 'i-lucide-check' })
     await refetch()
   } catch (error) {
-    toast.add({ title: 'Could not generate variants', description: apiErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
+    toast.add({ title: failure, description: apiErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
   } finally {
     generating.value = false
   }
 }
+const generate = (options: Record<string, string[]>) =>
+  whenSaved(async () => {
+    const made = await api<unknown[]>(`/api/admin/products/${productId.value}/variants/generate`, { method: 'POST', body: { options } })
+    return `Created ${made.length} variant${made.length === 1 ? '' : 's'}`
+  }, 'Could not generate variants')
+const renameOption = (id: number, name: string) =>
+  whenSaved(async () => {
+    await api(`/api/admin/options/${id}`, { method: 'PATCH', body: { name } })
+    return `Renamed to ${name}`
+  }, 'Could not rename')
+const deleteOption = (id: number) =>
+  whenSaved(async () => {
+    await api(`/api/admin/options/${id}`, { method: 'DELETE' })
+    return 'Deleted the option'
+  }, 'Could not delete the option')
+const renameValue = (id: number, value: string) =>
+  whenSaved(async () => {
+    await api(`/api/admin/option-values/${id}`, { method: 'PATCH', body: { value } })
+    return `Renamed to ${value}`
+  }, 'Could not rename')
+const deleteValue = (id: number) =>
+  whenSaved(async () => {
+    await api(`/api/admin/option-values/${id}`, { method: 'DELETE' })
+    return 'Deleted the value and its variants'
+  }, 'Could not delete the value')
 // One variant without options is edited as plain fields, not a table
 const simple = computed(() => state.variants.length === 1 && !state.variants[0]!.options.length)
 const optionNames = computed(() => (product.value?.options ?? []).map((option) => option.name))
@@ -195,11 +220,11 @@ const linkPlaceholder = 'https://…'
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/products" aria-label="Back to products" class="2xl:hidden" />
         </template>
-        <template #trailing>
+        <template v-if="!error" #trailing>
           <UBadge v-if="!isNew" :color="savedForm.status === 'Published' ? 'success' : 'neutral'" variant="subtle">{{ savedForm.status }}</UBadge>
           <UBadge v-if="!isNew && !savedForm.isActive" color="warning" variant="subtle">Inactive</UBadge>
         </template>
-        <template #right>
+        <template v-if="!error" #right>
           <span v-if="dirty" class="text-xs text-muted">Unsaved changes</span>
           <UButton v-if="dirty && !isNew" color="neutral" variant="ghost" label="Discard" @click="discard" />
           <UButton :loading="saving" :label="isNew ? 'Create' : 'Save'" @click="save">
@@ -212,7 +237,14 @@ const linkPlaceholder = 'https://…'
     </template>
 
     <template #body>
-      <div v-if="error" class="p-6 text-sm text-muted">This product could not be loaded: {{ apiErrorMessage(error) }}</div>
+      <UEmpty
+        v-if="error"
+        icon="i-lucide-package-x"
+        :title="isNotFound(error) ? 'No such product' : 'This product could not be loaded'"
+        :description="isNotFound(error) ? 'It may have been deleted.' : apiErrorMessage(error)"
+        :actions="[{ label: 'Back to products', to: '/products', color: 'neutral', variant: 'outline' }]"
+        class="m-auto"
+      />
       <UForm
         v-else
         ref="form"
@@ -221,7 +253,7 @@ const linkPlaceholder = 'https://…'
         class="@container"
         @keydown.enter="keepEnter"
       >
-        <div class="mx-auto flex max-w-6xl flex-col gap-8 @3xl:flex-row">
+        <div class="mx-auto flex max-w-6xl flex-col gap-8 @4xl:flex-row">
           <div class="min-w-0 flex-1 space-y-8">
             <section class="space-y-4">
               <UFormField label="Name" name="name" required>
@@ -264,7 +296,17 @@ const linkPlaceholder = 'https://…'
 
               <div class="space-y-2 rounded-md border border-dashed border-default p-3">
                 <p class="text-xs text-muted">Options, such as Size and Colour, give a variant for each combination of their values.</p>
-                <ProductsOptionsEditor :options="product?.options ?? []" :disabled="isNew" :loading="generating" @generate="generate" />
+                <ProductsOptionsEditor
+                  :options="product?.options ?? []"
+                  :variants="savedForm.variants.filter((variant) => variant.id)"
+                  :disabled="isNew"
+                  :loading="generating"
+                  @generate="generate"
+                  @rename-option="renameOption"
+                  @delete-option="deleteOption"
+                  @rename-value="renameValue"
+                  @delete-value="deleteValue"
+                />
               </div>
             </section>
 
@@ -291,7 +333,7 @@ const linkPlaceholder = 'https://…'
             </section>
           </div>
 
-          <aside class="space-y-4 @3xl:w-64 @3xl:shrink-0">
+          <aside class="space-y-4 @4xl:w-64 @4xl:shrink-0">
             <UFormField label="Status" name="status">
               <USelect v-model="state.status" :items="['Draft', 'Published']" class="w-full" />
             </UFormField>

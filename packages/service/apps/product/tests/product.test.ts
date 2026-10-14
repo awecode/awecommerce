@@ -204,6 +204,44 @@ test('should remove a deleted option value from its variants', async () => {
   ])
 })
 
+test('should delete the variants that use a deleted option value', async () => {
+  const product = await createProduct('Delete Value Shirt')
+  await variantService.generateVariants(product.id, { Size: ['S', 'M'], Color: ['Red', 'Blue'] })
+  const [size] = await optionService.list(product.id)
+  const medium = size.values.find((v) => v.value === 'M')!
+
+  await optionService.deleteValue(medium.id)
+
+  const left = await variantService.list(product.id)
+  expect(left.map((v) => v.options.map((o) => o.value).join('/')).sort()).toEqual(['S/Blue', 'S/Red'])
+  expect((await optionService.list(product.id))[0].values.map((v) => v.value)).toEqual(['S'])
+})
+
+test('should refuse to delete the option value of every variant', async () => {
+  const product = await createProduct('Only Value Shirt')
+  await variantService.update(product.variants[0].id, { options: { Size: 'M' } })
+  const [size] = await optionService.list(product.id)
+
+  await expect(optionService.deleteValue(size.values[0].id)).rejects.toThrow(
+    'Deleting M would delete every variant; delete the option instead',
+  )
+  expect(await variantService.list(product.id)).toHaveLength(1)
+})
+
+test('should refuse to delete an option while more than one of its values is used', async () => {
+  const product = await createProduct('Option In Use Shirt')
+  await variantService.generateVariants(product.id, { Size: ['S', 'M'], Color: ['Red'] })
+  const [size] = await optionService.list(product.id)
+
+  // The variants would be left with the same options
+  await expect(optionService.delete(size.id)).rejects.toThrow(
+    'Size has more than one value in use; delete its values until one is left',
+  )
+  await optionService.deleteValue(size.values.find((v) => v.value === 'M')!.id)
+  await optionService.delete(size.id)
+  expect((await variantService.list(product.id)).map((v) => v.options)).toEqual([[{ name: 'Color', value: 'Red' }]])
+})
+
 test('should link a variant to an image of its own product only', async () => {
   const product = await createProduct('Image Shirt')
   const [front, back] = await imageService.setImages(product.id, [
