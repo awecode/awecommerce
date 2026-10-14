@@ -60,22 +60,13 @@ const { data, isLoading } = useQuery({
 type Product = NonNullable<typeof data.value>['results'][number]
 const refresh = () => queryCache.invalidateQueries({ key: ['products'] })
 
-// Choices for the filters; 100 is the most the API gives at once
-const lookups = { query: { size: 100 } }
-const { data: categories } = useQuery({ key: ['categories', 'all'], query: () => $fetch('/api/admin/categories', lookups) })
-const { data: brands } = useQuery({ key: ['brands', 'all'], query: () => $fetch('/api/admin/brands', lookups) })
-const { data: classes } = useQuery({ key: ['product-classes', 'all'], query: () => $fetch('/api/admin/product-classes', lookups) })
+// Choices for the filters, with ids as text like the URL's
+const choices = useCatalogChoices()
+const asText = (items: { label: string; value: number }[]) => items.map((item) => ({ ...item, value: String(item.value) }))
 const filters = computed(() => [
-  {
-    name: 'category',
-    placeholder: 'Category',
-    // Sorted by path, so subcategories follow their parent
-    items: (categories.value?.results ?? [])
-      .map((c) => ({ label: c.parent ? `${c.parent.name} › ${c.name}` : c.name, value: String(c.id) }))
-      .sort((a, b) => a.label.localeCompare(b.label)),
-  },
-  { name: 'brand', placeholder: 'Brand', items: (brands.value?.results ?? []).map((b) => ({ label: b.name, value: String(b.id) })) },
-  { name: 'class', placeholder: 'Class', items: (classes.value?.results ?? []).map((c) => ({ label: c.name, value: String(c.id) })) },
+  { name: 'category', placeholder: 'Category', items: asText(choices.categories.value) },
+  { name: 'brand', placeholder: 'Brand', items: asText(choices.brands.value) },
+  { name: 'class', placeholder: 'Class', items: asText(choices.classes.value) },
 ])
 
 // Clicking a sortable header sorts by it, and clicking again reverses
@@ -244,6 +235,7 @@ const tableMeta = { class: { tr: (row: { index: number }) => (row.index === high
         </template>
         <template #right>
           <span v-if="data" class="text-xs text-muted tabular-nums">{{ plural(data.pagination.total) }}</span>
+          <UButton icon="i-lucide-plus" label="New product" to="/products/new" />
           <UInput ref="searchInput" v-model="search" icon="i-lucide-search" placeholder="Search…" class="w-60">
             <template #trailing>
               <UKbd value="/" />

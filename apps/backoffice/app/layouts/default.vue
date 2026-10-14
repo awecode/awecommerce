@@ -26,6 +26,7 @@ const groups = computed(() => [
     id: 'create',
     label: 'Create',
     items: [
+      { label: 'New product', icon: 'i-lucide-plus', to: '/products/new' },
       { label: 'New category', icon: 'i-lucide-plus', to: '/catalog/categories?new=1' },
       { label: 'New brand', icon: 'i-lucide-plus', to: '/catalog/brands?new=1' },
       { label: 'New product class', icon: 'i-lucide-plus', to: '/catalog/product-classes?new=1' },

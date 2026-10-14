@@ -19,6 +19,13 @@ export default defineAppConfig({
     switch: compact,
     badge: compact,
     tabs: compact,
+    formField: compact,
+    // Rich text at the size of the rest of the form
+    editor: {
+      slots: {
+        base: 'sm:px-0 text-sm *:my-3 [&_p]:leading-6 [&_h2]:text-lg [&_h3]:text-base',
+      },
+    },
     table: {
       slots: {
         th: 'py-2 px-3 text-xs font-medium text-muted',

@@ -94,7 +94,9 @@ describe.skipIf(!url)('catalog screens', async () => {
     await page.getByRole('dialog').waitFor()
     // The palette's input has focus
     await page.keyboard.type('New category')
-    await page.getByRole('option', { name: 'New category' }).click()
+    // The list filters as it is typed; once it has settled, the best match is first
+    await expect.poll(() => page.getByRole('option').first().textContent()).toContain('New category')
+    await page.keyboard.press('Enter')
 
     await page.waitForURL('**/catalog/categories**')
     await page.getByRole('heading', { name: 'New category' }).waitFor()

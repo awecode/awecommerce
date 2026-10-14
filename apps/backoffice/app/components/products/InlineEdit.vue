@@ -20,9 +20,8 @@ const input = useTemplateRef('input')
 
 const pattern = { money: /^\d+(\.\d+)?$/, integer: /^\d+$/ }
 
-// The text to edit: prices without the database's trailing zeros ("42.50000000" is "42.5")
-const initial = () =>
-  props.value === null ? '' : String(props.value).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+// The text to edit, prices without the database's trailing zeros
+const initial = () => trimDecimal(props.value)
 
 const start = async () => {
   text.value = initial()
