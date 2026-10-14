@@ -26,6 +26,9 @@ const tokenSchema = z.object({ token: z.string().trim().min(1, 'Enter the token 
 const verifying = ref(false)
 
 const errorMessage = ref('')
+// Show field errors on submit. After that, update them as the field changes.
+const emailValidateOn = ref<Array<'input' | 'blur' | 'change'>>([])
+const tokenValidateOn = ref<Array<'input' | 'blur' | 'change'>>([])
 
 const sendLink = async () => {
   sending.value = true
@@ -62,6 +65,7 @@ const startOver = () => {
   sentTo.value = ''
   tokenState.token = ''
   errorMessage.value = ''
+  tokenValidateOn.value = []
 }
 </script>
 
@@ -76,19 +80,19 @@ const startOver = () => {
           We sent a sign-in link to <span class="font-medium text-default">{{ sentTo }}</span>. Open it, or paste the token from the email.
         </template>
         <template v-else>
-          We will email you a link to sign in. No password needed.
+          We will email you a link to sign in.
         </template>
       </p>
     </div>
 
-    <UForm v-if="!sentTo" :schema="emailSchema" :state="emailState" class="space-y-3" @submit="sendLink">
+    <UForm v-if="!sentTo" novalidate :schema="emailSchema" :state="emailState" :validate-on="emailValidateOn" class="space-y-3" @error="emailValidateOn = ['input', 'blur', 'change']" @submit="sendLink">
       <UFormField name="email" label="Email">
         <UInput v-model="emailState.email" type="email" autocomplete="email" placeholder="you@example.com" autofocus class="w-full" />
       </UFormField>
       <UButton type="submit" block :loading="sending" label="Email me a sign-in link" />
     </UForm>
 
-    <UForm v-else :schema="tokenSchema" :state="tokenState" class="space-y-3" @submit="verifyToken">
+    <UForm v-else novalidate :schema="tokenSchema" :state="tokenState" :validate-on="tokenValidateOn" class="space-y-3" @error="tokenValidateOn = ['input', 'blur', 'change']" @submit="verifyToken">
       <UFormField name="token" label="Token">
         <UInput v-model="tokenState.token" autocomplete="one-time-code" placeholder="Paste the token" autofocus class="w-full font-mono" />
       </UFormField>
