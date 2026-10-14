@@ -96,3 +96,36 @@ test('createFromCart refuses a product hidden after it was added', async () => {
     `Product variant is not available: ${product.variants[0].sku}`,
   )
 })
+
+test('hasListedProducts keeps brands with a listed product', async () => {
+  const listedBrand = await brandService.create({ name: unique('b'), slug: unique('b') })
+  const draftBrand = await brandService.create({ name: unique('b'), slug: unique('b') })
+  const hiddenCategoryBrand = await brandService.create({ name: unique('b'), slug: unique('b') })
+  const emptyBrand = await brandService.create({ name: unique('b'), slug: unique('b') })
+  const hiddenCategory = await categoryService.create({ name: unique('c'), slug: unique('c'), isActive: false })
+  await createProduct(unique('brand-menu'), { brandId: listedBrand.id })
+  await createProduct(unique('brand-menu'), { brandId: draftBrand.id, status: 'Draft' })
+  await createProduct(unique('brand-menu'), { brandId: hiddenCategoryBrand.id, categoryId: hiddenCategory.id })
+
+  const ids = (await brandService.list({ hasListedProducts: true })).map((b) => b.id)
+
+  expect(ids).toContain(listedBrand.id)
+  expect(ids).not.toContain(draftBrand.id)
+  expect(ids).not.toContain(hiddenCategoryBrand.id)
+  expect(ids).not.toContain(emptyBrand.id)
+})
+
+test('hasListedProducts keeps categories with a listed product in them or below them', async () => {
+  const parent = await categoryService.create({ name: unique('c'), slug: unique('c') })
+  const child = await categoryService.create({ name: unique('c'), slug: unique('c'), parentId: parent.id })
+  const draftOnly = await categoryService.create({ name: unique('c'), slug: unique('c') })
+  const empty = await categoryService.create({ name: unique('c'), slug: unique('c') })
+  await createProduct(unique('category-menu'), { categoryId: child.id })
+  await createProduct(unique('category-menu'), { categoryId: draftOnly.id, status: 'Draft' })
+
+  const ids = (await categoryService.list({ hasListedProducts: true })).map((c) => c.id)
+
+  expect(ids).toEqual(expect.arrayContaining([parent.id, child.id]))
+  expect(ids).not.toContain(draftOnly.id)
+  expect(ids).not.toContain(empty.id)
+})

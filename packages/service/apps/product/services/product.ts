@@ -105,6 +105,18 @@ const listedProduct = and(
   or(isNull(products.categoryId), sql`${products.categoryId} NOT IN ${inactiveCategoryIds}`),
 )!
 
+// Ids of the categories that hold a listed product, and of every category
+// above them
+const categoriesWithListedProducts = sql`(
+  WITH RECURSIVE up(id, "parentId") AS (
+    SELECT c.id, c."parentId" FROM ${categories} c
+    WHERE c.id IN (SELECT ${products.categoryId} FROM ${products} WHERE ${listedProduct})
+    UNION
+    SELECT parent.id, parent."parentId" FROM ${categories} parent JOIN up ON parent.id = up."parentId"
+  )
+  SELECT id FROM up
+)`
+
 interface ProductFilter {
   brands?: number[]
   categories?: number[]
@@ -573,6 +585,8 @@ interface BrandFilter {
   q?: string
   isActive?: boolean
   hasActiveProducts?: boolean
+  // Only brands with a product the store shows (see listedProduct)
+  hasListedProducts?: boolean
   pagination?: PaginationArgs
 }
 class BrandService {
@@ -684,6 +698,17 @@ class BrandService {
           ),
         )
       }
+    }
+
+    if (filter.hasListedProducts) {
+      where.push(
+        exists(
+          this.db
+            .select({ id: products.id })
+            .from(products)
+            .where(and(eq(products.brandId, brands.id), listedProduct)),
+        ),
+      )
     }
 
     const query = this.db
@@ -846,6 +871,9 @@ interface CategoryFilter {
   hasActiveProductWithBrands?: number[]
   // Also leaves out categories under an inactive category
   excludeInactiveBranches?: boolean
+  // Only categories with a product the store shows (see listedProduct), in
+  // them or in a category under them
+  hasListedProducts?: boolean
   pagination?: PaginationArgs
 }
 
@@ -1003,6 +1031,10 @@ class CategoryService {
 
     if (filter?.excludeInactiveBranches) {
       where.push(sql`${categories.id} NOT IN ${inactiveCategoryIds}`)
+    }
+
+    if (filter?.hasListedProducts) {
+      where.push(sql`${categories.id} IN ${categoriesWithListedProducts}`)
     }
 
     const parentCategories = alias(categories, 'parent_categories')

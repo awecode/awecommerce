@@ -32,8 +32,8 @@ Buyers see, and can buy, only listed products: active and `Published`, with an a
 |---|---|
 | `GET /api/store/products` | One page of products. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
 | `GET /api/store/products/:slug` | A product with its active variants, options, images and listed related products |
-| `GET /api/store/categories` | Active categories, each with its `parent`. Categories under an inactive category are left out. |
-| `GET /api/store/brands` | Active brands that have active products |
+| `GET /api/store/categories` | Active categories with a listed product in them or below them, each with its `parent`. Categories under an inactive category are left out. |
+| `GET /api/store/brands` | Active brands with a listed product |
 
 The query schema is `productListQuery` in `packages/api-store/shared/utils/catalog.ts`.
 

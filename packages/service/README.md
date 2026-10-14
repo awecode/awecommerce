@@ -272,6 +272,7 @@ Categories form a tree through `parentId`.
 - `ProductService.list({ categories, includeSubcategories: true })` matches products in those categories and in every category under them, at any depth. Without `includeSubcategories`, only the categories themselves.
 - `ProductService.list()` leaves out products whose category is inactive or under an inactive category. Pass `includeInactiveCategories: true` to include them.
 - `CategoryService.list({ excludeInactiveBranches: true })` leaves out categories under an inactive category; `isActive` only checks each category's own flag.
+- `CategoryService.list({ hasListedProducts: true })` keeps categories that hold a listed product (see Product variants), in them or in a category below them. `BrandService.list({ hasListedProducts: true })` keeps brands with a listed product. Use them for store menus, so no entry leads to an empty page.
 
 ### Services and import paths
 

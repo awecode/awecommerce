@@ -142,7 +142,7 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect((await request(`/api/store/products/${product.slug}`)).body.relatedProducts).toEqual([])
   })
 
-  test('lists active categories with their parents, and brands with active products', async () => {
+  test('menus list only categories and brands with listed products', async () => {
     const categoryService = new CategoryService(db)
     const parent = await categoryService.create({ name: unique('parent'), slug: unique('parent') })
     const child = await categoryService.create({ name: unique('child'), slug: unique('child'), parentId: parent.id })
@@ -150,17 +150,22 @@ describe.skipIf(!url)('store catalog API', async () => {
     const brandService = new BrandService(db)
     const stocked = await brandService.create({ name: unique('stocked'), slug: unique('stocked') })
     const empty = await brandService.create({ name: unique('empty'), slug: unique('empty') })
-    await createProduct(unique('brand'), { brandId: stocked.id })
+    const draftOnly = await brandService.create({ name: unique('draft'), slug: unique('draft') })
+    const emptyCategory = await categoryService.create({ name: unique('empty'), slug: unique('empty') })
+    await createProduct(unique('brand'), { brandId: stocked.id, categoryId: child.id })
+    await createProduct(unique('brand'), { brandId: draftOnly.id, status: 'Draft' })
 
     const categories = (await request('/api/store/categories')).body
     const ids = categories.map((c: any) => c.id)
     expect(ids).toEqual(expect.arrayContaining([parent.id, child.id]))
     expect(ids).not.toContain(hidden.id)
+    expect(ids).not.toContain(emptyCategory.id)
     expect(categories.find((c: any) => c.id === child.id).parent.id).toBe(parent.id)
 
     const brandIds = (await request('/api/store/brands')).body.map((b: any) => b.id)
     expect(brandIds).toContain(stocked.id)
     expect(brandIds).not.toContain(empty.id)
+    expect(brandIds).not.toContain(draftOnly.id)
   })
 
   test('the cart summary does not show variant costs', async () => {
