@@ -2,6 +2,8 @@ import { eq } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
 import { ShippingMethodService } from '@awecommerce/service/apps/order/services/shipping-method'
 import { offers } from '@awecommerce/service/apps/offer/schemas'
+import { ProductService } from '@awecommerce/service/apps/product/services/product'
+import { products, productVariants } from '@awecommerce/service/core/db/pg/schema'
 import { buyer, createProduct, createVoucher, setupApi, unique, url } from './helpers'
 
 const shippingAddress = { line1: '1 Main St', city: 'Kathmandu', country: 'Nepal' }
@@ -96,6 +98,58 @@ describe.skipIf(!url)('store checkout API', async () => {
       offerId,
       voucherCode: code,
     })
+  })
+
+  test('refuses checkout when the product is no longer for sale and keeps the cart', async () => {
+    const { request, variantId } = await buyerWithCart('25', 1)
+    const [variant] = await db
+      .select()
+      .from(productVariants)
+      .where(eq(productVariants.id, variantId))
+    await db.update(products).set({ status: 'Draft' }).where(eq(products.id, variant!.productId))
+
+    const summary = await request('/api/store/cart')
+    expect(summary.body.lines[0].isAvailable).toBe(false)
+
+    const refused = await request('/api/store/checkout', {
+      method: 'POST',
+      body: { expectedTotal: summary.body.total, shippingAddress, guestUser },
+    })
+    expect(refused.status).toBe(422)
+    expect(refused.body.message).toMatch(/not available/)
+    expect((await request('/api/store/cart')).status).toBe(200)
+  })
+
+  test('refuses checkout when the answers no longer fit the product and keeps the cart', async () => {
+    const request = buyer()
+    const variantId = await createProduct(db, '30', [{ label: 'Print name', required: true, maxLength: 12 }])
+    const added = await request('/api/store/cart/lines', {
+      method: 'POST',
+      body: { variantId, quantity: 1, customizations: { 'Print name': 'Dipesh' } },
+    })
+    const lineId = added.body.lines[0].id
+    const [variant] = await db
+      .select()
+      .from(productVariants)
+      .where(eq(productVariants.id, variantId))
+    await new ProductService(db).update(variant!.productId, {
+      customFields: [
+        { label: 'Print name', required: true, maxLength: 12 },
+        { label: 'Initials', required: true, maxLength: 3 },
+      ],
+    })
+
+    const refused = await request('/api/store/checkout', {
+      method: 'POST',
+      body: { expectedTotal: added.body.total, shippingAddress, guestUser },
+    })
+    expect(refused.status).toBe(409)
+    expect(refused.body.data).toMatchObject({
+      code: 'CustomizationsNoLongerValidError',
+      cartLineId: lineId,
+      reason: 'Missing required field: Initials',
+    })
+    expect((await request('/api/store/cart')).status).toBe(200)
   })
 
   test('maps bad requests to 400, 404 and 422', async () => {
