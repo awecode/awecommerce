@@ -4,7 +4,7 @@
   "description": "Awecommerce monorepo",
   "scripts": {
     "test": "pnpm --filter @awecommerce/service test",
-    "coverage": "pnpm --filter @awecommerce/service coverage",
+    "coverage": "node scripts/coverage.mjs",
     "build": "pnpm --filter @awecommerce/service build",
     "check:dist": "pnpm --filter @awecommerce/service check:dist",
     "test:pg": "pnpm --filter @awecommerce/service test:pg",

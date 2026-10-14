@@ -6,6 +6,7 @@
   "main": "./nuxt.config.ts",
   "scripts": {
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate"
   },
@@ -18,6 +19,7 @@
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^5.0.4",
     "drizzle-kit": "^0.31.11",
     "nuxt": "^4.6.1",
     "vitest": "^5.0.4"

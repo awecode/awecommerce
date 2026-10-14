@@ -18,5 +18,9 @@ export default defineConfig({
     env: loadEnv('', process.cwd(), ''),
     setupFiles: ['./tests/setup.ts'],
     globalSetup: ['./tests/pg-global-setup.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+    },
   },
 })
