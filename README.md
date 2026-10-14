@@ -26,13 +26,13 @@ pnpm dev:backoffice
 
 ### Catalog
 
-Buyers see only products that are active and `Published`, only active variants, and never a variant's `inventoryCost` (not in product pages, not in the cart).
+Buyers see only products that are active and `Published` and not under an inactive category (at any depth), only active variants, and never a variant's `inventoryCost` (not in product pages, not in the cart).
 
 | Route | Does |
 |---|---|
-| `GET /api/store/products` | One page of products. Query: `q`, `categories` and `brands` (ids, `1,2` or repeated), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
+| `GET /api/store/products` | One page of products. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
 | `GET /api/store/products/:slug` | A product with its active variants, options, images and listed related products |
-| `GET /api/store/categories` | Active categories, each with its `parent` |
+| `GET /api/store/categories` | Active categories, each with its `parent`. Categories under an inactive category are left out. |
 | `GET /api/store/brands` | Active brands that have active products |
 
 The query schema is `productListQuery` in `packages/api-store/shared/utils/catalog.ts`.

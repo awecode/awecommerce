@@ -65,6 +65,28 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect(await list(`categories=${category.id}&categories=${other.id}&sortBy=priceAsc`)).toEqual([inOther.name, cheap.name, mid.name])
   })
 
+  test('a category filter includes its subcategories, and inactive branches are hidden', async () => {
+    const prefix = unique('tree')
+    const categoryService = new CategoryService(db)
+    const clothing = await categoryService.create({ name: unique('clothing'), slug: unique('clothing') })
+    const shirts = await categoryService.create({ name: unique('shirts'), slug: unique('shirts'), parentId: clothing.id })
+    const formal = await categoryService.create({ name: unique('formal'), slug: unique('formal'), parentId: shirts.id })
+    const inClothing = await createProduct(prefix, { categoryId: clothing.id })
+    const inShirts = await createProduct(prefix, { categoryId: shirts.id })
+    const inFormal = await createProduct(prefix, { categoryId: formal.id })
+    const list = async () =>
+      names((await request(`/api/store/products?q=${prefix}&categories=${clothing.id}`)).body).sort()
+
+    expect(await list()).toEqual([inClothing.name, inShirts.name, inFormal.name].sort())
+
+    await categoryService.update(shirts.id, { isActive: false })
+    expect(await list()).toEqual([inClothing.name])
+    const categoryIds = (await request('/api/store/categories')).body.map((c: any) => c.id)
+    expect(categoryIds).toContain(clothing.id)
+    expect(categoryIds).not.toContain(shirts.id)
+    expect(categoryIds).not.toContain(formal.id)
+  })
+
   test('paginates, up to 100 a page', async () => {
     const prefix = unique('page')
     for (let i = 0; i < 3; i++) await createProduct(prefix)

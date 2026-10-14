@@ -265,6 +265,14 @@ const page = await productService.list({ isActive: true, pagination: { page: 2, 
 
 The return type follows the filter: an array without `pagination`, a page with it, and either one when the filter's type allows both, for example a `pagination` that may be `undefined`. Unknown filter fields are type errors.
 
+### Categories
+
+Categories form a tree through `parentId`.
+
+- `ProductService.list({ categories, includeSubcategories: true })` matches products in those categories and in every category under them, at any depth. Without `includeSubcategories`, only the categories themselves.
+- `ProductService.list()` leaves out products whose category is inactive or under an inactive category. Pass `includeInactiveCategories: true` to include them.
+- `CategoryService.list({ excludeInactiveBranches: true })` leaves out categories under an inactive category; `isActive` only checks each category's own flag.
+
 ### Services and import paths
 
 | Import path | Exports |

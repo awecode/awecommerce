@@ -40,7 +40,7 @@ import {
   UpdateProductVariant,
 } from '../schemas'
 import { orderLines } from '../../order/schemas'
-import { aliasedTable } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { Database } from '../../types'
 
 // Checks the custom fields a product asks the buyer for, and trims the labels
@@ -67,9 +67,32 @@ const validateCustomFields = (fields: CustomField[]) => {
 }
 
 
+// Ids of the given categories and every category under them. UNION skips
+// categories already found, so a loop of parents cannot recurse forever.
+const categoryTreeIds = (categoryIds: number[]) => sql`(
+  WITH RECURSIVE tree(id) AS (
+    SELECT c.id FROM ${categories} c WHERE c.id IN ${categoryIds}
+    UNION
+    SELECT child.id FROM ${categories} child JOIN tree ON child."parentId" = tree.id
+  )
+  SELECT id FROM tree
+)`
+
+// Ids of the categories that are inactive or under an inactive category
+const inactiveCategoryIds = sql`(
+  WITH RECURSIVE hidden(id) AS (
+    SELECT c.id FROM ${categories} c WHERE c."isActive" IS NOT TRUE
+    UNION
+    SELECT child.id FROM ${categories} child JOIN hidden ON child."parentId" = hidden.id
+  )
+  SELECT id FROM hidden
+)`
+
 interface ProductFilter {
   brands?: number[]
   categories?: number[]
+  // Makes `categories` also match every category under them
+  includeSubcategories?: boolean
   productClass?: number
   status?: Product['status']
   q?: string
@@ -287,11 +310,13 @@ class ProductService {
       }
       if (filter.categories && filter.categories.length) {
         where.push(
-          or(
-            ...filter.categories.map((categoryId) =>
-              eq(products.categoryId, categoryId),
-            ),
-          )!,
+          filter.includeSubcategories
+            ? sql`${products.categoryId} IN ${categoryTreeIds(filter.categories)}`
+            : or(
+                ...filter.categories.map((categoryId) =>
+                  eq(products.categoryId, categoryId),
+                ),
+              )!,
         )
       }
       if (filter.productClass) {
@@ -325,9 +350,13 @@ class ProductService {
         where.push(or(isNull(products.brandId), eq(brands.isActive, true))!)
       }
 
+      // Also hides products under an inactive category, at any depth
       if (!filter.includeInactiveCategories) {
         where.push(
-          or(isNull(products.categoryId), eq(categories.isActive, true))!,
+          or(
+            isNull(products.categoryId),
+            sql`${products.categoryId} NOT IN ${inactiveCategoryIds}`,
+          )!,
         )
       }
 
@@ -779,6 +808,8 @@ interface CategoryFilter {
   hasProducts?: boolean
   hasActiveProducts?: boolean
   hasActiveProductWithBrands?: number[]
+  // Also leaves out categories under an inactive category
+  excludeInactiveBranches?: boolean
   pagination?: PaginationArgs
 }
 
@@ -934,7 +965,11 @@ class CategoryService {
       where.push(eq(categories.isActive, filter.isActive))
     }
 
-    const parentCategories = aliasedTable(categories, 'parent_categories')
+    if (filter?.excludeInactiveBranches) {
+      where.push(sql`${categories.id} NOT IN ${inactiveCategoryIds}`)
+    }
+
+    const parentCategories = alias(categories, 'parent_categories')
 
     const query = this.db
       .select({

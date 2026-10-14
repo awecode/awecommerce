@@ -2,7 +2,7 @@ import { beforeAll, expect, expectTypeOf, test } from 'vitest'
 
 import { db } from 'core/db'
 import type { PaginationArgs } from 'core/pagination'
-import { BrandService, ProductService } from 'apps/product/services/product'
+import { BrandService, CategoryService, ProductService } from 'apps/product/services/product'
 import { OfferRangeService } from 'apps/offer/services/offer'
 import { OrderService } from 'apps/order/services/order'
 
@@ -51,6 +51,10 @@ test('other lists follow the same rule', async () => {
   const allOrders = await new OrderService(db).list()
   const orderPage = await new OrderService(db).list({ pagination: { page: 1, size: 5 } })
 
+  const categories = await new CategoryService(db).list()
+
+  expectTypeOf(categories).items.not.toBeNever()
+  expectTypeOf(categories).items.toHaveProperty('parent')
   expectTypeOf(brands).toBeArray()
   expectTypeOf(ranges.results).toBeArray()
   expectTypeOf(allOrders).toBeArray()
