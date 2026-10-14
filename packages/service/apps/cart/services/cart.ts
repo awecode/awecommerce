@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import {
   listedProduct,
   optionValuesWithOption,
+  ProductService,
   withVariantOptions,
 } from '../../product/services/product'
 import { CustomField, products, productVariants } from '../../product/schemas'
@@ -297,12 +298,20 @@ class CartService {
       options.shippingMethodId,
       loyaltyDiscount,
     )
+    const listedIds = new Set(
+      await new ProductService(this.db).listedProductIds(
+        content.lines.map((line) => line.variant.productId),
+      ),
+    )
     return {
       ...content,
       lines: content.lines.map((line, index) => ({
         ...line,
         tax: pricing.lines[index].tax,
         taxRate: pricing.lines[index].taxRate,
+        // Checkout fails while this is false; the buyer needs to remove the line.
+        // Same rule as checkout: an active variant of a listed product.
+        isAvailable: line.variant.isActive && listedIds.has(line.variant.productId),
         // Checkout fails while this is set; the buyer needs to update the line
         customizationsError: customizationsError(
           line.variant.product.customFields,

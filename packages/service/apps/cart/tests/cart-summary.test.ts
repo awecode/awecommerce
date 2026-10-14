@@ -7,7 +7,11 @@ import { CartService } from 'apps/cart/services/cart'
 import { OrderService } from 'apps/order/services/order'
 import { ShippingMethodService } from 'apps/order/services/shipping-method'
 import { OfferService } from 'apps/offer/services/offer'
-import { ProductClassService, ProductService } from 'apps/product/services/product'
+import {
+  ProductClassService,
+  ProductService,
+  ProductVariantService,
+} from 'apps/product/services/product'
 import { TaxService } from 'apps/tax/services/tax'
 import { carts } from 'apps/cart/schemas'
 import {
@@ -169,4 +173,26 @@ test('should not place an order or use up offers', async () => {
   expect(cartAfter.status).toBe('Open')
   const [offer] = await db.select().from(offers).where(eq(offers.id, voucher.id))
   expect(offer.usageCount).toBe(0)
+})
+
+test('should flag lines that are no longer for sale', async () => {
+  const available = await createProduct('10')
+  const unpublished = await createProduct('20')
+  const deactivated = await createProduct('30')
+  const { cart } = await createCart([
+    { variantId: available.variants[0].id, quantity: 1 },
+    { variantId: unpublished.variants[0].id, quantity: 1 },
+    { variantId: deactivated.variants[0].id, quantity: 1 },
+  ])
+  await productService.update(unpublished.id, { status: 'Draft' })
+  await new ProductVariantService(db).markAsInactive(deactivated.variants[0].id)
+
+  const summary = await cartService.getCartSummary(cart.sessionId)
+
+  const flags = Object.fromEntries(summary.lines.map((line) => [line.variantId, line.isAvailable]))
+  expect(flags).toEqual({
+    [available.variants[0].id]: true,
+    [unpublished.variants[0].id]: false,
+    [deactivated.variants[0].id]: false,
+  })
 })

@@ -19,6 +19,7 @@ describe.skipIf(!url)('store cart API', async () => {
     expect(added.status).toBe(200)
     expect(added.setCookie).toMatch(/^awe_cart=[0-9a-f-]{36};.*HttpOnly/i)
     expect(added.body.lines.map((l: any) => [l.variantId, l.quantity])).toEqual([[variantId, 2]])
+    expect(added.body.lines[0].isAvailable).toBe(true)
     expect(Number(added.body.total)).toBe(20)
 
     const again = await request('/api/store/cart/lines', {

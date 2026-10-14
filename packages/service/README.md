@@ -188,7 +188,7 @@ A voucher that gives nothing throws `Voucher code is not applicable to any produ
 
 ### Cart summary
 
-`CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax` and `taxRate`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
+`CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax`, `taxRate`, `isAvailable` and `customizationsError`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
 
 ```ts
 const summary = await new CartService(db).getCartSummary(cart.sessionId, {
@@ -201,6 +201,8 @@ const order = await new OrderService(db).createFromCart(cart.id, {
   expectedTotal: summary.total,
 })
 ```
+
+A line with `isAvailable: false` is no longer for sale (its variant is inactive or its product is not listed, see Product variants); checkout fails with `Product variant is not available: <sku>` until the buyer removes it, so warn on the cart page. Totals still include it.
 
 It does not place an order, use up offers, or redeem points (`redeemPoints` only previews their value, with the same checks as checkout). Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied.
 
