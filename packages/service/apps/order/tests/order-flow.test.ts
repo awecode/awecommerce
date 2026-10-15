@@ -175,6 +175,23 @@ test('should list orders with filters and pagination', async () => {
   expect(page2.results.map((o) => o.id)).toEqual([pending.id])
 })
 
+test('q finds orders by guest name and by the users the app matched', async () => {
+  const cartService = new CartService(db)
+  const product = await createProduct()
+  const guestCart = await cartService.create()
+  await cartService.addToCart(guestCart.id, product.variants[0].id, 1)
+  const guestOrder = await orderService.createFromCart(guestCart.id, {
+    guestUser: { name: 'Zelda Quill', email: 'zq@example.com' },
+  })
+  const memberOrder = await createOrder('flow-q-member')
+
+  const byName = await orderService.list({ q: 'zelda qu' })
+  expect(byName.map((o) => o.id)).toEqual([guestOrder.id])
+  // The users whose email or name matched `q`, looked up by the app
+  const byUser = await orderService.list({ q: 'someone@example.com', qUserIds: ['flow-q-member'] })
+  expect(byUser.map((o) => o.id)).toEqual([memberOrder.id])
+})
+
 test('should record payment events and update payment status', async () => {
   const userId = 'flow-payment-user'
   const order = await createOrder(userId)

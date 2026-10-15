@@ -28,6 +28,24 @@ describe.skipIf(!url)('admin orders and users API', async () => {
     expect((await admin(`/api/admin/orders?q=${email}&tab=Completed`)).body.results).toEqual([])
   })
 
+  test('shows the customer on each order, finds members by email or name, and names who changed it', async () => {
+    const email = `${unique('dee')}@example.com`
+    const member = await createSignedInUser(db, null, email)
+    const [memberOrder] = await db.insert(orders).values({ total: '40', userId: member.userId }).returning()
+    const guestEmail = `${unique('gus')}@example.com`
+    const guestOrder = await createOrder(guestEmail)
+
+    const byEmail = (await admin(`/api/admin/orders?q=${email}`)).body.results
+    expect(byEmail.map((o: any) => [o.id, o.customer])).toEqual([[memberOrder!.id, { name: 'Staff', email, guest: false }]])
+    const guest = (await admin(`/api/admin/orders?q=${guestEmail}`)).body.results[0]
+    expect(guest.customer).toEqual({ name: 'Guest', email: guestEmail, guest: true })
+
+    await admin(`/api/admin/orders/${guestOrder.id}/status`, { method: 'POST', body: { status: 'Confirmed' } })
+    const detail = (await admin(`/api/admin/orders/${guestOrder.id}`)).body
+    expect(detail.customer).toEqual({ name: 'Guest', email: guestEmail, guest: true })
+    expect(detail.logs[0].loggedByEmail).toBe(`${staff.userId}@example.com`)
+  })
+
   test('moves an order through statuses, records payment, then cancels it, logging who did each', async () => {
     const order = await createOrder(`${unique('flow')}@example.com`)
 

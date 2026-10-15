@@ -6,7 +6,10 @@ const { data: store } = useStoreSettings()
 
 const close = () => (open.value = false)
 const links: NavigationMenuItem[][] = [
-  [{ label: 'Products', icon: 'i-lucide-package', to: '/products', onSelect: close }],
+  [
+    { label: 'Orders', icon: 'i-lucide-receipt', to: '/orders', onSelect: close },
+    { label: 'Products', icon: 'i-lucide-package', to: '/products', onSelect: close },
+  ],
   [
     { label: 'Catalog', type: 'label' },
     { label: 'Categories', icon: 'i-lucide-folder-tree', to: '/catalog/categories', onSelect: close },

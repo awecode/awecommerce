@@ -289,6 +289,8 @@ const page = await productService.list({ isActive: true, pagination: { page: 2, 
 
 The return type follows the filter: an array without `pagination`, a page with it, and either one when the filter's type allows both, for example a `pagination` that may be `undefined`. Unknown filter fields are type errors.
 
+`OrderService.list({ q })` matches an order id, a user id, or part of the guest's email or name. Users are not the library's, so to find members by their own details, look up the matching user ids in your users table and pass them as `qUserIds`; their orders match `q` too.
+
 ### Categories
 
 Categories form a tree through `parentId`. `CategoryService.update` refuses (with a `ValidationError`) a parent that is the category itself or a category under it.

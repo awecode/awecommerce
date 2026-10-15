@@ -104,7 +104,11 @@ type OrderStatus =
 type OrderPaymentStatus = 'Pending' | 'Paid' | 'Refunded'
 
 type OrderListFilter = {
+  // An order id, a user id, or part of the guest's email or name
   q?: string
+  // Users whose own details match `q` (such as their email), looked up by the
+  // app, since users are not the library's: their orders match too
+  qUserIds?: string[]
   tab?: 'Active' | 'Inactive' | 'Cancelled' | 'Completed'
   status?: OrderStatus
   userId?: string
@@ -755,13 +759,14 @@ class OrderService {
   async list<F extends OrderListFilter = {}>(filters?: Exact<F, OrderListFilter>) {
     const where: SQL[] = []
 
-    // An order id, a user id, or part of the guest's email
     if (filters?.q) {
       where.push(
         or(
           Number(filters.q) ? eq(orders.id, Number(filters.q)) : undefined,
           eq(orders.userId, filters.q),
           sql`${orders.guestUser}->>'email' ILIKE ${`%${filters.q}%`}`,
+          sql`${orders.guestUser}->>'name' ILIKE ${`%${filters.q}%`}`,
+          filters.qUserIds?.length ? inArray(orders.userId, filters.qUserIds) : undefined,
         )!,
       )
     }
