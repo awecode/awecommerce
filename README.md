@@ -60,7 +60,9 @@ pnpm dev:backoffice   # backoffice only
   - The cart drawer slides in after Add to cart and from the header's cart button: the lines (quantity and Remove), the subtotal and discounts, Checkout and View cart.
   - `/cart`: the lines with their options and answers, quantity and Remove; warnings that block checkout (no longer for sale, more than in stock, product fields changed); vouchers; and the summary (subtotal, offer and voucher discounts, tax, total). `noindex`.
   - `/checkout`: one page with contact (guests give name and email; members see who they are signed in as), the delivery address (members pick a saved one or add a new one, saved after the order is placed), the delivery method (the cheapest first), loyalty points (members, previewed in the total) and payment (Pay on delivery), beside the summary. The order is placed for the total shown: if it changed, the new total is shown to confirm; stock, voucher and availability problems link back to the cart.
-  - `/orders/:id?hash=`: the confirmation after checkout (the link works for whoever has it), with the address, delivery, payment, items and totals. Without the hash, it is the signed-in owner's order page.
+  - `/orders/:id?hash=`: the confirmation after checkout (the link works for whoever has it), with the address, delivery, payment, items and totals. Without the hash, it is the signed-in owner's order page (guests are sent to sign in first).
+  - Sign-in: `/login` (email, then the emailed link or the pasted token), `/auth/confirm` (where the link lands) and `/auth/error`, in the shop's look; they replace the auth layer's pages. The header's and checkout's Sign in links bring the buyer back to the same page (`?redirect=`).
+  - `/account` (sign-in needed): the overview with loyalty points, recent orders and the default address; `/account/orders` (every order, a page at a time); `/account/addresses` (add, edit, make default, delete). The address fields are shared with checkout (`AddressFields`).
 - **Composables:** `useStoreSettings()`, `useMoney()` (prices in the store's currency and locale), `useCategories()`, `useBrands()`, `useCategoryMenu()` and `useCart()` (the cart summary, its item count, the drawer's state, and `add`, `setQuantity`, `remove`, `applyVoucher` and `removeVoucher`, which store the summary the API answers with). Shared data is fetched once per page under one key (`dedupe: 'defer'`).
 - **SEO defaults** (`app/app.vue`): titles as `Page · Store`, the default description, Open Graph and Twitter tags, `<html lang>` from the store's locale, and a canonical link without the query, built from `NUXT_PUBLIC_SITE_URL` (the request's address when unset).
 
@@ -75,7 +77,7 @@ Customers and staff sign in the same way, with a magic link, and share one `user
 - In routes, `getUser(event)`, `requireAuthenticated(event)` and `requireAdmin(event)` come from the auth layer (see `packages/auth/README.md`).
 - To run code after every sign-in, call `onSignedIn(({ user }) => ...)` from a Nitro plugin. The store uses it to link the orders a buyer placed as a guest with the same email (`packages/api-store/server/plugins/claim-guest-orders.ts`), only when that email is verified, which magic link sign-in does.
 - The auth tables have their own `drizzle-kit` schema and migrations in `packages/auth` (`pnpm generate:auth`, `pnpm migrate:auth`), recorded in `__drizzle_migrations_auth`, apart from the library's.
-- Its login components use Tailwind classes. The storefront uses the layer's sign-in pages for now; the backoffice has its own.
+- Its login components use Tailwind classes. Both apps have their own sign-in pages, in their own look.
 
 Changes from the upstream layer: it takes `useDb` from api-core, adds the auth tables to its schema, mounts the email template as `assets:auth` (so no copying into each app), sets the admin role from `NUXT_AUTH_ADMIN_EMAILS`, keeps the plugins' types (`role`, the magic link endpoints), and drops the demo pages.
 

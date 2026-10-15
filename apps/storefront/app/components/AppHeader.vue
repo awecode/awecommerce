@@ -10,6 +10,9 @@ const { count, drawerOpen } = useCart()
 const { user, signOut } = useAuth()
 
 const storeName = computed(() => settings.value?.name || 'Store')
+// Back to the same page after signing in
+const route = useRoute()
+const signInLink = computed(() => ({ path: '/login', query: route.path === '/' ? {} : { redirect: route.fullPath } }))
 
 // Top-level categories; the ones with subcategories open a panel listing them
 const links = computed<NavigationMenuItem[]>(() =>
@@ -40,6 +43,7 @@ const search = async () => {
 const accountItems = computed<DropdownMenuItem[][]>(() => [
   [{ type: 'label', label: user.value?.email ?? '' }],
   [
+    { label: 'Account', icon: 'i-lucide-user', to: '/account' },
     { label: 'Orders', icon: 'i-lucide-package', to: '/account/orders' },
     { label: 'Addresses', icon: 'i-lucide-map-pin', to: '/account/addresses' },
   ],
@@ -61,7 +65,7 @@ const accountItems = computed<DropdownMenuItem[][]>(() => [
       <UDropdownMenu v-if="user" :items="accountItems" :content="{ align: 'end' }">
         <UButton icon="i-lucide-user" color="neutral" variant="ghost" aria-label="Account" />
       </UDropdownMenu>
-      <UButton v-else icon="i-lucide-user" color="neutral" variant="ghost" to="/login" aria-label="Sign in" />
+      <UButton v-else icon="i-lucide-user" color="neutral" variant="ghost" :to="signInLink" aria-label="Sign in" />
       <UChip :text="count" :show="count > 0" size="3xl" color="primary" inset>
         <UButton icon="i-lucide-shopping-bag" color="neutral" variant="ghost" :aria-label="count ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'" @click="drawerOpen = true" />
       </UChip>

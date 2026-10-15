@@ -71,6 +71,8 @@ describe.skipIf(!url)('storefront shell', async () => {
   test('signed out shows Sign in; signed in shows the account menu', async () => {
     const guest = await createPage('/')
     expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
+    await guest.goto(`${base()}/cart`)
+    expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login?redirect=/cart')
 
     const email = `${unique('ann')}@example.com`
     const page = await signedInPage(db, email)

@@ -63,7 +63,7 @@ export const signedInPage = async (db: TestDb, email: string) => {
   })
   const page = await createPage()
   await page.goto(`${process.env.BETTER_AUTH_URL}/auth/confirm#token=${token}`)
-  await page.getByRole('button', { name: 'Continue to log in' }).click()
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.waitForURL(`${process.env.BETTER_AUTH_URL}/`)
   return page
 }

@@ -1,6 +1,14 @@
 <script setup lang="ts">
 // An order: right after checkout (with the `hash` from checkout, so the link
 // works for whoever has it), or from the buyer's account (signed in, no hash)
+definePageMeta({
+  // Without the link's hash, only its owner can see it: sign in first
+  middleware: (to) => {
+    if (!to.query.hash && !useAuth().loggedIn.value) {
+      return navigateTo({ path: '/login', query: { redirect: to.fullPath } })
+    }
+  },
+})
 const route = useRoute()
 const money = useMoney()
 const { user } = useAuth()
@@ -35,6 +43,7 @@ const placedOn = computed(() =>
 
 <template>
   <UContainer v-if="order" class="max-w-4xl py-10 lg:py-14">
+    <UButton v-if="!hash" to="/account/orders" label="All orders" icon="i-lucide-arrow-left" color="neutral" variant="link" class="mb-6 px-0" />
     <div class="space-y-3">
       <p class="text-sm tracking-wider text-muted uppercase">Order {{ order.id }} · {{ placedOn }}</p>
       <h1 class="text-4xl font-medium tracking-tight sm:text-5xl">{{ hash ? 'Thank you for your order' : `Order ${order.id}` }}</h1>

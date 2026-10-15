@@ -23,13 +23,7 @@ const state = reactive({
   phone: '',
   // A saved address's id, or 'new'
   addressId: (addresses.value?.find((a) => a.isDefault) ?? addresses.value?.[0])?.id ?? ('new' as number | 'new'),
-  line1: '',
-  line2: '',
-  city: '',
-  province: '',
-  postalCode: '',
-  country: '',
-  instructions: '',
+  address: emptyAddress(),
   saveAddress: true,
   // The cheapest to start with
   shippingMethodId: [...(methods.value ?? [])].sort((a, b) => Number(a.price) - Number(b.price))[0]?.id as number | undefined,
@@ -62,7 +56,7 @@ const offers = computed(() => [
 // ---- choices
 const addressItems = computed(() => [
   ...(addresses.value ?? []).map((a) => ({
-    label: [a.line1, a.line2, a.city, a.province, a.postalCode, a.country].filter(Boolean).join(', '),
+    label: addressLine(a),
     value: a.id,
   })),
   { label: 'A new address', value: 'new' as const },
@@ -84,11 +78,7 @@ const validate = () => {
     if (!state.email.trim()) errors.push({ name: 'email', message: 'Enter your email' })
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) errors.push({ name: 'email', message: 'Enter a valid email' })
   }
-  if (newAddress.value) {
-    need('line1', 'Enter the street address')
-    need('city', 'Enter the city')
-    need('country', 'Enter the country')
-  }
+  if (newAddress.value) errors.push(...addressErrors(state.address))
   if (methodItems.value.length && !state.shippingMethodId) errors.push({ name: 'shippingMethodId', message: 'Choose a delivery method' })
   return errors
 }
@@ -99,10 +89,6 @@ const placing = ref(false)
 const problem = ref<{ message: string; cart?: boolean } | null>(null)
 type ApiError = { data?: { message?: string; data?: { code?: string; actualTotal?: string } } }
 
-const address = () => {
-  const fields = { line1: state.line1, line2: state.line2, city: state.city, province: state.province, postalCode: state.postalCode, country: state.country, instructions: state.instructions }
-  return Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v))
-}
 
 const place = async () => {
   if (!summary.value) return
@@ -114,7 +100,7 @@ const place = async () => {
       body: {
         shippingMethodId: state.shippingMethodId,
         expectedTotal: summary.value.total,
-        ...(newAddress.value ? { shippingAddress: address() as never } : { shippingAddressId: state.addressId as number }),
+        ...(newAddress.value ? { shippingAddress: addressBody(state.address) } : { shippingAddressId: state.addressId as number }),
         guestUser: user.value ? undefined : { name: state.name.trim(), email: state.email.trim(), phone: state.phone.trim() || undefined },
         redeemPoints: appliedPoints.value > 0 ? appliedPoints.value : undefined,
         paymentMethod: state.paymentMethod,
@@ -122,7 +108,7 @@ const place = async () => {
     })
     // Saved once the order is placed; a failure here does not undo the order
     if (user.value && newAddress.value && state.saveAddress) {
-      await $fetch('/api/store/addresses', { method: 'POST', body: address() }).catch(() => {})
+      await $fetch('/api/store/addresses', { method: 'POST', body: addressBody(state.address) }).catch(() => {})
     }
     await refreshCart()
     await navigateTo(`/orders/${order.id}?hash=${encodeURIComponent(order.hash)}`)
@@ -168,7 +154,7 @@ const place = async () => {
               <UInput v-model="state.phone" type="tel" autocomplete="tel" size="lg" class="w-full sm:w-1/2" />
             </UFormField>
             <p class="text-sm text-muted">
-              Have an account? <NuxtLink to="/login" class="underline">Sign in</NuxtLink> to use your saved addresses and points.
+              Have an account? <NuxtLink to="/login?redirect=/checkout" class="underline">Sign in</NuxtLink> to use your saved addresses and points.
             </p>
           </template>
         </section>
@@ -176,30 +162,9 @@ const place = async () => {
         <section class="space-y-4" aria-labelledby="address">
           <h2 id="address" class="text-2xl font-medium">Delivery address</h2>
           <URadioGroup v-if="addresses?.length" v-model="state.addressId" :items="addressItems" variant="table" aria-label="Delivery address" />
-          <div v-if="newAddress" class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="Address" name="line1" required class="sm:col-span-2">
-              <UInput v-model="state.line1" autocomplete="address-line1" size="lg" class="w-full" />
-            </UFormField>
-            <UFormField label="Apartment, suite" name="line2" hint="Optional" class="sm:col-span-2">
-              <UInput v-model="state.line2" autocomplete="address-line2" size="lg" class="w-full" />
-            </UFormField>
-            <UFormField label="City" name="city" required>
-              <UInput v-model="state.city" autocomplete="address-level2" size="lg" class="w-full" />
-            </UFormField>
-            <UFormField label="Province or state" name="province" hint="Optional">
-              <UInput v-model="state.province" autocomplete="address-level1" size="lg" class="w-full" />
-            </UFormField>
-            <UFormField label="Postal code" name="postalCode" hint="Optional">
-              <UInput v-model="state.postalCode" autocomplete="postal-code" size="lg" class="w-full" />
-            </UFormField>
-            <UFormField label="Country" name="country" required>
-              <UInput v-model="state.country" autocomplete="country-name" size="lg" class="w-full" />
-            </UFormField>
-            <UFormField label="Delivery instructions" name="instructions" hint="Optional" class="sm:col-span-2">
-              <UTextarea v-model="state.instructions" :rows="2" autoresize class="w-full" />
-            </UFormField>
+          <AddressFields v-if="newAddress" v-model="state.address">
             <UCheckbox v-if="user" v-model="state.saveAddress" label="Save this address for next time" class="sm:col-span-2" />
-          </div>
+          </AddressFields>
         </section>
 
         <section v-if="methodItems.length" class="space-y-4" aria-labelledby="delivery">
