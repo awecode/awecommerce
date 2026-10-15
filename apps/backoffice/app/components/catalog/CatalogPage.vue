@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="Row extends CatalogRow">
 import type { TableColumn } from '@nuxt/ui'
-import type { ZodType } from 'zod'
+import { z, type ZodType } from 'zod'
 
 // A list-and-edit screen for one catalog lookup (categories, brands, product
 // classes): search and active filter in the URL, a table, and a side panel to
@@ -93,9 +93,12 @@ const closeForm = async () => {
   open.value = false
 }
 
-// Empty optional text is sent as null, so it clears the field
-const body = () =>
-  Object.fromEntries(Object.entries(state).map(([key, value]) => [key, value === '' && key !== 'name' && key !== 'slug' ? null : value]))
+// Empty optional fields are sent as null, so they clear the field
+const blanksToNull = (values: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value === '' && key !== 'name' && key !== 'slug' ? null : value]))
+const body = () => blanksToNull(state)
+// Checks what is sent, so an empty optional field (such as a tax rate) passes
+const formSchema = computed(() => z.preprocess((values) => blanksToNull(values as Record<string, unknown>), editing.value ? props.updateSchema : props.createSchema))
 
 const { mutate: save, isLoading: saving } = useMutation({
   mutation: () =>
@@ -244,7 +247,7 @@ watch(() => route.query.new, (value) => {
     @update:open="(value: boolean) => !value && closeForm()"
   >
     <template #body>
-      <UForm ref="form" :schema="editing ? updateSchema : createSchema" :state="state" class="space-y-4" @submit="save()">
+      <UForm ref="form" :schema="formSchema" :state="state" class="space-y-4" @submit="save()">
         <UFormField label="Name" name="name" required>
           <UInput v-model="state.name" autofocus class="w-full" />
         </UFormField>

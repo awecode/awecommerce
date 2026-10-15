@@ -82,13 +82,19 @@ describe.skipIf(!url)('catalog screens', async () => {
 
     await page.getByRole('button', { name: 'New product class' }).click()
     await page.getByLabel('Name').fill(name)
-    await page.getByLabel('Tax rate (%)').fill('5')
+    // A bad rate is still caught on the field
+    await page.getByLabel('Tax rate (%)').fill('abc')
+    await page.getByRole('button', { name: /^Save/ }).click()
+    await page.getByText(/must match pattern/).waitFor()
+    // Left empty: the store default
+    await page.getByLabel('Tax rate (%)').fill('')
     await page.getByRole('switch', { name: /Ships to the buyer/ }).click()
     await page.getByRole('button', { name: /^Save/ }).click()
 
     await page.getByText(`Created ${name}`).first().waitFor()
     const [saved] = await db.select().from(productClasses).where(eq(productClasses.name, name))
     expect(saved!.requiresShipping).toBe(false)
+    expect(saved!.taxRate).toBeNull()
     await page.getByPlaceholder(/^Search/).fill(name)
     await page.getByRole('row', { name: new RegExp(name) }).getByText('Not shipped').waitFor()
   })
