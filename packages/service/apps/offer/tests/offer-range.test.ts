@@ -48,3 +48,35 @@ test('a range of every product leaves out its exceptions', async () => {
   })
   expect(await offerService.getProductIdsInOfferRange(range.id, [acmeThing.id, unbranded.id])).toEqual([unbranded.id])
 })
+
+test('a category covers its subcategories, at any depth, chosen or excepted', async () => {
+  const categoryService = new CategoryService(db)
+  const clothing = await categoryService.create({ name: unique('Clothing'), slug: unique('clothing') })
+  const shirts = await categoryService.create({ name: unique('Shirts'), slug: unique('shirts'), parentId: clothing.id })
+  const sale = await categoryService.create({ name: unique('Sale'), slug: unique('sale'), parentId: shirts.id })
+  const shoes = await categoryService.create({ name: unique('Shoes'), slug: unique('shoes') })
+  const jacket = await product({ categoryId: clothing.id })
+  const shirt = await product({ categoryId: shirts.id })
+  const saleShirt = await product({ categoryId: sale.id })
+  const boot = await product({ categoryId: shoes.id })
+  const ids = [jacket.id, shirt.id, saleShirt.id, boot.id]
+
+  const chosen = await new OfferRangeService(db).create({
+    name: unique('range'),
+    inclusiveFilter: false,
+    includedCategories: [clothing.id],
+    excludedCategories: [sale.id],
+  })
+  expect((await offerService.getProductIdsInOfferRange(chosen.id, ids)).sort()).toEqual([jacket.id, shirt.id].sort())
+
+  const everything = await new OfferRangeService(db).create({
+    name: unique('range'),
+    inclusiveFilter: true,
+    includeAllProducts: true,
+    includeAllBrands: true,
+    includeAllCategories: true,
+    includeAllProductClasses: true,
+    excludedCategories: [shirts.id],
+  })
+  expect((await offerService.getProductIdsInOfferRange(everything.id, ids)).sort()).toEqual([jacket.id, boot.id].sort())
+})

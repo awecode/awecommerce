@@ -74,14 +74,25 @@ const inAudience = (userId: string | null) =>
 // Whether the outer query's product is in the outer query's range. With
 // inclusiveFilter, it must match every list (an `includeAll...` flag matches
 // anything); without, any one of them. Either way, a product on any excluded
-// list is left out.
+// list is left out. A category covers its subcategories, at any depth.
 const listed = (included: any, column: any, all: any) =>
   sql`(${all} = true OR EXISTS (SELECT 1 FROM ${included} WHERE ${included.rangeId} = ${offerRanges.id} AND ${column}))`
 const unlisted = (excluded: any, column: any) =>
   sql`NOT EXISTS (SELECT 1 FROM ${excluded} WHERE ${excluded.rangeId} = ${offerRanges.id} AND ${column})`
 const inProducts = listed(offerRangeIncludedProducts, sql`${offerRangeIncludedProducts.productId} = ${products.id}`, offerRanges.includeAllProducts)
 const inBrands = listed(offerRangeIncludedBrands, sql`${offerRangeIncludedBrands.brandId} = ${products.brandId}`, offerRanges.includeAllBrands)
-const inCategories = listed(offerRangeIncludedCategories, sql`${offerRangeIncludedCategories.categoryId} = ${products.categoryId}`, offerRanges.includeAllCategories)
+// The product's category is one of the range's listed categories (included or
+// excluded) or under one. UNION skips categories already found, so a loop of
+// parents cannot recurse forever.
+const categoryUnder = (list: typeof offerRangeIncludedCategories | typeof offerRangeExcludedCategories) => sql`${products.categoryId} IN (
+  WITH RECURSIVE tree(id) AS (
+    SELECT l."categoryId" FROM ${list} l WHERE l."rangeId" = ${offerRanges.id}
+    UNION
+    SELECT child.id FROM ${categories} child JOIN tree ON child."parentId" = tree.id
+  )
+  SELECT id FROM tree
+)`
+const inCategories = sql`(${offerRanges.includeAllCategories} = true OR ${categoryUnder(offerRangeIncludedCategories)})`
 const inClasses = listed(offerRangeIncludedProductClasses, sql`${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}`, offerRanges.includeAllProductClasses)
 const productInRange = sql`(
   (
@@ -90,7 +101,7 @@ const productInRange = sql`(
   )
   AND ${unlisted(offerRangeExcludedProducts, sql`${offerRangeExcludedProducts.productId} = ${products.id}`)}
   AND ${unlisted(offerRangeExcludedBrands, sql`${offerRangeExcludedBrands.brandId} = ${products.brandId}`)}
-  AND ${unlisted(offerRangeExcludedCategories, sql`${offerRangeExcludedCategories.categoryId} = ${products.categoryId}`)}
+  AND NOT COALESCE(${categoryUnder(offerRangeExcludedCategories)}, false)
   AND ${unlisted(offerRangeExcludedProductClasses, sql`${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}`)}
 )`
 

@@ -173,7 +173,7 @@ The applied offers are listed in `siteOfferDiscounts`, `userOfferDiscounts` and 
 
 **Offers that do not combine:** an offer with `combinesWithOtherOffers: false` is not added to others. The offers that combine are applied together, as above, and each one that does not is priced alone; the cart gets whichever gives the biggest discount (on a tie, the ones that combine). The total is the same in the summary and at checkout. Free shipping counts as no discount in this comparison. A voucher that loses stays applied to the cart and is listed in `notCombinedVoucherOffers` (`id`, `name`, `voucherCode`): it gives nothing, is not used up, and does not fail checkout. `applyVoucherCode` prices a voucher that does not combine on the cart without its other offers, so it applies even where it would not fit on top of them.
 
-A range covers every product, or chosen ones. With `inclusiveFilter`, a product must match every list (products, brands, categories, classes; an `includeAll…` flag matches anything); without, any one of them. Either way, a product on any excluded list is left out: "Shirts, except brand Acme" leaves out Acme shirts. A category covers the products directly in it, not those in its subcategories.
+A range covers every product, or chosen ones. With `inclusiveFilter`, a product must match every list (products, brands, categories, classes; an `includeAll…` flag matches anything); without, any one of them. Either way, a product on any excluded list is left out: "Shirts, except brand Acme" leaves out Acme shirts. A category covers its subcategories, at any depth, whether listed or excepted: "Clothing, except Clothing › Sale" covers shirts but not the sale.
 
 Conditions are checked against the cart lines in the offer's range:
 

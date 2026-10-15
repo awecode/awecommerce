@@ -361,7 +361,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
                     </UFormField>
                   </div>
                 </details>
-                <p class="text-xs text-muted">A category covers the products directly in it, not those in its subcategories.</p>
+                <p class="text-xs text-muted">A category covers its subcategories too.</p>
               </template>
             </section>
 
