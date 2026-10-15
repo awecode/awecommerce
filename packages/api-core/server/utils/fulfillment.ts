@@ -4,7 +4,7 @@ import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { productClasses, products } from '@awecommerce/service/apps/product/schemas'
 
 // Fulfilment hooks: code that runs when an order with certain products is
-// placed, paid or cancelled (send a download link, issue a licence key, book
+// placed, paid, refunded or cancelled (send a download link, issue a licence key, book
 // a seat), and a short note per line for the buyer, shown on the storefront
 // order page and in the order placed email.
 //
@@ -23,9 +23,10 @@ import { productClasses, products } from '@awecommerce/service/apps/product/sche
 //     })
 //   })
 //
-// A hook matches a line by its product's class slug or its product slug.
+// A hook matches a line by its product's class slug or its product slug, or
+// by its own `match`.
 
-export type FulfillmentEvent = 'placed' | 'paid' | 'cancelled'
+export type FulfillmentEvent = 'placed' | 'paid' | 'refunded' | 'cancelled'
 
 export type FulfillmentNote = { title: string; text: string; link?: { label: string; url: string } }
 
@@ -37,6 +38,8 @@ export type Fulfillment = {
   name: string
   productClasses?: string[]
   products?: string[]
+  // Any other test for a line, such as the variant selling a membership
+  match?: (line: OrderLine) => boolean | Promise<boolean>
   // Runs once per event with the order's matching lines. A hook that throws
   // is logged; the order and the other hooks are not affected.
   on?: Partial<Record<FulfillmentEvent, (context: { event: H3Event; order: Order; lines: OrderLine[] }) => void | Promise<void>>>
@@ -67,18 +70,22 @@ const matching = async (order: Order): Promise<{ fulfillment: Fulfillment; lines
       : [],
   )
   const slugs = new Map(rows.map((row) => [row.id, { product: row.slug, productClass: row.classId === null ? undefined : classSlugs.get(row.classId) }]))
-  return fulfillments
-    .map((fulfillment) => ({
-      fulfillment,
-      lines: order.lines.filter((line) => {
-        const slug = slugs.get(line.productId)
-        return (
-          (slug !== undefined && fulfillment.products?.includes(slug.product)) ||
-          (slug?.productClass !== undefined && fulfillment.productClasses?.includes(slug.productClass))
-        )
-      }),
-    }))
-    .filter((match) => match.lines.length)
+  const matches: { fulfillment: Fulfillment; lines: OrderLine[] }[] = []
+  for (const fulfillment of fulfillments) {
+    const lines: OrderLine[] = []
+    for (const line of order.lines) {
+      const slug = slugs.get(line.productId)
+      if (
+        (slug !== undefined && fulfillment.products?.includes(slug.product)) ||
+        (slug?.productClass !== undefined && fulfillment.productClasses?.includes(slug.productClass)) ||
+        (fulfillment.match && (await fulfillment.match(line)))
+      ) {
+        lines.push(line)
+      }
+    }
+    if (lines.length) matches.push({ fulfillment, lines })
+  }
+  return matches
 }
 
 // Runs the hooks for this event on the order. Never throws: failures are

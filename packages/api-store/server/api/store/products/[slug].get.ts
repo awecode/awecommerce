@@ -1,11 +1,15 @@
 import { inArray } from 'drizzle-orm'
+import { MembershipService } from '@awecommerce/service/apps/membership/services/membership'
+import { OfferService } from '@awecommerce/service/apps/offer/services/offer'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 import { products } from '@awecommerce/service/apps/product/schemas'
 
 // A listed product with its active variants and listed related products (as
 // product list rows, with their prices and stock, for product cards). Each
 // variant says whether it is in stock: its stock is not counted (the product
-// class does not track stock), or some is left.
+// class does not track stock), or some is left, and its `memberPrice` when
+// members of a plan pay less for one: the buyer's own (`isYours`) when they
+// hold such a plan, otherwise the lowest, or null.
 export default defineServiceHandler(async (event) => {
   const productService = new ProductService(useDb())
   const found = await productService.getBySlug(getRouterParam(event, 'slug')!)
@@ -18,14 +22,23 @@ export default defineServiceHandler(async (event) => {
   const relatedProducts = relatedIds.length
     ? await productService.list({ listedOnly: true, extraFilters: [inArray(products.id, relatedIds)] })
     : []
+  const variants = product.variants.filter((variant) => variant.isActive)
+  const offerService = new OfferService(useDb())
+  const user = await getUser(event)
+  const planIds = user ? (await new MembershipService(useDb()).activeMemberships(user.id)).map((m) => m.planId) : []
+  const yours = await offerService.memberPrices(variants, planIds)
+  const lowest = await offerService.memberPrices(variants)
   return {
     ...product,
-    variants: product.variants
-      .filter((variant) => variant.isActive)
-      .map((variant) => ({
+    variants: variants.map((variant) => {
+      const own = yours.get(variant.id)
+      const memberPrice = own ? { ...own, isYours: true } : lowest.has(variant.id) ? { ...lowest.get(variant.id)!, isYours: false } : null
+      return {
         ...storeVariant(variant),
         inStock: product.productClass?.trackStock === false || (variant.stockQuantity ?? 0) > 0,
-      })),
+        memberPrice,
+      }
+    }),
     relatedProducts,
   }
 })

@@ -35,6 +35,8 @@ const state = reactive({
 
 // False when nothing in the cart is shipped
 const ships = computed(() => cart.value?.requiresShipping !== false)
+// A membership in the cart needs an account
+const needsSignIn = computed(() => Boolean(cart.value?.requiresAccount) && !user.value)
 
 // The points previewed in the summary, set when the field is left
 const appliedPoints = ref(0)
@@ -83,7 +85,7 @@ const validate = () => {
   const need = (name: keyof typeof state, message: string) => {
     if (!String(state[name] ?? '').trim()) errors.push({ name, message })
   }
-  if (!user.value) {
+  if (!user.value && !needsSignIn.value) {
     need('name', 'Enter your name')
     if (!state.email.trim()) errors.push({ name: 'email', message: 'Enter your email' })
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) errors.push({ name: 'email', message: 'Enter a valid email' })
@@ -153,6 +155,15 @@ const place = async () => {
         <section class="space-y-4" aria-labelledby="contact">
           <h2 id="contact" class="text-2xl font-medium">Contact</h2>
           <p v-if="user" class="text-muted">Signed in as {{ user.email }}</p>
+          <UAlert
+            v-else-if="needsSignIn"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-user-round"
+            title="Sign in to buy a membership"
+            description="A membership belongs to your account, so it needs one."
+            :actions="[{ label: 'Sign in', to: '/login?redirect=/checkout', color: 'neutral' }]"
+          />
           <template v-else>
             <div class="grid gap-4 sm:grid-cols-2">
               <UFormField label="Name" name="name" required>
@@ -267,7 +278,7 @@ const place = async () => {
           size="xl"
           block
           :loading="placing"
-          :disabled="blocked || !summary"
+          :disabled="blocked || !summary || needsSignIn"
           :label="summary ? `Place order · ${money(summary.total)}` : 'Place order'"
         />
       </aside>

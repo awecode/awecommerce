@@ -106,6 +106,13 @@
       "when": 1792051881637,
       "tag": "0014_digital_products",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792054466650,
+      "tag": "0015_memberships",
+      "breakpoints": true
     }
   ]
 }

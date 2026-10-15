@@ -69,6 +69,9 @@ describe.skipIf(!url)('admin offers API', async () => {
     expect(
       (await admin(`/api/admin/offers/${offer.id}`, { method: 'PATCH', body: { isActive: false, priority: 5 } })).body,
     ).toMatchObject({ isActive: false, priority: 5 })
+    expect(
+      (await admin(`/api/admin/offers/${offer.id}`, { method: 'PATCH', body: { includedMembershipPlanIds: [1, 2], combinesWithOtherOffers: false } })).body,
+    ).toMatchObject({ includedMembershipPlanIds: [1, 2], combinesWithOtherOffers: false })
   })
 
   test('lists with filters', async () => {

@@ -44,6 +44,16 @@
         "default": "./dist/apps/loyalty/schemas/index.cjs"
       }
     },
+    "./apps/membership/schemas": {
+      "import": {
+        "types": "./dist/apps/membership/schemas/index.d.ts",
+        "default": "./dist/apps/membership/schemas/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apps/membership/schemas/index.d.ts",
+        "default": "./dist/apps/membership/schemas/index.cjs"
+      }
+    },
     "./apps/tax/schemas": {
       "import": {
         "types": "./dist/apps/tax/schemas/index.d.ts",

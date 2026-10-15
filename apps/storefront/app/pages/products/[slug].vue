@@ -1,13 +1,15 @@
 <script setup lang="ts">
 // A product: its images, the variant picked by option (kept in the URL as
 // `variant`, so a link opens the same one), stock, the buyer's answers to its
-// fields, and adding it to the cart (which opens the cart drawer). Also its SEO tags and Product JSON-LD.
+// fields, and adding it to the cart (which opens the cart drawer). Also its SEO tags and Product JSON-LD,
+// and the member price when members of a plan pay less.
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { store } = useAppConfig()
 const { data: settings } = useStoreSettings()
 const { add: addToCart, drawerOpen } = useCart()
+const money = useMoney()
 
 const { data: product, error } = await useFetch(() => `/api/store/products/${route.params.slug}`)
 if (error.value || !product.value) {
@@ -166,6 +168,10 @@ useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
             <div data-testid="price" class="text-2xl">
               <PriceTag v-if="variant" :price="variant.price" :sale="variant.discountedPrice" />
             </div>
+            <p v-if="variant?.memberPrice" data-testid="member-price" class="text-sm">
+              {{ variant.memberPrice.isYours ? `Your ${variant.memberPrice.planName} price` : `${variant.memberPrice.planName} members` }}:
+              <span class="font-serif text-base">{{ money(variant.memberPrice.price) }}</span>
+            </p>
           </div>
 
           <div v-for="option in options" :key="option.name" class="space-y-3">

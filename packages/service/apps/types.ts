@@ -8,6 +8,7 @@ import * as productSchemas from './product/schemas'
 import * as loyaltySchemas from './loyalty/schemas'
 import * as taxSchemas from './tax/schemas'
 import * as storeSchemas from './store/schemas'
+import * as membershipSchemas from './membership/schemas'
 
 const tables = {
   ...cartSchemas,
@@ -17,6 +18,7 @@ const tables = {
   ...loyaltySchemas,
   ...taxSchemas,
   ...storeSchemas,
+  ...membershipSchemas,
 }
 
 type BenefitType = 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'
@@ -59,6 +61,9 @@ export type CartContent = Cart & {
   userOfferDiscounts: OfferDiscount[]
   voucherOfferDiscounts: VoucherOfferDiscount[]
   totalOfferDiscount: number
+  // Vouchers applied to the cart that give nothing, because a bigger discount
+  // does not combine with them (or they do not combine with the others)
+  notCombinedVoucherOffers: { id: number; name: string; voucherCode: string }[]
 }
 
 export type CartContentWithoutOfferInfo = Cart & {

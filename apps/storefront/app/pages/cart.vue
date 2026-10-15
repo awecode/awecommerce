@@ -79,6 +79,14 @@ const remove = async (voucherCode: string) => {
             </dt>
             <dd class="whitespace-nowrap">−{{ money(voucher.discount) }}</dd>
           </div>
+          <!-- Kept on the cart, but a bigger discount does not combine with it -->
+          <div v-for="voucher in cart.notCombinedVoucherOffers" :key="`not-combined-${voucher.id}`" class="flex items-center justify-between gap-2">
+            <dt class="flex min-w-0 items-center gap-1 break-all">
+              Voucher {{ voucher.voucherCode }}
+              <UButton icon="i-lucide-x" color="neutral" variant="ghost" size="xs" :aria-label="`Remove voucher ${voucher.voucherCode}`" @click="remove(voucher.voucherCode)" />
+            </dt>
+            <dd class="text-right text-xs text-muted">Not combined: a better discount applies</dd>
+          </div>
           <div class="flex justify-between text-muted">
             <dt>Shipping</dt>
             <dd>{{ cart.requiresShipping ? 'At checkout' : 'Nothing to ship' }}</dd>

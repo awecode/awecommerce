@@ -68,6 +68,10 @@ const offerFields = z.object({
   // Who user offers and vouchers are for; ignored by site offers
   includeAllUsers: z.boolean().optional(),
   includedUserIds: z.array(z.string()).optional(),
+  // Members of these plans get it too
+  includedMembershipPlanIds: z.array(z.number().int()).optional(),
+  // Off: not added to other offers; the cart gets the bigger discount
+  combinesWithOtherOffers: z.boolean().optional(),
   conditionId: z.number().int(),
   benefitId: z.number().int(),
   startDate: dateTime,

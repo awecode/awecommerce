@@ -95,7 +95,7 @@ Buyers see, and can buy, only listed products: active and `Published`, with an a
 | Route | Does |
 |---|---|
 | `GET /api/store/products` | One page of products, each with `inStock`. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
-| `GET /api/store/products/:slug` | A product with its active variants (each with `inStock`), options, images and listed related products (as product list rows, with prices and stock, for product cards) |
+| `GET /api/store/products/:slug` | A product with its active variants (each with `inStock` and `memberPrice`; see Memberships), options, images and listed related products (as product list rows, with prices and stock, for product cards) |
 | `GET /api/store/settings` | The store's `name`, `currency` and `locale`, for showing prices |
 | `GET /api/store/categories` | Active categories with a listed product in them or below them, each with its `parent`. Categories under an inactive category are left out. |
 | `GET /api/store/brands` | Active brands with a listed product |
@@ -117,7 +117,7 @@ Signed in, the buyer gets their own open cart on every device. A guest cart stil
 | `POST /api/store/cart/vouchers` | `{ code }` | Applies a voucher |
 | `DELETE /api/store/cart/vouchers/:code` | | Removes a voucher |
 
-Adding more than is in stock, or raising a quantity past it, gives 409 with `data.code` `OutOfStockError` and `data.available`. Each line in the summary has `isInStock` and `stockLeft`; warn while `isInStock` is false (see Stock in the library README).
+Adding more than is in stock, or raising a quantity past it, gives 409 with `data.code` `OutOfStockError` and `data.available`. Each line in the summary has `isInStock` and `stockLeft`; warn while `isInStock` is false (see Stock in the library README). `requiresAccount` is true when the cart has a membership (checkout then needs sign-in), and `notCombinedVoucherOffers` lists applied vouchers that give nothing because a bigger discount does not combine with them; they can still be removed.
 
 ### Checkout
 
@@ -130,7 +130,7 @@ Adding more than is in stock, or raising a quantity past it, gives 409 with `dat
 - `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.
 - The other 409s: `OutOfStockError`, `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
 - `shippingAddress` needs `line1`, `city` and `country`; `line2`, `houseNo`, `province`, `postalCode`, `countryCode` and `instructions` are optional. Signed-in buyers can pass `shippingAddressId` (one of their saved addresses) instead; its fields are copied onto the order. Pass one of the two when the cart has something to ship (422 without); for a cart with nothing to ship, neither is needed, and one given is not kept.
-- Guests must pass `guestUser` (`name` and `email`; `phone` is optional). Signed in, the order belongs to the user and `guestUser` is ignored.
+- Guests must pass `guestUser` (`name` and `email`; `phone` is optional). A cart with a membership needs a signed-in buyer: guests get 422 `Sign in to buy a membership`. Signed in, the order belongs to the user and `guestUser` is ignored.
 - `redeemPoints` (signed in) redeems loyalty points; preview them with the same value in `GET /api/store/cart?redeemPoints=`. Guests get 422.
 - Other fields are dropped.
 - The storefront needs `ORDER_HASH_SECRET` (see its `.env.example`) to sign order links.
@@ -194,6 +194,7 @@ An offer is built from parts, created first: a range (which products), a conditi
 - A voucher needs a `voucherCode`, and other offers cannot have one (422). Codes are unique (409 `AlreadyExists`).
 - A part still used cannot be deleted (409 `InUse`): delete the offer, then its benefit and condition, then the range. Orders keep their own copy of the offers they used, so deleting an offer does not change them.
 - `usageCount` is not settable; checkout and cancelling keep it.
+- `includedMembershipPlanIds` makes a user offer or voucher also for members of those plans, and `combinesWithOtherOffers: false` keeps an offer from adding to others (see the library README).
 
 ### Settings and shipping
 
@@ -217,7 +218,7 @@ Body schemas are in `packages/api-admin/shared/utils/orders.ts`. Each change rec
 | `GET /api/admin/orders/:id` | | The order with its lines, payments, `customer`, and `logs` (what changed, when, by whom and their `loggedByEmail`) |
 | `POST /api/admin/orders/:id/status` | `{ status }` | Moves it to another status. Not `Cancelled` (400): cancel it instead. A cancelled order cannot change (422). |
 | `POST /api/admin/orders/:id/cancel` | `{ reason, remarks? }` | Cancels it, giving back its offer usage and redeemed loyalty points, and runs the cancelled fulfilment hooks |
-| `POST /api/admin/orders/:id/payment-status` | `{ paymentStatus }` | Sets `Pending`, `Paid` or `Refunded` by hand, for example for cash on delivery or pay later. A change to `Paid` runs the paid fulfilment hooks. |
+| `POST /api/admin/orders/:id/payment-status` | `{ paymentStatus }` | Sets `Pending`, `Paid` or `Refunded` by hand, for example for cash on delivery or pay later. A change to `Paid` runs the paid fulfilment hooks, and a change to `Refunded` the refunded ones. |
 | `GET /api/admin/users` | `q` (part of the email), `role` (`admin` or `user`), `page`, `size` | Customers and staff, newest first |
 | `PATCH /api/admin/users/:id` | `{ role }` | Makes a user staff (`admin`) or a customer (`user`). You cannot remove your own admin role (422). |
 | `POST /api/admin/users/:id/ban` | `{ reason?, days? }` | Bans a user (forever without `days`) and signs them out everywhere. You cannot ban yourself (400). |
@@ -252,7 +253,7 @@ A product class has `requiresShipping` (Ships to the buyer in the backoffice), o
 
 - **Cart and checkout:** a cart with nothing to ship takes no address and no shipping method, and pays later (`pay_later`: the store contacts the buyer, and staff mark it paid). A mixed cart is shipped as before: an address, a method, and pay on delivery.
 - **Orders:** each line records `requiresShipping` when the order is placed, so changing the class later does not change past orders. An order with nothing to ship goes Confirm order, then Complete in the backoffice, and never gets the shipped email.
-- **Fulfilment hooks** (`packages/api-core/server/utils/fulfillment.ts`): `registerFulfillment({ name, productClasses?, products?, on?, note? })` matches order lines by their product's class slug or product slug. `on.placed` runs after checkout, `on.paid` when staff change the payment to Paid, and `on.cancelled` when the order is cancelled, each with the order and its matching lines, before the route answers. A hook that throws is logged; the order and the other hooks are not affected. `note({ order, line })` returns `{ title, text, link?: { label, url } }` (or nothing), read whenever the order is shown, so it can follow the payment; the first matching hook's note is used. A line with nothing to ship and no note gets "Your purchase is confirmed" (not once the order is cancelled). Notes show on the storefront's order page and in the placed email.
+- **Fulfilment hooks** (`packages/api-core/server/utils/fulfillment.ts`): `registerFulfillment({ name, productClasses?, products?, match?, on?, note? })` matches order lines by their product's class slug or product slug, or by `match(line)`. `on.placed` runs after checkout, `on.paid` when staff change the payment to Paid, `on.refunded` when they change it to Refunded, and `on.cancelled` when the order is cancelled, each with the order and its matching lines, before the route answers. A hook that throws is logged; the order and the other hooks are not affected. `note({ order, line })` returns `{ title, text, link?: { label, url } }` (or nothing), read whenever the order is shown, so it can follow the payment; the first matching hook's note is used. A line with nothing to ship and no note gets "Your purchase is confirmed" (not once the order is cancelled). Notes show on the storefront's order page and in the placed email.
 - **Registering hooks:** from a Nitro plugin in a layer both apps extend, as the storefront places orders and shows the notes while the backoffice marks them paid and cancels them:
 
 ```ts
@@ -271,6 +272,16 @@ export default defineNitroPlugin(() => {
 ```
 
 The API tests register theirs in `packages/api-core/tests/fulfillment-hooks`.
+
+## Memberships
+
+Plans, such as Platinum, are grouped by `program` (such as `music`): a person holds at most one plan per program, and any number of programs. See Memberships in the library README for the rules.
+
+- **Selling one:** make a product in a class that is not shipped and does not track stock, and link each variant to a plan and a number of months (`MembershipService.addTerm`; the backoffice screens come next). Its price is the variant's.
+- **Buying:** only a signed-in buyer can check out a cart with a membership; the storefront's checkout asks a guest to sign in. The order pays later. When staff mark it paid, the built-in membership hook (`packages/api-core/server/plugins/membership.ts`) grants the plan for the term's months times the quantity, to the order's user. Cancelling the order, or marking it refunded, cancels what it granted.
+- **The order page** says "It starts once your payment is confirmed", then "Active until …" (or when it starts, for a renewal that waits for the current one to end).
+- **Perks:** user offers and vouchers with `includedMembershipPlanIds` apply to the plan's active members, in the cart and at checkout. An expired or cancelled membership stops them on the next read.
+- **Member prices:** product variants have `memberPrice` (`{ planId, planName, price, isYours }` or null): what one unit costs members, from the offers that name a plan. A signed-in member sees their own plan's price (`isYours`), others the lowest. The product page shows "Platinum members: $80" or "Your Platinum price: $80".
 
 ## API errors
 

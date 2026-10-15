@@ -17,6 +17,7 @@ const require = createRequire(import.meta.url)
 const expectedExports = {
   'apps/cart/services/cart': ['CartService'],
   'apps/loyalty/services/loyalty': ['LoyaltyService'],
+  'apps/membership/services/membership': ['MembershipService'],
   'apps/tax/services/tax': ['TaxService', 'calculateTax'],
   'apps/store/services/store': ['StoreSettingsService'],
   'apps/offer/services/offer': ['OfferService', 'OfferRangeService'],
@@ -43,6 +44,7 @@ const expectedExports = {
   'apps/order/schemas': ['orders'],
   'apps/product/schemas': ['products'],
   'apps/loyalty/schemas': ['loyaltyPoints'],
+  'apps/membership/schemas': ['memberships', 'membershipPlans', 'membershipTerms'],
   'apps/tax/schemas': ['taxSettings'],
   'apps/store/schemas': ['storeSettings'],
   'core/db': ['db'],

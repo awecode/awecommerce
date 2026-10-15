@@ -34,6 +34,7 @@ import {
   transactions,
 } from '../schemas'
 import { products, productVariants } from '../../product/schemas'
+import { MembershipService } from '../../membership/services/membership'
 import { Database } from '../../types'
 
 type CreateFromCartOptions = {
@@ -214,7 +215,12 @@ class OrderService {
       // Re-applying drops vouchers that ran out, expired or no longer match the
       // cart. Fail instead of placing the order without a discount the
       // customer applied.
-      const reappliedIds = new Set(content.voucherOfferDiscounts.map((d) => d.id))
+      // A voucher kept on the cart but left out for a bigger discount that does
+      // not combine with it is still valid: it is just not used.
+      const reappliedIds = new Set([
+        ...content.voucherOfferDiscounts.map((d) => d.id),
+        ...content.notCombinedVoucherOffers.map((voucher) => voucher.id),
+      ])
       const droppedVoucher = lockedVouchers.find(
         (voucher) => !reappliedIds.has(voucher.id),
       )
@@ -223,6 +229,15 @@ class OrderService {
           droppedVoucher.id,
           droppedVoucher.voucherCode,
         )
+      }
+      // A membership belongs to an account
+      if (!cart.userId) {
+        const terms = await new MembershipService(tx).termsForVariants(
+          content.lines.map((line) => line.variantId),
+        )
+        if (terms.size) {
+          throw new ValidationError('Sign in to buy a membership')
+        }
       }
       // The product's custom fields may have changed since the buyer answered
       // them. Fail instead of placing an order with answers it no longer asks for.

@@ -47,9 +47,41 @@ import {
   UpdateOfferBenefit,
   UpdateOfferRange,
 } from '../schemas'
+import { membershipPlans, memberships } from '../../membership/schemas'
+import { MembershipService } from '../../membership/services/membership'
 import { Decimal } from 'decimal.js'
 
 type OfferKind = 'site' | 'user' | 'voucher'
+
+// Whether the user is one the offer is for: everyone, one of its users, or a
+// member of one of its plans (an active membership)
+const inAudience = (userId: string | null) =>
+  or(
+    eq(offers.includeAllUsers, true),
+    sql`${userId} IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
+    sql`EXISTS (
+      SELECT 1 FROM ${memberships}
+      WHERE ${memberships.userId} = ${userId}
+        AND ${memberships.status} = 'active'
+        AND ${memberships.startsAt} <= now()
+        AND ${memberships.endsAt} > now()
+        AND ${memberships.planId}::text IN (SELECT jsonb_array_elements_text(${offers.includedMembershipPlanIds}))
+    )`,
+  )
+
+// A copy of the cart content without any offer applied, to price a set of
+// offers on its own
+const withoutOffers = (content: CartContent): CartContent => {
+  const copy = structuredClone(content)
+  for (const part of [copy, ...copy.lines]) {
+    part.siteOfferDiscounts = []
+    part.userOfferDiscounts = []
+    part.voucherOfferDiscounts = []
+    part.totalOfferDiscount = 0
+  }
+  copy.notCombinedVoucherOffers = []
+  return copy
+}
 
 const sellingPrice = (line: CartContent['lines'][number]) =>
   new Decimal(line.variant.discountedPrice ?? line.variant.price!)
@@ -839,6 +871,7 @@ class OfferService {
       isFeatured: offers.isFeatured,
       type: offers.type,
       metadata: offers.metadata,
+      combinesWithOtherOffers: offers.combinesWithOtherOffers,
       benefit: {
         isActive: offerBenefits.isActive,
         type: offerBenefits.type,
@@ -874,14 +907,7 @@ class OfferService {
       and(
         ...where,
         eq(offers.isActive, true),
-        filters?.type === 'site'
-          ? undefined
-          : or(
-              eq(offers.includeAllUsers, true),
-              sql`${userId} IN (SELECT jsonb_array_elements_text(${
-                offers.includedUserIds
-              }))`,
-            ),
+        filters?.type === 'site' ? undefined : inAudience(userId),
         or(isNull(offers.startDate), lte(offers.startDate, now)),
         or(isNull(offers.endDate), gte(offers.endDate, now)),
         or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
@@ -956,10 +982,7 @@ class OfferService {
         and(
           eq(offers.type, 'user'),
           eq(offers.isActive, true),
-          or(
-            eq(offers.includeAllUsers, true),
-            sql`${userId} IN (SELECT jsonb_array_elements_text(${offers.includedUserIds}))`,
-          ),
+          inAudience(userId),
           or(isNull(offers.startDate), lte(offers.startDate, now)),
           or(isNull(offers.endDate), gte(offers.endDate, now)),
           or(
@@ -1469,12 +1492,22 @@ class OfferService {
     if (!voucherOffer) {
       voucherOffer = await this.getByVoucherCode(voucherCode!)
     }
+    // Members of the voucher's plans can use it too
+    const memberOfPlan = async () =>
+      Boolean(
+        userId &&
+          voucherOffer.includedMembershipPlanIds?.length &&
+          (await new MembershipService(this.db).activeMemberships(userId)).some((membership) =>
+            voucherOffer.includedMembershipPlanIds.includes(membership.planId),
+          ),
+      )
     if (
       !voucherOffer ||
       voucherOffer.type !== 'voucher' ||
       !voucherOffer.isActive ||
       (voucherOffer.includeAllUsers === false &&
-        !voucherOffer.includedUserIds.includes(userId)) ||
+        !voucherOffer.includedUserIds.includes(userId) &&
+        !(await memberOfPlan())) ||
       (voucherOffer.startDate &&
         new Date(voucherOffer.startDate) > new Date()) ||
       (voucherOffer.endDate && new Date(voucherOffer.endDate) < new Date())
@@ -1521,6 +1554,11 @@ class OfferService {
 
     if (!voucherOffer.benefit.isActive) {
       return cartContent
+    }
+    // One that does not combine is priced alone; reading the cart then keeps
+    // whichever gives more (see CartService.getCartContentForSession)
+    if (voucherOffer.combinesWithOtherOffers === false) {
+      cartContent = withoutOffers(cartContent)
     }
 
     const productIds = cartContent.lines.map((line) => line.variant.productId)
@@ -1582,6 +1620,86 @@ class OfferService {
 
     applyBenefit(offer, cartContent, productIdsInOfferRange, kind)
     return cartContent
+  }
+
+  // What one unit of each variant costs a member, for product pages: the
+  // lowest price over the plans (or just these plans), from the offers that
+  // name the plan and that one unit qualifies for, with the same combining
+  // rule as the cart. Offers for everyone, site offers, vouchers, free
+  // shipping and per-user limits are left out. Only variants a member pays
+  // less for are in the map.
+  async memberPrices(
+    variants: { id: number; productId: number; price: string | null; discountedPrice: string | null }[],
+    planIds?: number[],
+  ) {
+    const prices = new Map<number, { planId: number; planName: string; price: string }>()
+    const now = new Date().toISOString()
+    const plans = await this.db.query.membershipPlans.findMany({
+      where: and(
+        eq(membershipPlans.isActive, true),
+        planIds ? inArray(membershipPlans.id, planIds.length ? planIds : [-1]) : undefined,
+      ),
+    })
+    const memberOffers = plans.length
+      ? (
+          await this.db.query.offers.findMany({
+            where: and(
+              eq(offers.type, 'user'),
+              eq(offers.isActive, true),
+              sql`jsonb_array_length(${offers.includedMembershipPlanIds}) > 0`,
+              or(isNull(offers.startDate), lte(offers.startDate, now)),
+              or(isNull(offers.endDate), gte(offers.endDate, now)),
+              or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+            ),
+            with: { condition: true, benefit: true },
+            orderBy: [desc(offers.priority), desc(offers.createdAt)],
+          })
+        ).filter((offer) => offer.benefit.isActive && offer.benefit.type !== 'free_shipping')
+      : []
+    const productIds = [...new Set(variants.map((variant) => variant.productId))]
+    const inRange = new Map<number, number[]>()
+    for (const offer of memberOffers) {
+      inRange.set(offer.id, await this.getProductIdsInOfferRange(offer.condition.rangeId, productIds))
+    }
+
+    for (const variant of variants) {
+      if ((variant.discountedPrice ?? variant.price) === null) continue
+      // A cart of one unit, for the cart's own pricing
+      const oneUnit = () => {
+        const discounts = { siteOfferDiscounts: [], userOfferDiscounts: [], voucherOfferDiscounts: [], totalOfferDiscount: 0 }
+        return {
+          ...discounts,
+          notCombinedVoucherOffers: [],
+          lines: [{ ...structuredClone(discounts), variant, quantity: 1 }],
+        } as unknown as CartContent
+      }
+      for (const plan of plans) {
+        const forPlan = memberOffers.filter(
+          (offer) => offer.includedMembershipPlanIds.includes(plan.id) && inRange.get(offer.id)!.includes(variant.productId),
+        )
+        if (!forPlan.length) continue
+        const ids = [variant.productId]
+        const combined = oneUnit()
+        const candidates = [combined]
+        for (const offer of forPlan) {
+          if (!offer.combinesWithOtherOffers) {
+            const alone = oneUnit()
+            applyBenefit(offer, alone, ids, 'user')
+            candidates.push(alone)
+          } else if (!isFullyDiscounted(combined, ids)) {
+            applyBenefit(offer, combined, ids, 'user')
+          }
+        }
+        const discount = Math.max(...candidates.map((candidate) => candidate.totalOfferDiscount))
+        if (discount <= 0) continue
+        const price = new Decimal(variant.discountedPrice ?? variant.price!).sub(discount).toString()
+        const current = prices.get(variant.id)
+        if (!current || new Decimal(price).lt(current.price)) {
+          prices.set(variant.id, { planId: plan.id, planName: plan.name, price })
+        }
+      }
+    }
+    return prices
   }
 
   async increaseUsage(offerId: number, userId: string) {
@@ -1679,4 +1797,5 @@ export {
   OfferConditionService,
   OfferRangeService,
   OfferService,
+  withoutOffers,
 }

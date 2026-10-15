@@ -241,6 +241,12 @@ export const offers = pgTable('offer', {
   voucherCode: text().unique(),
   includeAllUsers: boolean().default(false),
   includedUserIds: jsonb().default([]).$type<string[]>(),
+  // Members of these plans (an active membership) get the offer too
+  includedMembershipPlanIds: jsonb().notNull().default([]).$type<number[]>(),
+  // Off: the offer is not added to others. When it applies, the cart gets
+  // whichever is the bigger discount: this offer alone, or the offers that
+  // combine.
+  combinesWithOtherOffers: boolean().notNull().default(true),
   conditionId: integer()
     .references(() => offerConditions.id)
     .notNull(),

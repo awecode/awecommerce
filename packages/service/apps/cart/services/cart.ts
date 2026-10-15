@@ -15,11 +15,12 @@ import {
   carts,
   NewCartLine,
 } from '../schemas'
-import { OfferService } from '../../offer/services/offer'
+import { OfferService, withoutOffers } from '../../offer/services/offer'
 import { offers } from '../../offer/schemas'
 import { CartContent, CartContentWithoutOfferInfo, Database } from '../../types'
 import { priceCart } from './pricing'
 import { LoyaltyService } from '../../loyalty/services/loyalty'
+import { MembershipService } from '../../membership/services/membership'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -330,6 +331,9 @@ class CartService {
     const stock = await new ProductVariantService(this.db).stockLevels(
       content.lines.map((line) => line.variantId),
     )
+    const terms = await new MembershipService(this.db).termsForVariants(
+      content.lines.map((line) => line.variantId),
+    )
     const stockLeft = (variantId: number) => stock.get(variantId)?.stock ?? null
     const inCart = new Map<number, number>()
     for (const line of content.lines) {
@@ -360,6 +364,8 @@ class CartService {
       // False when nothing in the cart is shipped (digital goods only): checkout
       // then takes no address and no shipping method
       requiresShipping: pricing.requiresShipping,
+      // True when the cart has a membership: only a signed-in buyer can order it
+      requiresAccount: terms.size > 0,
       subtotal: pricing.subtotal,
       loyaltyDiscount: pricing.loyaltyDiscount,
       shippingCharge: pricing.shippingCharge,
@@ -417,44 +423,10 @@ class CartService {
       userOfferDiscounts: [],
       voucherOfferDiscounts: [],
       totalOfferDiscount: 0,
+      notCombinedVoucherOffers: [],
     }
     if (withOffersInfo) {
-      cartContent = await this.applySiteOffers(cartContent)
-      if (cartContent.userId) {
-        cartContent = await this.applyUserOffers(
-          cartContent,
-          cartContent.userId,
-        )
-      }
-      cartContent = await this.db.transaction(async (tx) => {
-        let content = cartContent
-        // Locked, and the vouchers read after it, so reads of the same cart
-        // re-apply its vouchers one at a time. Otherwise a read could clear
-        // them while another re-applies them, and answer without them.
-        await tx.select({ id: carts.id }).from(carts).where(eq(carts.id, content.id)).for('update')
-        const appliedVoucherOffers = await tx.query.cartAppliedVoucherOffers.findMany({
-          with: { offer: { with: { benefit: true, condition: true } } },
-          where: eq(cartAppliedVoucherOffers.cartId, content.id),
-        })
-        await new CartService(tx).resetAppliedVoucherOffers(content.id)
-        for (const appliedOffer of appliedVoucherOffers) {
-          try {
-            // A savepoint per voucher, so a database error while applying one
-            // does not abort the transaction and drop the others
-            content = await tx.transaction((savepoint) =>
-              new OfferService(savepoint).applyVoucherCode(
-                content,
-                appliedOffer.offer,
-                undefined,
-                content.userId || undefined,
-              ),
-            )
-          } catch (e) {
-            console.error(e)
-          }
-        }
-        return content
-      })
+      cartContent = await this.withOffers(cartContent)
     }
     return cartContent
   }
@@ -630,27 +602,95 @@ class CartService {
       .where(eq(cartAppliedVoucherOffers.cartId, cartId))
   }
 
-  // Site offers apply to every cart, guests included
+  // The site offers (every cart, guests included), then the user's offers
+  // (theirs, everyone's, and their plans'), that apply now
+  private async automaticOffers(userId: string | null) {
+    const offerService = new OfferService(this.db)
+    const site = await offerService.getActiveUserOffers(userId, { type: 'site' })
+    const user = userId ? await offerService.getActiveUserOffers(userId) : []
+    return [
+      ...site.map((offer) => ({ offer, kind: 'site' as const })),
+      ...user.map((offer) => ({ offer, kind: 'user' as const })),
+    ].filter(({ offer }) => offer.benefit?.isActive)
+  }
+
+  // Applies the site offers that combine with others
   async applySiteOffers(cartContent: CartContent) {
     const offerService = new OfferService(this.db)
-    let offers = await offerService.getActiveUserOffers(cartContent.userId, {
-      type: 'site',
-    })
-    offers = offers.filter((offer) => offer.benefit?.isActive)
-    for (const offer of offers) {
-      cartContent = await offerService.applyUserOffer(offer, cartContent, 'site')
+    for (const { offer, kind } of await this.automaticOffers(cartContent.userId)) {
+      if (kind === 'site' && offer.combinesWithOtherOffers) {
+        cartContent = await offerService.applyUserOffer(offer, cartContent, kind)
+      }
     }
     return cartContent
   }
 
+  // Applies the user's offers that combine with others
   async applyUserOffers(cartContent: CartContent, userId: string) {
     const offerService = new OfferService(this.db)
-    let offers = await offerService.getActiveUserOffers(userId)
-    offers = offers.filter((offer) => offer.benefit?.isActive)
-    for (const offer of offers) {
-      cartContent = await offerService.applyUserOffer(offer, cartContent)
+    for (const { offer, kind } of await this.automaticOffers(userId)) {
+      if (kind === 'user' && offer.combinesWithOtherOffers) {
+        cartContent = await offerService.applyUserOffer(offer, cartContent, kind)
+      }
     }
     return cartContent
+  }
+
+  // The cart with its offers and vouchers. The ones that combine are applied
+  // together (site offers, then user offers, then vouchers); each one that
+  // does not is priced alone. The cart gets whichever gives the biggest
+  // discount (on a tie, the ones that combine). Applied vouchers left out are
+  // listed in notCombinedVoucherOffers: they stay on the cart, give nothing
+  // and are not used up.
+  private async withOffers(base: CartContent): Promise<CartContent> {
+    const offerService = new OfferService(this.db)
+    const automatic = await this.automaticOffers(base.userId)
+    let combined = withoutOffers(base)
+    const alone: CartContent[] = []
+    for (const { offer, kind } of automatic) {
+      if (offer.combinesWithOtherOffers) {
+        combined = await offerService.applyUserOffer(offer, combined, kind)
+      } else {
+        alone.push(await offerService.applyUserOffer(offer, withoutOffers(base), kind))
+      }
+    }
+    const appliedVouchers: { id: number; name: string; voucherCode: string }[] = []
+    combined = await this.db.transaction(async (tx) => {
+      let content = combined
+      // Locked, and the vouchers read after it, so reads of the same cart
+      // re-apply its vouchers one at a time. Otherwise a read could clear
+      // them while another re-applies them, and answer without them.
+      await tx.select({ id: carts.id }).from(carts).where(eq(carts.id, content.id)).for('update')
+      const appliedVoucherOffers = await tx.query.cartAppliedVoucherOffers.findMany({
+        with: { offer: { with: { benefit: true, condition: true } } },
+        where: eq(cartAppliedVoucherOffers.cartId, content.id),
+      })
+      await new CartService(tx).resetAppliedVoucherOffers(content.id)
+      for (const appliedOffer of appliedVoucherOffers) {
+        const { offer } = appliedOffer
+        try {
+          // A savepoint per voucher, so a database error while applying one
+          // does not abort the transaction and drop the others
+          const applied = await tx.transaction((savepoint) =>
+            new OfferService(savepoint).applyVoucherCode(content, offer, undefined, content.userId || undefined),
+          )
+          // One that does not combine comes back priced alone
+          if (offer.combinesWithOtherOffers) content = applied
+          else alone.push(applied)
+          appliedVouchers.push({ id: offer.id, name: offer.name, voucherCode: offer.voucherCode! })
+        } catch (e) {
+          console.error(e)
+        }
+      }
+      return content
+    })
+    const best = alone.reduce(
+      (best, candidate) => (candidate.totalOfferDiscount > best.totalOfferDiscount ? candidate : best),
+      combined,
+    )
+    const used = new Set(best.voucherOfferDiscounts.map((discount) => discount.id))
+    best.notCombinedVoucherOffers = appliedVouchers.filter((voucher) => !used.has(voucher.id))
+    return best
   }
 }
 
