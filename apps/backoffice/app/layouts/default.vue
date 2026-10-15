@@ -16,6 +16,12 @@ const links: NavigationMenuItem[][] = [
     { label: 'Brands', icon: 'i-lucide-tag', to: '/catalog/brands', onSelect: close },
     { label: 'Product classes', icon: 'i-lucide-shapes', to: '/catalog/product-classes', onSelect: close },
   ],
+  [
+    { label: 'Settings', type: 'label' },
+    { label: 'Store', icon: 'i-lucide-store', to: '/settings/store', onSelect: close },
+    { label: 'Tax', icon: 'i-lucide-percent', to: '/settings/tax', onSelect: close },
+    { label: 'Shipping', icon: 'i-lucide-truck', to: '/settings/shipping', onSelect: close },
+  ],
 ]
 
 // The ⌘K palette: go to any screen, or start a new record
