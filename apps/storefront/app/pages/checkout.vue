@@ -108,7 +108,9 @@ const place = async () => {
     })
     // Saved once the order is placed; a failure here does not undo the order
     if (user.value && newAddress.value && state.saveAddress) {
-      await $fetch('/api/store/addresses', { method: 'POST', body: addressBody(state.address) }).catch(() => {})
+      // The first one saved becomes the default, as on the account's addresses
+      const body = { ...addressBody(state.address), isDefault: !addresses.value?.length }
+      await $fetch('/api/store/addresses', { method: 'POST', body }).catch(() => {})
     }
     await refreshCart()
     await navigateTo(`/orders/${order.id}?hash=${encodeURIComponent(order.hash)}`)

@@ -56,12 +56,12 @@ const total = computed(() => data.value?.pagination.total ?? 0)
       <div class="min-w-0 flex-1">
         <div class="mb-6 flex items-center gap-3">
           <UButton label="Filters" icon="i-lucide-sliders-horizontal" color="neutral" variant="outline" class="lg:hidden" @click="filtersOpen = true" />
-          <p class="text-sm text-muted">{{ total }} product{{ total === 1 ? '' : 's' }}</p>
+          <p class="text-sm whitespace-nowrap text-muted">{{ total }} product{{ total === 1 ? '' : 's' }}</p>
           <USelect
             :model-value="sort"
             :items="sorts"
             aria-label="Sort by"
-            class="ml-auto w-48"
+            class="ml-auto w-40 sm:w-48"
             @update:model-value="(value) => setSort(String(value))"
           />
         </div>

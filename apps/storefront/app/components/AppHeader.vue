@@ -10,9 +10,15 @@ const { count, drawerOpen } = useCart()
 const { user, signOut } = useAuth()
 
 const storeName = computed(() => settings.value?.name || 'Store')
-// Back to the same page after signing in
+// Back to the same page after signing in. Its path and query only: the hash
+// is never sent to the server (and on the sign-in link's page it holds the
+// token), and the sign-in pages themselves have nothing to come back to.
 const route = useRoute()
-const signInLink = computed(() => ({ path: '/login', query: route.path === '/' ? {} : { redirect: route.fullPath } }))
+const router = useRouter()
+const signInLink = computed(() => {
+  const back = route.path === '/' || route.path === '/login' || route.path.startsWith('/auth/')
+  return { path: '/login', query: back ? {} : { redirect: router.resolve({ path: route.path, query: route.query }).fullPath } }
+})
 
 // Top-level categories; the ones with subcategories open a panel listing them
 const links = computed<NavigationMenuItem[]>(() =>
@@ -66,7 +72,12 @@ const accountItems = computed<DropdownMenuItem[][]>(() => [
         <UButton icon="i-lucide-user" color="neutral" variant="ghost" aria-label="Account" />
       </UDropdownMenu>
       <UButton v-else icon="i-lucide-user" color="neutral" variant="ghost" :to="signInLink" aria-label="Sign in" />
-      <UChip :text="count" :show="count > 0" size="3xl" color="primary" inset>
+      <UChip
+        :text="count"
+        :show="count > 0"
+        color="primary"
+        :ui="{ base: 'top-1.5 right-1.5 h-4 min-w-4 px-1 text-[10px] font-semibold' }"
+      >
         <UButton icon="i-lucide-shopping-bag" color="neutral" variant="ghost" :aria-label="count ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'" @click="drawerOpen = true" />
       </UChip>
     </template>

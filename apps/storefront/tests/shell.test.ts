@@ -73,6 +73,9 @@ describe.skipIf(!url)('storefront shell', async () => {
     expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
     await guest.goto(`${base()}/cart`)
     expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login?redirect=/cart')
+    // The sign-in link's token (in the hash) never ends up in the link
+    await guest.goto(`${base()}/auth/confirm#token=secret-token`)
+    expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
 
     const email = `${unique('ann')}@example.com`
     const page = await signedInPage(db, email)
