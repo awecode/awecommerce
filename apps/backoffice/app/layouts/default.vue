@@ -17,6 +17,11 @@ const links: NavigationMenuItem[][] = [
     { label: 'Product classes', icon: 'i-lucide-shapes', to: '/catalog/product-classes', onSelect: close },
   ],
   [
+    { label: 'Memberships', type: 'label' },
+    { label: 'Members', icon: 'i-lucide-crown', to: '/memberships', exact: true, onSelect: close },
+    { label: 'Plans', icon: 'i-lucide-layers', to: '/memberships/plans', onSelect: close },
+  ],
+  [
     { label: 'Settings', type: 'label' },
     { label: 'Store', icon: 'i-lucide-store', to: '/settings/store', onSelect: close },
     { label: 'Tax', icon: 'i-lucide-percent', to: '/settings/tax', onSelect: close },
@@ -39,6 +44,8 @@ const groups = computed(() => [
       { label: 'New category', icon: 'i-lucide-plus', to: '/catalog/categories?new=1' },
       { label: 'New brand', icon: 'i-lucide-plus', to: '/catalog/brands?new=1' },
       { label: 'New product class', icon: 'i-lucide-plus', to: '/catalog/product-classes?new=1' },
+      { label: 'New membership plan', icon: 'i-lucide-plus', to: '/memberships/plans?new=1' },
+      { label: 'Grant membership', icon: 'i-lucide-plus', to: '/memberships?grant=1' },
     ],
   },
 ])

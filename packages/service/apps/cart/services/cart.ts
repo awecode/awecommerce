@@ -348,8 +348,12 @@ class CartService {
         // Whether the line is shipped to the buyer (its product class says so)
         requiresShipping: pricing.lines[index].requiresShipping,
         // Checkout fails while this is false; the buyer needs to remove the line.
-        // Same rule as checkout: an active variant of a listed product.
-        isAvailable: line.variant.isActive && listedIds.has(line.variant.productId),
+        // Same rule as checkout: an active variant of a listed product, and for
+        // a membership, a plan that is still active.
+        isAvailable:
+          line.variant.isActive &&
+          listedIds.has(line.variant.productId) &&
+          (terms.get(line.variantId)?.plan.isActive ?? true),
         // What is left of the variant (null when its stock is not counted), and
         // whether that covers all of it in the cart. Checkout fails while
         // isInStock is false; the buyer needs to lower the quantity.

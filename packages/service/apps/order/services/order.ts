@@ -230,14 +230,17 @@ class OrderService {
           droppedVoucher.voucherCode,
         )
       }
+      const terms = await new MembershipService(tx).termsForVariants(
+        content.lines.map((line) => line.variantId),
+      )
       // A membership belongs to an account
-      if (!cart.userId) {
-        const terms = await new MembershipService(tx).termsForVariants(
-          content.lines.map((line) => line.variantId),
-        )
-        if (terms.size) {
-          throw new ValidationError('Sign in to buy a membership')
-        }
+      if (!cart.userId && terms.size) {
+        throw new ValidationError('Sign in to buy a membership')
+      }
+      // A plan turned off is no longer sold
+      const retired = content.lines.find((line) => terms.get(line.variantId)?.plan.isActive === false)
+      if (retired) {
+        throw new ValidationError(`Product variant is not available: ${retired.variant.sku}`)
       }
       // The product's custom fields may have changed since the buyer answered
       // them. Fail instead of placing an order with answers it no longer asks for.

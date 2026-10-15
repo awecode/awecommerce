@@ -3,7 +3,7 @@ import type { TableColumn } from '@nuxt/ui'
 import { z, type ZodType } from 'zod'
 
 // A list-and-edit screen for one catalog lookup (categories, brands, product
-// classes): search and active filter in the URL, a table, and a side panel to
+// classes, membership plans): search and active filter in the URL, a table, and a side panel to
 // create and edit. The page passes its extra columns and form fields.
 const props = defineProps<{
   // API path under /api/admin, such as 'brands'
@@ -17,6 +17,9 @@ const props = defineProps<{
   defaults: Record<string, unknown>
   createSchema: ZodType
   updateSchema: ZodType
+  // Under the slug and Active fields, when the defaults do not fit
+  slugHelp?: string
+  activeHelp?: string
 }>()
 
 defineSlots<{
@@ -251,12 +254,12 @@ watch(() => route.query.new, (value) => {
         <UFormField label="Name" name="name" required>
           <UInput v-model="state.name" autofocus class="w-full" />
         </UFormField>
-        <UFormField label="Slug" name="slug" required help="Used in store links">
+        <UFormField label="Slug" name="slug" required :help="slugHelp ?? 'Used in store links'">
           <UInput v-model="state.slug" class="w-full font-mono" @update:model-value="slugTouched = true" />
         </UFormField>
         <slot name="fields" :state="state" :editing="editing" />
         <UFormField name="isActive">
-          <USwitch v-model="state.isActive" label="Active" description="Inactive ones are hidden from the store" />
+          <USwitch v-model="state.isActive" label="Active" :description="activeHelp ?? 'Inactive ones are hidden from the store'" />
         </UFormField>
       </UForm>
     </template>

@@ -74,6 +74,15 @@ export const orderListQuery = z.object({
   ...pageFields,
 })
 
+export const membershipListQuery = z.object({
+  // Part of the member's email or name
+  q: z.string().trim().min(1).optional(),
+  userId: z.string().min(1).optional(),
+  plan: z.coerce.number().int().optional(),
+  state: z.enum(['active', 'upcoming', 'ended', 'cancelled']).optional(),
+  ...pageFields,
+})
+
 export const userListQuery = z.object({
   // Part of the email
   q: z.string().trim().min(1).optional(),

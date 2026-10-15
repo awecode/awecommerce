@@ -1,5 +1,6 @@
-import { and, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, ilike, inArray, lte, or, SQL, sql } from 'drizzle-orm'
 import { NotFoundError, ValidationError } from '../../../core/errors'
+import { Exact, paginate, PaginationArgs } from '../../../core/pagination'
 import { Database } from '../../types'
 import {
   membershipPlans,
@@ -8,6 +9,32 @@ import {
   NewMembershipPlan,
   NewMembershipTerm,
 } from '../schemas'
+
+interface PlanFilter {
+  // Part of the name, slug or program
+  q?: string
+  isActive?: boolean
+  pagination?: PaginationArgs
+}
+
+// A membership's state now: active (counts), upcoming (waits for its start),
+// ended, or cancelled
+export type MembershipState = 'active' | 'upcoming' | 'ended' | 'cancelled'
+
+interface MembershipFilter {
+  userId?: string
+  // Members whose id is one of these (such as the users matching a search)
+  userIds?: string[]
+  planId?: number
+  state?: MembershipState
+  pagination?: PaginationArgs
+}
+
+const membershipState = sql<MembershipState>`CASE
+  WHEN ${memberships.status} = 'cancelled' THEN 'cancelled'
+  WHEN ${memberships.startsAt} > now() THEN 'upcoming'
+  WHEN ${memberships.endsAt} <= now() THEN 'ended'
+  ELSE 'active' END`
 
 type GrantOptions = {
   userId: string
@@ -53,20 +80,83 @@ class MembershipService {
     return plan
   }
 
+  // Throws NotFoundError when missing, and a database error (foreign key)
+  // while memberships use it; its terms go with it
+  async deletePlan(id: number) {
+    const [plan] = await this.db.delete(membershipPlans).where(eq(membershipPlans.id, id)).returning()
+    if (!plan) {
+      throw new NotFoundError(`Membership plan not found: ${id}`)
+    }
+    return plan
+  }
+
+  // The plan with its terms, each with the variant and product that sell it
   async getPlan(id: number) {
     return (
       (await this.db.query.membershipPlans.findFirst({
         where: eq(membershipPlans.id, id),
-        with: { terms: true },
+        with: {
+          terms: {
+            with: { variant: { with: { product: { columns: { id: true, name: true } } } } },
+            orderBy: asc(membershipTerms.months),
+          },
+        },
       })) ?? null
     )
   }
 
-  async listPlans() {
-    return await this.db.query.membershipPlans.findMany({
-      with: { terms: true },
-      orderBy: [membershipPlans.program, desc(membershipPlans.rank)],
-    })
+  // By program, then highest rank first, each with its number of terms
+  async listPlans<F extends PlanFilter = {}>(filter?: Exact<F, PlanFilter>) {
+    const where: SQL[] = []
+    if (filter?.q) {
+      const like = `%${filter.q}%`
+      where.push(or(ilike(membershipPlans.name, like), ilike(membershipPlans.slug, like), ilike(membershipPlans.program, like))!)
+    }
+    if (filter?.isActive !== undefined) {
+      where.push(eq(membershipPlans.isActive, filter.isActive))
+    }
+    const query = this.db
+      .select({
+        id: membershipPlans.id,
+        name: membershipPlans.name,
+        slug: membershipPlans.slug,
+        program: membershipPlans.program,
+        rank: membershipPlans.rank,
+        description: membershipPlans.description,
+        isActive: membershipPlans.isActive,
+        // Written out: in a one-table select, Drizzle leaves column names unqualified
+        termCount: sql<number>`(SELECT count(*)::int FROM "membership_term" WHERE "membership_term"."planId" = "membership_plan"."id")`,
+      })
+      .from(membershipPlans)
+      .where(and(...where))
+      .orderBy(asc(membershipPlans.program), desc(membershipPlans.rank), asc(membershipPlans.name))
+      .$dynamic()
+    return await paginate(
+      filter as F | undefined,
+      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
+      () => this.db.$count(membershipPlans, and(...where)),
+    )
+  }
+
+  // Memberships, latest start first, each with its plan and `state`
+  async list<F extends MembershipFilter = {}>(filter?: Exact<F, MembershipFilter>) {
+    const where: SQL[] = []
+    if (filter?.userId) where.push(eq(memberships.userId, filter.userId))
+    if (filter?.userIds) where.push(inArray(memberships.userId, filter.userIds.length ? filter.userIds : ['']))
+    if (filter?.planId) where.push(eq(memberships.planId, filter.planId))
+    if (filter?.state) where.push(sql`${membershipState} = ${filter.state}`)
+    return await paginate(
+      filter as F | undefined,
+      (page) =>
+        this.db.query.memberships.findMany({
+          where: and(...where),
+          with: { plan: { columns: { id: true, name: true, program: true, rank: true } } },
+          extras: { state: membershipState.as('state') },
+          orderBy: [desc(memberships.startsAt), desc(memberships.id)],
+          ...page,
+        }),
+      () => this.db.$count(memberships, and(...where)),
+    )
   }
 
   // Makes the variant sell the plan for that many months

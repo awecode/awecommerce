@@ -135,3 +135,70 @@ test('only a signed-in buyer can order a membership', async () => {
   await carts.addToCart(memberCart.id, product.variants[0].id, 1)
   expect((await new OrderService(db).createFromCart(memberCart.id)).lines).toHaveLength(1)
 })
+
+test('plans list by program and rank, with search, pages and their terms', async () => {
+  const program = unique('films')
+  const basic = await plan(program, 1, unique('Basic'))
+  const premium = await plan(program, 2, unique('Premium'))
+  const slug = unique('films-year')
+  const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '50', stockQuantity: 0 })
+  await service.addTerm({ planId: premium.id, variantId: product.variants[0].id, months: 12 })
+
+  const found = await service.listPlans({ q: program, pagination: { page: 1, size: 10 } })
+  expect(found.results.map((p) => [p.id, p.termCount])).toEqual([[premium.id, 1], [basic.id, 0]])
+  expect(found.pagination.total).toBe(2)
+  await service.updatePlan(basic.id, { isActive: false })
+  expect((await service.listPlans({ q: program, isActive: true })).map((p) => p.id)).toEqual([premium.id])
+
+  const shown = await service.getPlan(premium.id)
+  expect(shown!.terms[0]).toMatchObject({ months: 12, variant: { sku: slug, product: { name: slug } } })
+})
+
+test('a plan with memberships cannot be deleted; one without can', async () => {
+  const used = await plan(unique('music'), 1)
+  await service.grant({ userId: unique('member'), planId: used.id, months: 1 })
+  await expect(service.deletePlan(used.id)).rejects.toThrow()
+  const unused = await plan(unique('music'), 1)
+  expect((await service.deletePlan(unused.id)).id).toBe(unused.id)
+  expect(await service.getPlan(unused.id)).toBeNull()
+  await expect(service.deletePlan(unused.id)).rejects.toThrow(`Membership plan not found: ${unused.id}`)
+})
+
+test('lists memberships with their state, by person, plan and state', async () => {
+  const userId = unique('member')
+  const music = await plan(unique('music'), 1)
+  const movies = await plan(unique('movies'), 1)
+  const running = await service.grant({ userId, planId: music.id, months: 1 })
+  const renewal = await service.grant({ userId, planId: music.id, months: 1 })
+  const cancelled = await service.grant({ userId, planId: movies.id, months: 1 })
+  await service.cancel(cancelled.id, 'Asked to leave')
+  const ended = await service.grant({ userId, planId: movies.id, months: 1 })
+  await db.update(memberships).set({ startsAt: '2020-01-01T00:00:00Z', endsAt: '2020-02-01T00:00:00Z' }).where(eq(memberships.id, ended.id))
+
+  const states = new Map((await service.list({ userId })).map((m) => [m.id, m.state]))
+  expect(Object.fromEntries(states)).toEqual({
+    [running.id]: 'active',
+    [renewal.id]: 'upcoming',
+    [cancelled.id]: 'cancelled',
+    [ended.id]: 'ended',
+  })
+  expect((await service.list({ userIds: [userId], state: 'upcoming' })).map((m) => m.id)).toEqual([renewal.id])
+  const page = await service.list({ userId, planId: movies.id, pagination: { page: 1, size: 1 } })
+  expect(page.pagination.total).toBe(2)
+  expect(page.results[0].plan.name).toBe(movies.name)
+  expect(await service.list({ userIds: [] })).toEqual([])
+})
+
+test('a term of a plan turned off is no longer sold', async () => {
+  const music = await plan(unique('music'), 1)
+  const slug = unique('membership-product')
+  const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '99', stockQuantity: 10, status: 'Published' })
+  await service.addTerm({ planId: music.id, variantId: product.variants[0].id, months: 12 })
+  await service.updatePlan(music.id, { isActive: false })
+  const carts = new CartService(db)
+  const cart = await carts.create(unique('member'))
+  await carts.addToCart(cart.id, product.variants[0].id, 1)
+
+  expect((await carts.getCartSummary(cart.sessionId)).lines[0].isAvailable).toBe(false)
+  await expect(new OrderService(db).createFromCart(cart.id)).rejects.toThrow(`Product variant is not available: ${slug}`)
+})
