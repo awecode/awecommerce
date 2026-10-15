@@ -55,7 +55,7 @@ describe.skipIf(!url)('storefront shell', async () => {
   test('the cart button shows how many items the cart holds', async () => {
     const { variants } = await product()
     const page = await createPage('/')
-    expect(await page.getByRole('link', { name: 'Cart', exact: true }).count()).toBe(1)
+    expect(await page.getByRole('button', { name: 'Cart', exact: true }).count()).toBe(1)
 
     await page.evaluate(async (variantId) => {
       await fetch('/api/store/cart/lines', {
@@ -65,7 +65,7 @@ describe.skipIf(!url)('storefront shell', async () => {
       })
     }, variants[0]!.id)
     await page.reload()
-    await page.getByRole('link', { name: 'Cart, 2 items' }).waitFor()
+    await page.getByRole('button', { name: 'Cart, 2 items' }).waitFor()
   })
 
   test('signed out shows Sign in; signed in shows the account menu', async () => {

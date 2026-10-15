@@ -374,26 +374,15 @@ class CartService {
           with: lineVariant,
           orderBy: asc(cartLines.createdAt),
         },
-        appliedVoucherOffers: {
-          with: {
-            offer: {
-              with: {
-                benefit: true,
-                condition: true,
-              },
-            },
-          },
-        },
       },
       where: eq(carts.sessionId, sessionId),
     })
     if(!content) {
       throw new NotFoundError(`Cart not found for session: ${sessionId}`)
     }
-    const {appliedVoucherOffers, ...rest} = content
     let cartContent: CartContent = {
-      ...rest,
-      lines: rest.lines.map((line) => ({
+      ...content,
+      lines: content.lines.map((line) => ({
         ...withLineVariant(line),
         siteOfferDiscounts: [],
         userOfferDiscounts: [],
@@ -415,6 +404,14 @@ class CartService {
       }
       cartContent = await this.db.transaction(async (tx) => {
         let content = cartContent
+        // Locked, and the vouchers read after it, so reads of the same cart
+        // re-apply its vouchers one at a time. Otherwise a read could clear
+        // them while another re-applies them, and answer without them.
+        await tx.select({ id: carts.id }).from(carts).where(eq(carts.id, content.id)).for('update')
+        const appliedVoucherOffers = await tx.query.cartAppliedVoucherOffers.findMany({
+          with: { offer: { with: { benefit: true, condition: true } } },
+          where: eq(cartAppliedVoucherOffers.cartId, content.id),
+        })
         await new CartService(tx).resetAppliedVoucherOffers(content.id)
         for (const appliedOffer of appliedVoucherOffers) {
           try {

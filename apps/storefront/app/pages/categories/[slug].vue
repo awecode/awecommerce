@@ -2,7 +2,7 @@
 // A category's products, its subcategories' included, with links to the
 // subcategories
 const route = useRoute()
-const { data: categories } = await useFetch('/api/store/categories', { key: 'categories' })
+const { data: categories } = await useCategories()
 const category = computed(() => categories.value?.find((c) => c.slug === route.params.slug))
 if (!category.value) {
   throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })

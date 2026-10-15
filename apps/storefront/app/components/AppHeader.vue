@@ -2,11 +2,11 @@
 import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
 
 // The shop's header: name or logo, the category menu (in a drawer on small
-// screens), search, the account menu and the cart
+// screens), search, the account menu and the cart button (opens the drawer)
 const { store } = useAppConfig()
 const { data: settings } = useStoreSettings()
 const menu = useCategoryMenu()
-const { count } = useCart()
+const { count, drawerOpen } = useCart()
 const { user, signOut } = useAuth()
 
 const storeName = computed(() => settings.value?.name || 'Store')
@@ -63,7 +63,7 @@ const accountItems = computed<DropdownMenuItem[][]>(() => [
       </UDropdownMenu>
       <UButton v-else icon="i-lucide-user" color="neutral" variant="ghost" to="/login" aria-label="Sign in" />
       <UChip :text="count" :show="count > 0" size="3xl" color="primary" inset>
-        <UButton icon="i-lucide-shopping-bag" color="neutral" variant="ghost" to="/cart" :aria-label="count ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'" />
+        <UButton icon="i-lucide-shopping-bag" color="neutral" variant="ghost" :aria-label="count ? `Cart, ${count} item${count === 1 ? '' : 's'}` : 'Cart'" @click="drawerOpen = true" />
       </UChip>
     </template>
 

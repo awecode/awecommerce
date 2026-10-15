@@ -208,7 +208,7 @@ A line with `isAvailable: false` is no longer for sale (its variant is inactive 
 
 Each line also has `stockLeft` (what is left of its variant, or `null` when stock is not counted) and `isInStock`, false when the cart holds more of the variant, over all its lines, than is left. Checkout fails with `OutOfStockError` until the buyer lowers the quantity (see Stock).
 
-It does not place an order, use up offers, or redeem points (`redeemPoints` only previews their value, with the same checks as checkout). Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied.
+It does not place an order, use up offers, or redeem points (`redeemPoints` only previews their value, with the same checks as checkout). Like reading the cart with offers, it re-applies the cart's vouchers and drops any that can no longer be applied. Re-applying locks the cart for a moment, so reads of the same cart at the same time each see its vouchers.
 
 ### Stock
 

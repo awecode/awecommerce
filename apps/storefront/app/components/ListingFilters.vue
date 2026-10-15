@@ -4,7 +4,7 @@
 defineProps<{ brandFilter?: boolean }>()
 
 const route = useRoute()
-const { data: brands } = await useFetch('/api/store/brands', { key: 'brands' })
+const { data: brands } = await useBrands()
 
 const param = (name: string) => (route.query[name] as string | undefined) || undefined
 const setQuery = (changes: Record<string, string | undefined>) =>

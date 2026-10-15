@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A brand's products
 const route = useRoute()
-const { data: brands } = await useFetch('/api/store/brands', { key: 'brands' })
+const { data: brands } = await useBrands()
 const brand = computed(() => brands.value?.find((b) => b.slug === route.params.slug))
 if (!brand.value) {
   throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })

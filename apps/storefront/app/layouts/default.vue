@@ -5,5 +5,6 @@
       <slot />
     </main>
     <AppFooter />
+    <CartDrawer />
   </div>
 </template>

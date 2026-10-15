@@ -1,6 +1,13 @@
-// The store's name, currency and locale, fetched once per page load and
-// shared by every caller
-export const useStoreSettings = () => useFetch('/api/store/settings', { key: 'store-settings' })
+// Data many components need on one page is fetched once, under one key: a
+// later caller waits for the request in flight (`defer`) instead of
+// cancelling it and fetching again.
+
+// The store's name, currency and locale
+export const useStoreSettings = () => useFetch('/api/store/settings', { key: 'store-settings', dedupe: 'defer' })
+
+// Categories and brands with products the store shows
+export const useCategories = () => useFetch('/api/store/categories', { key: 'categories', dedupe: 'defer' })
+export const useBrands = () => useFetch('/api/store/brands', { key: 'brands', dedupe: 'defer' })
 
 // Formats a price (a decimal string, as the API sends it) in the store's
 // currency and locale. Empty for no price.
@@ -16,7 +23,7 @@ export const useMoney = () => {
 // The shop's menu: top-level categories with their subcategories. Only
 // categories with products the store shows are listed.
 export const useCategoryMenu = () => {
-  const { data } = useFetch('/api/store/categories', { key: 'categories' })
+  const { data } = useCategories()
   return computed(() => {
     const categories = data.value ?? []
     return categories

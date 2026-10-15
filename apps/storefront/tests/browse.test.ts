@@ -127,8 +127,9 @@ describe.skipIf(!url)('browsing', async () => {
     await page.getByText('Enter Monogram').waitFor()
     await page.getByLabel('Monogram').fill('ABC')
     await page.getByRole('button', { name: 'Add to cart' }).click()
-    await page.getByText('Added to your cart').first().waitFor()
-    await page.getByRole('link', { name: 'Cart, 1 item' }).waitFor()
+    await page.getByRole('dialog', { name: 'Your cart (1)' }).waitFor()
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Cart, 1 item' }).waitFor()
   })
 
   test('the product page has its SEO tags, JSON-LD and related products', async () => {

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 // A product: its images, the variant picked by option (kept in the URL as
 // `variant`, so a link opens the same one), stock, the buyer's answers to its
-// fields, and adding it to the cart. Also its SEO tags and Product JSON-LD.
+// fields, and adding it to the cart (which opens the cart drawer). Also its SEO tags and Product JSON-LD.
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const { store } = useAppConfig()
 const { data: settings } = useStoreSettings()
-const { refresh: refreshCart } = useCart()
+const { add: addToCart, drawerOpen } = useCart()
 
 const { data: product, error } = await useFetch(() => `/api/store/products/${route.params.slug}`)
 if (error.value || !product.value) {
@@ -82,20 +82,10 @@ const add = async () => {
   adding.value = true
   try {
     const customizations = Object.fromEntries(Object.entries(answers).filter(([, value]) => value.trim()))
-    await $fetch('/api/store/cart/lines', {
-      method: 'POST',
-      body: { variantId: variant.value.id, quantity: quantity.value, customizations },
-    })
-    await refreshCart()
-    toast.add({
-      title: 'Added to your cart',
-      description: product.value!.name,
-      icon: 'i-lucide-check',
-      actions: [{ label: 'View cart', to: '/cart', color: 'neutral', variant: 'outline' }],
-    })
+    await addToCart(variant.value.id, quantity.value, customizations)
+    drawerOpen.value = true
   } catch (error) {
-    const message = (error as { data?: { message?: string } }).data?.message
-    toast.add({ title: 'Could not add to your cart', description: message, color: 'error', icon: 'i-lucide-circle-alert' })
+    toast.add({ title: 'Could not add to your cart', description: cartErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
   } finally {
     adding.value = false
   }
