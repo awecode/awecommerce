@@ -52,10 +52,15 @@ pnpm dev:backoffice   # backoffice only
 - **Look:** an editorial theme, near-black on warm white with stone greys, Fraunces for headings and prices and Inter for text (both bundled). Light only. The colours are at the top of `app/assets/css/main.css` and in `app/app.config.ts`.
 - **Content without an admin screen yet** is in `app/app.config.ts` under `store`: `logo` (an image URL; the store name is shown without one), `tagline`, the default `description`, the home page `hero` (title, text, image, button) and the footer's `links`. The store's name, currency and locale come from the store settings (`/api/store/settings`).
 - **Layout** (`app/layouts/default.vue`): the header has the name or logo, the category menu (top-level categories with a panel of their subcategories; a drawer on small screens), search (a dialog that goes to `/search?q=`), the account menu or Sign in, and the cart with its item count. The footer lists the top-level categories and the configured links.
+- **Pages:**
+  - `/`: the hero, shop by category (top-level categories, with their logo when set), then featured products and best sellers (the product flags).
+  - `/categories/:slug` (its subcategories' products too, with links to them), `/brands/:slug` and `/search?q=`: a product grid with brand and price filters, sorting (newest, price up or down) and pages, all in the URL (`brands`, `minPrice`, `maxPrice`, `sort`, `page`). Filters sit beside the grid on wide screens and in a drawer on small ones. Search results are `noindex`.
+  - `/products/:slug`: images, the price (sale price struck through), option pickers (sold-out values crossed out; the picked variant is kept in the URL as `?variant=`), stock (`In stock`, `Only 3 left`, `Sold out`), the buyer's answers to the product's fields, quantity and Add to cart, the description and specification, and related products. Its tags include the product image and `og:type` product, and Product JSON-LD (an `Offer`, or an `AggregateOffer` for several prices).
+  - Unknown categories, brands and products give a real 404, shown by `app/error.vue`.
 - **Composables:** `useStoreSettings()`, `useMoney()` (prices in the store's currency and locale), `useCategoryMenu()` and `useCart()` (the cart summary and its item count).
 - **SEO defaults** (`app/app.vue`): titles as `Page · Store`, the default description, Open Graph and Twitter tags, `<html lang>` from the store's locale, and a canonical link without the query, built from `NUXT_PUBLIC_SITE_URL` (the request's address when unset).
 
-`pnpm test:storefront` runs its browser tests, like the backoffice's (same Chromium setup).
+`pnpm test:storefront` runs its browser tests, like the backoffice's (same Chromium setup), one file at a time, as some change the store settings that others check prices against.
 
 ## Sign-in
 
@@ -81,7 +86,7 @@ Buyers see, and can buy, only listed products: active and `Published`, with an a
 | Route | Does |
 |---|---|
 | `GET /api/store/products` | One page of products, each with `inStock`. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc` or `priceDesc`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
-| `GET /api/store/products/:slug` | A product with its active variants (each with `inStock`), options, images and listed related products |
+| `GET /api/store/products/:slug` | A product with its active variants (each with `inStock`), options, images and listed related products (as product list rows, with prices and stock, for product cards) |
 | `GET /api/store/settings` | The store's `name`, `currency` and `locale`, for showing prices |
 | `GET /api/store/categories` | Active categories with a listed product in them or below them, each with its `parent`. Categories under an inactive category are left out. |
 | `GET /api/store/brands` | Active brands with a listed product |
