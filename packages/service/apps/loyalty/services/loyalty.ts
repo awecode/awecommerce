@@ -68,6 +68,11 @@ class LoyaltyService {
         userId,
         orderId,
         earnedPoints: earnedPoints.toString(),
+        // Set when the points are earned; changing the setting later does
+        // not move it
+        expiresAt: settings.expiresAfterInDays
+          ? new Date(Date.now() + settings.expiresAfterInDays * 86_400_000)
+          : null,
       })
       await loyaltyService.createLog({
         userId,

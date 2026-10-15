@@ -16,6 +16,7 @@ describe.skipIf(!url)('settings', async () => {
   afterAll(async () => {
     await store.updateSettings({ name: '', currency: 'USD', locale: 'en-US' })
     await tax.updateSettings({ pricesIncludeTax: false, defaultRate: '0', taxShipping: false })
+    await new LoyaltyService(db).updateSettings({ isEnabled: false, earnRate: null, redeemRate: null, expiresAfterInDays: null })
   })
 
   const open = async (path: string) => {
@@ -25,10 +26,10 @@ describe.skipIf(!url)('settings', async () => {
     return page
   }
 
-  test('the sidebar has a Settings group with store, tax and shipping', async () => {
+  test('the sidebar has a Settings group with store, tax, shipping and loyalty', async () => {
     const page = await open('/products')
     const nav = page.getByRole('navigation').first()
-    for (const [label, path] of [['Store', '/settings/store'], ['Tax', '/settings/tax'], ['Shipping', '/settings/shipping']]) {
+    for (const [label, path] of [['Store', '/settings/store'], ['Tax', '/settings/tax'], ['Shipping', '/settings/shipping'], ['Loyalty', '/settings/loyalty']]) {
       expect(await nav.getByRole('link', { name: label, exact: true }).getAttribute('href')).toBe(path)
     }
   })
@@ -90,6 +91,31 @@ describe.skipIf(!url)('settings', async () => {
     await page.getByLabel('Default tax rate').fill('thirteen')
     await page.getByRole('button', { name: /^Save/ }).click()
     await page.getByText('Enter a rate, such as 13 or 12.5').waitFor()
+  })
+
+  test('turns loyalty on with its rates and expiry, with an example', async () => {
+    const loyalty = new LoyaltyService(db)
+    await loyalty.updateSettings({ isEnabled: false, earnRate: null, redeemRate: null, expiresAfterInDays: null })
+    await store.updateSettings({ currency: 'USD', locale: 'en-US' })
+    const page = await open('/settings/loyalty')
+    await page.getByRole('switch', { name: 'Loyalty points' }).click()
+    await page.getByLabel('Points per amount spent').fill('1')
+    await page.getByTestId('loyalty-example').getByText('Spending $100.00 earns 100 points, which cannot be redeemed yet.').waitFor()
+    await page.getByLabel('Value of one point').fill('0.01')
+    await page.getByTestId('loyalty-example').getByText('Spending $100.00 earns 100 points, worth $1.00 at checkout.').waitFor()
+    await page.getByLabel('Points expire after').fill('365')
+    await page.keyboard.press('ControlOrMeta+s')
+
+    await page.getByText('Loyalty settings saved').first().waitFor()
+    const saved = await loyalty.getSettings()
+    expect(saved).toMatchObject({ isEnabled: true, expiresAfterInDays: 365 })
+    expect([Number(saved.earnRate), Number(saved.redeemRate)]).toEqual([1, 0.01])
+
+    // Emptied, a rate is cleared
+    await page.getByLabel('Value of one point').fill('')
+    await page.getByRole('button', { name: /^Save/ }).click()
+    await page.getByText('Loyalty settings saved').first().waitFor()
+    await expect.poll(async () => (await loyalty.getSettings()).redeemRate).toBeNull()
   })
 
   test('adds, edits and deletes shipping methods', async () => {
