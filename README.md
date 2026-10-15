@@ -59,6 +59,8 @@ pnpm dev:backoffice   # backoffice only
   - Unknown categories, brands and products give a real 404, shown by `app/error.vue`.
   - The cart drawer slides in after Add to cart and from the header's cart button: the lines (quantity and Remove), the subtotal and discounts, Checkout and View cart.
   - `/cart`: the lines with their options and answers, quantity and Remove; warnings that block checkout (no longer for sale, more than in stock, product fields changed); vouchers; and the summary (subtotal, offer and voucher discounts, tax, total). `noindex`.
+  - `/checkout`: one page with contact (guests give name and email; members see who they are signed in as), the delivery address (members pick a saved one or add a new one, saved after the order is placed), the delivery method (the cheapest first), loyalty points (members, previewed in the total) and payment (Pay on delivery), beside the summary. The order is placed for the total shown: if it changed, the new total is shown to confirm; stock, voucher and availability problems link back to the cart.
+  - `/orders/:id?hash=`: the confirmation after checkout (the link works for whoever has it), with the address, delivery, payment, items and totals. Without the hash, it is the signed-in owner's order page.
 - **Composables:** `useStoreSettings()`, `useMoney()` (prices in the store's currency and locale), `useCategories()`, `useBrands()`, `useCategoryMenu()` and `useCart()` (the cart summary, its item count, the drawer's state, and `add`, `setQuantity`, `remove`, `applyVoucher` and `removeVoucher`, which store the summary the API answers with). Shared data is fetched once per page under one key (`dedupe: 'defer'`).
 - **SEO defaults** (`app/app.vue`): titles as `Page · Store`, the default description, Open Graph and Twitter tags, `<html lang>` from the store's locale, and a canonical link without the query, built from `NUXT_PUBLIC_SITE_URL` (the request's address when unset).
 
@@ -117,7 +119,7 @@ Adding more than is in stock, or raising a quantity past it, gives 409 with `dat
 | Route | Body | Does |
 |---|---|---|
 | `GET /api/store/shipping-methods` | | The shipping methods |
-| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress or shippingAddressId, guestUser?, redeemPoints? }` | Places the order and clears the cart cookie. Returns the order with its `hash`. |
+| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress or shippingAddressId, guestUser?, redeemPoints?, paymentMethod? }` | Places the order and clears the cart cookie. Returns the order with its `hash`. `paymentMethod` is `pay_on_delivery` (the default and, for now, the only one), stored as the order's `metadata.paymentMethod`. |
 | `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page, for whoever holds the link. A wrong hash gives 404. |
 
 - `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.

@@ -42,6 +42,10 @@ export const checkoutSchema = z
     guestUser: guestUserSchema.optional(),
     // Loyalty points to redeem (signed in only)
     redeemPoints: z.number().positive().optional(),
+    // How the buyer pays. Only paying the courier on delivery for now; card
+    // and other gateways will add their own. Stored as the order's
+    // `metadata.paymentMethod`.
+    paymentMethod: z.enum(['pay_on_delivery']).default('pay_on_delivery'),
   })
   .refine(
     (body) => (body.shippingAddress === undefined) !== (body.shippingAddressId === undefined),

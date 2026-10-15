@@ -53,7 +53,8 @@ describe.skipIf(!url)('store checkout API', async () => {
     expect(Number(placed.body.total)).toBe(95)
     expect(placed.body.shippingAddress).toEqual(shippingAddress)
     expect(placed.body.guestUser).toEqual(guestUser)
-    expect(placed.body.metadata).toBeNull()
+    // The only payment method for now, recorded on the order
+    expect(placed.body.metadata).toEqual({ paymentMethod: 'pay_on_delivery' })
     expect(placed.body.lines).toHaveLength(1)
     // The cookie is cleared and the cart is closed
     expect(placed.setCookie).toMatch(/^awe_cart=;/)
@@ -150,6 +151,16 @@ describe.skipIf(!url)('store checkout API', async () => {
       reason: 'Missing required field: Initials',
     })
     expect((await request('/api/store/cart')).status).toBe(200)
+  })
+
+  test('refuses a payment method the store does not offer', async () => {
+    const { request } = await buyerWithCart()
+    const summary = await request('/api/store/cart')
+    const placed = await request('/api/store/checkout', {
+      method: 'POST',
+      body: { expectedTotal: summary.body.total, shippingAddress, guestUser, paymentMethod: 'card' },
+    })
+    expect(placed.status).toBe(400)
   })
 
   test('maps bad requests to 400, 404 and 422', async () => {

@@ -4,7 +4,7 @@ import { ShippingAddressService } from '@awecommerce/service/apps/order/services
 // Places the order for the buyer's cart. Prices, offers and shipping are read
 // from the database; the buyer's confirmed total only has to match them.
 export default defineServiceHandler(async (event) => {
-  const { shippingAddressId, guestUser, ...body } = await readValidatedBody(event, checkoutSchema.parse)
+  const { shippingAddressId, guestUser, paymentMethod, ...body } = await readValidatedBody(event, checkoutSchema.parse)
   const user = await getUser(event)
   if (!user && !guestUser) {
     throw createError({ statusCode: 400, statusMessage: 'Bad Request', message: 'guestUser is required when not signed in' })
@@ -32,6 +32,7 @@ export default defineServiceHandler(async (event) => {
     shippingAddress,
     // A signed-in buyer is the order's user; the guest details are not needed
     guestUser: user ? undefined : guestUser,
+    metadata: { paymentMethod },
   })
   forgetCart(event)
   return order
