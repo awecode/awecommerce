@@ -1,4 +1,6 @@
+import { eq } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
+import { productClasses } from '@awecommerce/service/apps/product/schemas'
 import { BrandService, CategoryService, ProductService } from '@awecommerce/service/apps/product/services/product'
 import { STAFF_EMAIL, setupBackoffice, signedInPage, url } from './helpers'
 
@@ -72,6 +74,23 @@ describe.skipIf(!url)('catalog screens', async () => {
 
     await page.getByText(`${brand.name} deactivated`).first().waitFor()
     await page.getByRole('row', { name: new RegExp(brand.name) }).getByText('Inactive').waitFor()
+  })
+
+  test('a product class can be one that is not shipped', async () => {
+    const page = await openScreen('/catalog/product-classes')
+    const name = `E-books ${Date.now()}`
+
+    await page.getByRole('button', { name: 'New product class' }).click()
+    await page.getByLabel('Name').fill(name)
+    await page.getByLabel('Tax rate (%)').fill('5')
+    await page.getByRole('switch', { name: /Ships to the buyer/ }).click()
+    await page.getByRole('button', { name: /^Save/ }).click()
+
+    await page.getByText(`Created ${name}`).first().waitFor()
+    const [saved] = await db.select().from(productClasses).where(eq(productClasses.name, name))
+    expect(saved!.requiresShipping).toBe(false)
+    await page.getByPlaceholder(/^Search/).fill(name)
+    await page.getByRole('row', { name: new RegExp(name) }).getByText('Not shipped').waitFor()
   })
 
   test('closing with unsaved changes asks first', async () => {

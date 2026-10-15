@@ -99,6 +99,13 @@
       "when": 1792003153498,
       "tag": "0013_order_line_stock_taken",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792051881637,
+      "tag": "0014_digital_products",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,8 @@
 // the subject, an HTML message in the magic-link mail's style, and its plain
 // text. Sent by sendOrderEmail (server/utils/orderEmails.ts).
 
+import type { FulfillmentNote } from './utils/fulfillment'
+
 export type OrderEmailKind = 'placed' | 'shipped' | 'cancelled'
 
 export type OrderEmailOrder = {
@@ -9,11 +11,14 @@ export type OrderEmailOrder = {
   total: string
   cancellationReason?: string | null
   lines: {
+    id: number
     productName: string
     options: { name: string; value: string }[]
     quantity: number
     price: string | null
     discount: string
+    // The line's fulfilment note, in the placed email
+    note?: FulfillmentNote | null
   }[]
 }
 
@@ -61,10 +66,15 @@ export const orderEmailContent = (
       options: line.options.map((o) => `${o.name}: ${o.value}`).join(', '),
       quantity: line.quantity,
       amount: money((Number(line.price ?? 0) - Number(line.discount)) * line.quantity),
+      note: line.note,
     }))
+    const noteHtml = (note: FulfillmentNote) =>
+      `<br><span style="font-size: 14px;"><strong>${escape(note.title)}</strong><br><span style="color: #bbbbbb;">${escape(note.text)}</span>${note.link ? `<br><a href="${escape(note.link.url)}" style="color: #ffffff;" target="_blank">${escape(note.link.label)}</a>` : ''}</span>`
+    const noteText = (note: FulfillmentNote) =>
+      [`  ${note.title}: ${note.text}`, ...(note.link ? [`  ${note.link.label}: ${note.link.url}`] : [])]
     const rows = lines
       .map((line) => `            <tr>
-              <td style="padding: 8px 0; border-bottom: 1px solid #333333;">${escape(line.name)}${line.options ? `<br><span style="color: #868686; font-size: 14px;">${escape(line.options)}</span>` : ''}</td>
+              <td style="padding: 8px 0; border-bottom: 1px solid #333333;">${escape(line.name)}${line.options ? `<br><span style="color: #868686; font-size: 14px;">${escape(line.options)}</span>` : ''}${line.note ? noteHtml(line.note) : ''}</td>
               <td style="padding: 8px 12px; border-bottom: 1px solid #333333; text-align: center;">× ${line.quantity}</td>
               <td style="padding: 8px 0; border-bottom: 1px solid #333333; text-align: right; white-space: nowrap;">${escape(line.amount)}</td>
             </tr>`)
@@ -86,7 +96,10 @@ ${rows}
       text: [
         `Thank you for your order. Order ${number} is placed.`,
         '',
-        ...lines.map((line) => `${line.name}${line.options ? ` (${line.options})` : ''} × ${line.quantity}: ${line.amount}`),
+        ...lines.flatMap((line) => [
+          `${line.name}${line.options ? ` (${line.options})` : ''} × ${line.quantity}: ${line.amount}`,
+          ...(line.note ? noteText(line.note) : []),
+        ]),
         `Total: ${money(order.total)}`,
         '',
         `View your order: ${link}`,

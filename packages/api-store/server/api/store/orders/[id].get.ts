@@ -5,6 +5,7 @@ import { OrderService } from '@awecommerce/service/apps/order/services/order'
 // - With the hash from checkout: for whoever holds the link, signed in or not.
 // - Without it: only for its signed-in owner (401 when signed out).
 // A wrong hash, or someone else's order, looks the same as a missing order.
+// Each line has the fulfilment `note` for the buyer, or null.
 export default defineServiceHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, z.object({ id: z.coerce.number().int() }).parse)
   const { hash } = await getValidatedQuery(event, z.object({ hash: z.string().optional() }).parse)
@@ -16,5 +17,6 @@ export default defineServiceHandler(async (event) => {
   if (!order) {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Order not found' })
   }
-  return order
+  const notes = await fulfillmentNotes(order.id)
+  return { ...order, lines: order.lines.map((line) => ({ ...line, note: notes.get(line.id) ?? null })) }
 })

@@ -15,7 +15,9 @@ const schema = { ...librarySchema, ...authSchema }
 
 // Builds and starts the layer as a Nuxt app, and connects the tests to its
 // database. Call at the top of a describe block.
-export const setupAdminApi = async () => {
+// `rootDir`: another app to build, relative to the tests (such as
+// 'fulfillment-app', with the test fulfilment hooks)
+export const setupAdminApi = async ({ rootDir = '..' } = {}) => {
   // The built server reads these
   process.env.NUXT_POSTGRES_URL = url
   process.env.BETTER_AUTH_URL = 'http://localhost:3000'
@@ -24,7 +26,7 @@ export const setupAdminApi = async () => {
   process.env.ORDER_HASH_SECRET = 'test-secret'
   ses = await startFakeSes()
   bucket = await startFakeS3()
-  await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
+  await setup({ rootDir: fileURLToPath(new URL(rootDir, import.meta.url)) })
 
   const pool = new pg.Pool({ connectionString: url })
   afterAll(() => pool.end())

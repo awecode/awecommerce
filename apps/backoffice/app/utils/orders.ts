@@ -38,6 +38,11 @@ export const nextStep: Partial<Record<OrderStatus, { status: OrderStatus; label:
   Shipped: { status: 'Delivered', label: 'Mark delivered' },
   Delivered: { status: 'Completed', label: 'Complete' },
 }
+// For an order with nothing to ship (digital goods): confirm, then complete
+export const unshippedNextStep: Partial<Record<OrderStatus, { status: OrderStatus; label: string }>> = {
+  Pending: { status: 'Confirmed', label: 'Confirm order' },
+  Confirmed: { status: 'Completed', label: 'Complete' },
+}
 
 export const paymentColor: Record<string, Color> = { Pending: 'warning', Paid: 'success', Refunded: 'neutral' }
-export const paymentMethods: Record<string, string> = { pay_on_delivery: 'Pay on delivery' }
+export const paymentMethods: Record<string, string> = { pay_on_delivery: 'Pay on delivery', pay_later: 'Pay later' }

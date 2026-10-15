@@ -44,6 +44,9 @@ export const productClasses = pgTable('product_class', {
   slug: text().notNull().unique(),
   description: text(),
   trackStock: boolean().default(true),
+  // Whether products of this class are shipped to the buyer. A cart with only
+  // products that are not (digital goods) needs no address or shipping.
+  requiresShipping: boolean().notNull().default(true),
   // Tax percentage for products of this class; empty uses the store default
   taxRate: numeric({ precision: 100, scale: 20 }),
   isActive: boolean().default(true),

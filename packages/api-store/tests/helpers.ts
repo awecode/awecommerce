@@ -14,14 +14,16 @@ export const url = process.env.TEST_POSTGRES_URL
 
 // Builds and starts the layer as a Nuxt app, and connects the tests to its
 // database. Call at the top of a describe block.
-export const setupApi = async () => {
+// `rootDir`: another app to build, relative to the tests (such as
+// 'fulfillment-app', with the test fulfilment hooks)
+export const setupApi = async ({ rootDir = '..' } = {}) => {
   // The built server reads these
   process.env.NUXT_POSTGRES_URL = url
   process.env.ORDER_HASH_SECRET = 'test-secret'
   process.env.BETTER_AUTH_URL = 'http://localhost:3000'
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   ses = await startFakeSes()
-  await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
+  await setup({ rootDir: fileURLToPath(new URL(rootDir, import.meta.url)) })
 
   const pool = new pg.Pool({ connectionString: url })
   afterAll(() => pool.end())

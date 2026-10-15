@@ -81,7 +81,7 @@ const remove = async (voucherCode: string) => {
           </div>
           <div class="flex justify-between text-muted">
             <dt>Shipping</dt>
-            <dd>At checkout</dd>
+            <dd>{{ cart.requiresShipping ? 'At checkout' : 'Nothing to ship' }}</dd>
           </div>
           <div v-if="!cart.pricesIncludeTax" class="flex justify-between">
             <dt>Tax</dt>

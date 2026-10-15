@@ -111,6 +111,8 @@ const productClassFields = z.object({
   slug: text,
   description: optionalText,
   trackStock: z.boolean().optional(),
+  // False for digital goods: an order of only those takes no address or shipping
+  requiresShipping: z.boolean().optional(),
   // Tax percentage for its products; empty uses the store default
   taxRate: decimal.nullable().optional(),
   isActive: z.boolean().optional(),

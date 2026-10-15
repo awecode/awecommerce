@@ -47,7 +47,9 @@ const cancel = async () => {
 
 const status = computed(() => order.value?.status as OrderStatus | undefined)
 const open = computed(() => status.value && status.value !== 'Cancelled')
-const next = computed(() => (status.value ? nextStep[status.value] : undefined))
+// False when no line is shipped (digital goods): no delivery, and a shorter path
+const ships = computed(() => (order.value?.lines ?? []).some((line) => line.requiresShipping))
+const next = computed(() => (status.value ? (ships.value ? nextStep : unshippedNextStep)[status.value] : undefined))
 const menu = computed<DropdownMenuItem[][]>(() => [
   orderStatuses
     .filter((s) => s !== status.value && s !== next.value?.status)
@@ -157,7 +159,7 @@ const phone = computed(() => (order.value?.guestUser as { phone?: string } | nul
                   <dd class="tabular-nums whitespace-nowrap">−{{ money(offer.discount) }}</dd>
                 </div>
                 <div v-if="Number(order.loyaltyDiscount) > 0" class="flex justify-between"><dt class="text-muted">Points</dt><dd class="tabular-nums">−{{ money(order.loyaltyDiscount) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-muted">Delivery</dt><dd class="tabular-nums">{{ money(order.shippingCharge) }}</dd></div>
+                <div v-if="ships" class="flex justify-between"><dt class="text-muted">Delivery</dt><dd class="tabular-nums">{{ money(order.shippingCharge) }}</dd></div>
                 <div v-if="Number(order.tax) > 0" class="flex justify-between"><dt class="text-muted">Tax</dt><dd class="tabular-nums">{{ money(order.tax) }}</dd></div>
                 <div class="flex justify-between border-t border-default pt-1.5 font-medium text-highlighted">
                   <dt>Total</dt><dd data-testid="order-total" class="tabular-nums">{{ money(order.total) }}</dd>
@@ -193,14 +195,18 @@ const phone = computed(() => (order.value?.guestUser as { phone?: string } | nul
               </template>
               <p v-else class="text-muted">Unknown</p>
             </section>
-            <section aria-labelledby="ship-to" class="space-y-1">
+            <section v-if="ships" aria-labelledby="ship-to" class="space-y-1">
               <h2 id="ship-to" class="text-xs font-medium text-muted">Delivery address</h2>
               <p v-for="part in address" :key="part">{{ part }}</p>
               <p v-if="instructions" class="text-muted italic">{{ instructions }}</p>
             </section>
-            <section aria-labelledby="delivery" class="space-y-1">
+            <section v-if="ships" aria-labelledby="delivery" class="space-y-1">
               <h2 id="delivery" class="text-xs font-medium text-muted">Delivery method</h2>
               <p>{{ (order.shippingMethod as { name?: string } | null)?.name ?? 'None' }}</p>
+            </section>
+            <section v-else aria-labelledby="delivery" class="space-y-1">
+              <h2 id="delivery" class="text-xs font-medium text-muted">Delivery</h2>
+              <p>Nothing to ship</p>
             </section>
             <section aria-labelledby="payment" class="space-y-2">
               <h2 id="payment" class="text-xs font-medium text-muted">Payment</h2>

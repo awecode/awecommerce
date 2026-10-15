@@ -4,7 +4,8 @@
 // message in `cartErrorMessage(error)`.
 export const useCart = () => {
   // One request per page, however many components ask (see useStoreSettings)
-  const { data, refresh } = useFetch('/api/store/cart', { key: 'cart', dedupe: 'defer' })
+  const request = useFetch('/api/store/cart', { key: 'cart', dedupe: 'defer' })
+  const { data, refresh } = request
   const drawerOpen = useState('cart-drawer-open', () => false)
   const count = computed(() => (data.value?.lines ?? []).reduce((total, line) => total + line.quantity, 0))
 
@@ -14,6 +15,8 @@ export const useCart = () => {
 
   return {
     cart: data,
+    // Resolves once the cart is loaded, for a page that needs it first
+    loaded: request.then(() => {}),
     count,
     refresh,
     drawerOpen,

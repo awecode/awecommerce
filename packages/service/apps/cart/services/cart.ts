@@ -7,7 +7,7 @@ import {
   ProductVariantService,
   withVariantOptions,
 } from '../../product/services/product'
-import { CustomField, products, productVariants } from '../../product/schemas'
+import { CustomField, productClasses, products, productVariants } from '../../product/schemas'
 import {
   cartAppliedVoucherOffers,
   CartLine,
@@ -341,6 +341,8 @@ class CartService {
         ...line,
         tax: pricing.lines[index].tax,
         taxRate: pricing.lines[index].taxRate,
+        // Whether the line is shipped to the buyer (its product class says so)
+        requiresShipping: pricing.lines[index].requiresShipping,
         // Checkout fails while this is false; the buyer needs to remove the line.
         // Same rule as checkout: an active variant of a listed product.
         isAvailable: line.variant.isActive && listedIds.has(line.variant.productId),
@@ -355,6 +357,9 @@ class CartService {
           line.customizations,
         ),
       })),
+      // False when nothing in the cart is shipped (digital goods only): checkout
+      // then takes no address and no shipping method
+      requiresShipping: pricing.requiresShipping,
       subtotal: pricing.subtotal,
       loyaltyDiscount: pricing.loyaltyDiscount,
       shippingCharge: pricing.shippingCharge,
@@ -362,6 +367,25 @@ class CartService {
       total: pricing.total,
       pricesIncludeTax: pricing.pricesIncludeTax,
     }
+  }
+
+  // Whether anything in the cart is shipped to the buyer: a line whose product
+  // has no class, or a class that requires shipping. Same rule as the summary.
+  async requiresShipping(cartId: number): Promise<boolean> {
+    const [line] = await this.db
+      .select({ id: cartLines.id })
+      .from(cartLines)
+      .innerJoin(productVariants, eq(productVariants.id, cartLines.variantId))
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .leftJoin(productClasses, eq(productClasses.id, products.productClassId))
+      .where(
+        and(
+          eq(cartLines.cartId, cartId),
+          or(isNull(productClasses.id), eq(productClasses.requiresShipping, true)),
+        ),
+      )
+      .limit(1)
+    return line !== undefined
   }
 
   async getCartContentForSession(

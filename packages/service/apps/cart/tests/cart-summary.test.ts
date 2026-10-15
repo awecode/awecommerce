@@ -151,6 +151,39 @@ test('should split tax out without changing the total when prices include tax', 
   expect(summary.pricesIncludeTax).toBe(true)
 })
 
+test('should say whether the cart is shipped, from the product classes', async () => {
+  const classes = new ProductClassService(db)
+  const digital = await classes.create({ name: unique('E-book'), slug: unique('e-book'), requiresShipping: false })
+  const physical = await classes.create({ name: unique('Book'), slug: unique('book') })
+  const ebook = await createProduct('10', { productClassId: digital.id })
+  const book = await createProduct('20', { productClassId: physical.id })
+  const plain = await createProduct('30')
+  const method = await new ShippingMethodService(db).create({ name: 'Courier', price: '5' })
+
+  const digitalOnly = await createCart([{ variantId: ebook.variants[0].id, quantity: 1 }])
+  const summary = await cartService.getCartSummary(digitalOnly.cart.sessionId)
+  expect(summary.requiresShipping).toBe(false)
+  expect(summary.lines[0].requiresShipping).toBe(false)
+  expect(await cartService.requiresShipping(digitalOnly.cart.id)).toBe(false)
+  // Nothing to ship, so no shipping method or charge
+  await expect(
+    cartService.getCartSummary(digitalOnly.cart.sessionId, { shippingMethodId: method.id }),
+  ).rejects.toThrow('Nothing in the cart is shipped, so it takes no shipping method')
+
+  // A class that ships, or no class at all, makes the cart shipped
+  for (const product of [book, plain]) {
+    const mixed = await createCart([
+      { variantId: ebook.variants[0].id, quantity: 1 },
+      { variantId: product.variants[0].id, quantity: 1 },
+    ])
+    const mixedSummary = await cartService.getCartSummary(mixed.cart.sessionId, { shippingMethodId: method.id })
+    expect(mixedSummary.requiresShipping).toBe(true)
+    expect(mixedSummary.lines.map((line) => line.requiresShipping)).toEqual([false, true])
+    expect(Number(mixedSummary.shippingCharge)).toBe(5)
+    expect(await cartService.requiresShipping(mixed.cart.id)).toBe(true)
+  }
+})
+
 test('should reject an unknown shipping method', async () => {
   const product = await createProduct('10')
   const { cart } = await createCart([{ variantId: product.variants[0].id, quantity: 1 }])

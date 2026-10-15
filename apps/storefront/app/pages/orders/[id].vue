@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // An order: right after checkout (with the `hash` from checkout, so the link
-// works for whoever has it), or from the buyer's account (signed in, no hash)
+// works for whoever has it), or from the buyer's account (signed in, no hash).
+// An order with nothing to ship has no delivery; its lines show the
+// fulfilment notes (a download link, what happens next).
 definePageMeta({
   // Without the link's hash, only its owner can see it: sign in first
   middleware: (to) => {
@@ -26,12 +28,13 @@ const lines = computed(() => order.value?.lines ?? [])
 // Each line's price less its own discount, for its quantity
 const lineTotal = (line: (typeof lines.value)[number]) => (Number(line.price ?? 0) - Number(line.discount)) * line.quantity
 const subtotal = computed(() => lines.value.reduce((total, line) => total + lineTotal(line), 0))
+const ships = computed(() => lines.value.some((line) => line.requiresShipping))
 const email = computed(() => (order.value?.guestUser as { email?: string } | null)?.email ?? user.value?.email)
 const address = computed(() => {
   const a = (order.value?.shippingAddress ?? {}) as Record<string, string>
   return [a.line1, a.line2, [a.city, a.province].filter(Boolean).join(', '), a.postalCode, a.country].filter(Boolean)
 })
-const paymentLabels: Record<string, string> = { pay_on_delivery: 'Pay on delivery' }
+const paymentLabels: Record<string, string> = { pay_on_delivery: 'Pay on delivery', pay_later: 'Pay later' }
 const payment = computed(() => {
   const method = (order.value?.metadata as { paymentMethod?: string } | null)?.paymentMethod
   return method ? (paymentLabels[method] ?? method) : null
@@ -57,14 +60,14 @@ const placedOn = computed(() =>
     </div>
 
     <div class="mt-10 grid gap-10 sm:grid-cols-3">
-      <section aria-labelledby="ship-to">
+      <section v-if="ships" aria-labelledby="ship-to">
         <h2 id="ship-to" class="mb-2 font-sans text-xs font-medium tracking-wider text-muted uppercase">Delivery address</h2>
         <p v-for="part in address" :key="part">{{ part }}</p>
         <p v-if="(order.shippingAddress as Record<string, string>)?.instructions" class="mt-1 text-sm text-muted">
           {{ (order.shippingAddress as Record<string, string>).instructions }}
         </p>
       </section>
-      <section aria-labelledby="delivery">
+      <section v-if="ships" aria-labelledby="delivery">
         <h2 id="delivery" class="mb-2 font-sans text-xs font-medium tracking-wider text-muted uppercase">Delivery</h2>
         <p>{{ (order.shippingMethod as { name?: string })?.name ?? 'Standard' }}</p>
       </section>
@@ -72,6 +75,7 @@ const placedOn = computed(() =>
         <h2 id="payment" class="mb-2 font-sans text-xs font-medium tracking-wider text-muted uppercase">Payment</h2>
         <p>{{ payment }}</p>
         <p v-if="payment === 'Pay on delivery'" class="text-sm text-muted">Pay the courier when your order arrives.</p>
+        <p v-else-if="payment === 'Pay later' && order.paymentStatus !== 'Paid'" class="text-sm text-muted">We will contact you to arrange payment.</p>
       </section>
     </div>
 
@@ -87,6 +91,11 @@ const placedOn = computed(() =>
             <p v-for="o in line.options" :key="o.name" class="text-sm text-muted">{{ o.name }}: {{ o.value }}</p>
             <p v-for="(answer, label) in line.customizations" :key="label" class="text-sm text-muted">{{ label }}: {{ answer }}</p>
             <p class="text-sm text-muted">Quantity {{ line.quantity }}</p>
+            <div v-if="line.note" class="mt-3 space-y-1 rounded-sm bg-muted p-3 text-sm">
+              <p class="font-medium">{{ line.note.title }}</p>
+              <p class="text-muted">{{ line.note.text }}</p>
+              <UButton v-if="line.note.link" :to="line.note.link.url" :label="line.note.link.label" target="_blank" size="sm" variant="link" class="px-0" trailing-icon="i-lucide-arrow-up-right" />
+            </div>
           </div>
           <p class="font-serif">{{ money(lineTotal(line)) }}</p>
         </li>
@@ -105,7 +114,7 @@ const placedOn = computed(() =>
           <dt>Points</dt>
           <dd>−{{ money(order.loyaltyDiscount) }}</dd>
         </div>
-        <div class="flex justify-between">
+        <div v-if="ships" class="flex justify-between">
           <dt>Delivery</dt>
           <dd>{{ Number(order.shippingCharge) ? money(order.shippingCharge) : 'Free' }}</dd>
         </div>

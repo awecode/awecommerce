@@ -31,7 +31,7 @@ watch(() => route.fullPath, () => (drawerOpen.value = false))
           <span>Discounts</span>
           <span>−{{ money(cart.totalOfferDiscount) }}</span>
         </div>
-        <p class="text-sm text-muted">Shipping is worked out at checkout.</p>
+        <p class="text-sm text-muted">{{ cart.requiresShipping ? 'Shipping is worked out at checkout.' : 'Nothing to ship.' }}</p>
         <UButton to="/checkout" label="Checkout" size="xl" block :disabled="blocked" />
         <UButton to="/cart" label="View cart" color="neutral" variant="outline" size="lg" block />
       </div>

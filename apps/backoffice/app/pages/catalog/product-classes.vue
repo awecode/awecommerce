@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-type ProductClass = CatalogRow & { taxRate: string | null; trackStock: boolean | null; description: string | null }
+type ProductClass = CatalogRow & { taxRate: string | null; trackStock: boolean | null; requiresShipping: boolean; description: string | null }
 
 useSeoMeta({ title: 'Product classes' })
 
@@ -20,6 +20,12 @@ const columns: TableColumn<ProductClass>[] = [
     cell: ({ row }) => (row.original.trackStock ? 'Tracked' : 'Not tracked'),
     meta: { class: { td: 'text-muted' } },
   },
+  {
+    id: 'shipping',
+    header: 'Shipping',
+    cell: ({ row }) => (row.original.requiresShipping ? 'Shipped' : 'Not shipped'),
+    meta: { class: { td: 'text-muted' } },
+  },
 ]
 </script>
 
@@ -30,7 +36,7 @@ const columns: TableColumn<ProductClass>[] = [
     singular="product class"
     icon="i-lucide-shapes"
     :columns="columns"
-    :defaults="{ taxRate: '', trackStock: true, description: '' }"
+    :defaults="{ taxRate: '', trackStock: true, requiresShipping: true, description: '' }"
     :create-schema="createProductClassSchema"
     :update-schema="updateProductClassSchema"
   >
@@ -44,6 +50,13 @@ const columns: TableColumn<ProductClass>[] = [
       </UFormField>
       <UFormField name="trackStock">
         <USwitch v-model="form.state.trackStock" label="Track stock" description="Count stock for products of this class" />
+      </UFormField>
+      <UFormField name="requiresShipping">
+        <USwitch
+          v-model="form.state.requiresShipping"
+          label="Ships to the buyer"
+          description="Off for digital goods: an order of only these takes no address or shipping"
+        />
       </UFormField>
       <UFormField label="Description" name="description">
         <UTextarea v-model="form.state.description" :rows="3" autoresize class="w-full" />

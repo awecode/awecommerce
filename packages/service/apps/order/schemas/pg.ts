@@ -137,6 +137,9 @@ export const orderLines = pgTable('order_line', {
   // Whether placing the order took the quantity from the variant's stock (its
   // class tracked stock then), so cancelling gives back exactly that
   stockTaken: boolean().notNull().default(false),
+  // Whether the line was to be shipped (its product class said so when the
+  // order was placed); an order with no such line has nothing to ship
+  requiresShipping: boolean().notNull().default(true),
   status: orderStatusEnum().notNull().default('Pending'),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),

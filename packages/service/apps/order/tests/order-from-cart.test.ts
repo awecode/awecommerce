@@ -11,6 +11,7 @@ import { ShippingMethodService } from 'apps/order/services/shipping-method'
 import { CartService } from 'apps/cart/services/cart'
 import { OfferService } from 'apps/offer/services/offer'
 import {
+  ProductClassService,
   ProductImageService,
   ProductOptionService,
   ProductService,
@@ -352,6 +353,42 @@ test('should reject an unknown shipping method and write nothing', async () => {
   ).rejects.toThrow('Shipping method not found: 999999')
   expect(await ordersForCart(cart.id)).toEqual([])
   expect(await cartStatus(cart.id)).toBe('Open')
+})
+
+test('should record which lines are shipped, and take no shipping method when none is', async () => {
+  const digital = await new ProductClassService(db).create({
+    name: 'From Cart Download',
+    slug: 'from-cart-download',
+    requiresShipping: false,
+  })
+  const ebook = await createProduct('12')
+  await productService.update(ebook.id, { productClassId: digital.id })
+  const mug = await createProduct('20')
+  const method = await new ShippingMethodService(db).create({ name: 'Post', price: '5' })
+
+  const digitalCart = await createCart('from-cart-digital-user', [
+    { variantId: ebook.variants[0].id, quantity: 1 },
+  ])
+  await expect(
+    orderService.createFromCart(digitalCart.id, { shippingMethodId: method.id }),
+  ).rejects.toThrow('Nothing in the cart is shipped, so it takes no shipping method')
+  expect(await cartStatus(digitalCart.id)).toBe('Open')
+  const digitalOrder = await orderService.createFromCart(digitalCart.id)
+  expect(digitalOrder.lines.map((line) => line.requiresShipping)).toEqual([false])
+  expect(Number(digitalOrder.shippingCharge)).toBe(0)
+
+  const mixedCart = await createCart('from-cart-mixed-user', [
+    { variantId: ebook.variants[0].id, quantity: 1 },
+    { variantId: mug.variants[0].id, quantity: 1 },
+  ])
+  const mixedOrder = await orderService.createFromCart(mixedCart.id, { shippingMethodId: method.id })
+  const shipped = Object.fromEntries(mixedOrder.lines.map((line) => [line.productId, line.requiresShipping]))
+  expect(shipped).toEqual({ [ebook.id]: false, [mug.id]: true })
+  expect(Number(mixedOrder.shippingCharge)).toBe(5)
+
+  // Recorded at checkout: changing the class later does not change the order
+  await new ProductClassService(db).update(digital.id, { requiresShipping: true })
+  expect((await orderService.get(digitalOrder.id))!.lines.map((line) => line.requiresShipping)).toEqual([false])
 })
 
 test('should create the order when the expected total matches', async () => {

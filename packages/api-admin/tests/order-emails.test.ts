@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
-import { orders } from '@awecommerce/service/apps/order/schemas'
+import { orderLines, orders } from '@awecommerce/service/apps/order/schemas'
+import { ProductService } from '@awecommerce/service/apps/product/services/product'
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { client, createSignedInUser, mailsTo, setupAdminApi, unique, url } from './helpers'
 
@@ -8,6 +9,7 @@ describe.skipIf(!url)('order shipped and cancelled emails', async () => {
   const db = await setupAdminApi()
   const admin = client((await createSignedInUser(db, 'admin')).token)
 
+  // An order with one line to ship
   const createOrder = async (customer: { guestEmail?: string; userId?: string }) => {
     const [order] = await db
       .insert(orders)
@@ -17,6 +19,17 @@ describe.skipIf(!url)('order shipped and cancelled emails', async () => {
         guestUser: customer.guestEmail ? { name: 'Guest', email: customer.guestEmail } : null,
       })
       .returning()
+    const slug = unique('mug')
+    const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '25', stockQuantity: 5 })
+    await db.insert(orderLines).values({
+      orderId: order!.id,
+      productId: product.id,
+      variantId: product.variants[0]!.id,
+      productName: slug,
+      sku: slug,
+      price: '25',
+      quantity: 1,
+    })
     return order!
   }
   const setStatus = (id: number, status: string) => admin(`/api/admin/orders/${id}/status`, { method: 'POST', body: { status } })

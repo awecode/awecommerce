@@ -190,7 +190,7 @@ Managing offers: `OfferRangeService`, `OfferConditionService`, `OfferBenefitServ
 
 ### Cart summary
 
-`CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax`, `taxRate`, `isAvailable` and `customizationsError`, and the cart's `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
+`CartService.getCartSummary(sessionId, { shippingMethodId?, redeemPoints? })` returns the cart content with offers and vouchers applied, each line's `tax`, `taxRate`, `requiresShipping`, `isAvailable` and `customizationsError`, and the cart's `requiresShipping`, `subtotal`, `totalOfferDiscount`, `loyaltyDiscount`, `shippingCharge`, `tax`, `total` and `pricesIncludeTax`. It uses the same calculation as `createFromCart`, so pass the `total` you show the customer as `expectedTotal` when they check out:
 
 ```ts
 const summary = await new CartService(db).getCartSummary(cart.sessionId, {
@@ -219,6 +219,14 @@ A variant's `stockQuantity` is counted when its product's class has `trackStock`
 - `cancel` puts back what the order took, by `stockTaken`, so a class that started or stopped tracking stock since then does not matter.
 - `ProductService.list()` rows have `inStock`: stock is not counted, or an active variant has some. `ProductService.get()` includes the class's `trackStock`.
 - `ProductVariantService.stockLevels(variantIds)` and `checkStock(wanted)` are the helpers behind these.
+
+### Shipping
+
+A product class has `requiresShipping` (default true); products without a class are shipped. A class with `requiresShipping: false` is for digital goods.
+
+- `getCartSummary` gives each line's `requiresShipping`, and the cart's: true when any line is shipped. `CartService.requiresShipping(cartId)` answers the same for a cart without pricing it.
+- A cart with nothing to ship takes no shipping method: `getCartSummary` and `createFromCart` throw `Nothing in the cart is shipped, so it takes no shipping method` (a `ValidationError`) when given one.
+- Each order line records `requiresShipping` when the order is placed, so changing the class later does not change past orders.
 
 ### Signing in with a guest cart
 
@@ -268,7 +276,7 @@ try {
 - **`expectedTotal`:** if the computed total differs, it throws `OrderTotalMismatchError` (with `expectedTotal` and `actualTotal`) and writes nothing.
 - **Order lines:** each line has `productId` and `variantId`. `price` is the variant's `price`, or its `discountedPrice` when there is no `price`; `discount` is `price − discountedPrice` when both are set. A line whose variant has neither is stored with `price` `null` and counts as zero. `productName`, `variantTitle`, `sku`, `imageUrl` (the variant's image, else the product's thumbnail) and `options` (such as `[{ name: 'Color', value: 'Red' }, { name: 'Size', value: 'M' }]`) are copied onto the line, so renaming or deleting a product, variant, image or option later does not alter past orders.
 - **Offers:** the applied offer and voucher discounts are stored in `offers`, and their sum in `discount`. Each applied offer's usage is recorded once per order, which uses up its `limitPerUser` and `overallLimit`; guest orders count towards `overallLimit` only.
-- **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines` and `Shipping method not found: <id>`. Nothing is written in any of these cases.
+- **Errors:** it throws `Cart not found: <id>`, `Cart is not open: <id>` (for example, already ordered), `Cannot create an order without lines`, `Shipping method not found: <id>` and `Nothing in the cart is shipped, so it takes no shipping method`. Nothing is written in any of these cases.
 - **One order per cart:** the cart is locked while the order is created and then frozen, so two checkouts of the same cart at the same moment produce exactly one order.
 - **Loyalty points:** `redeemPoints` redeems that many of the user's points. Their value (`points × redeemRate`) is stored as `loyaltyDiscount` and reduces the products, not shipping, before tax: it is spread across the lines in proportion to their amounts, and each line is taxed on what is left. The points are taken from the balance in the same transaction. It throws `Guests cannot redeem loyalty points`, `Loyalty points cannot be redeemed` (loyalty disabled or no `redeemRate`), `Insufficient loyalty points`, and `Points are worth more than the order's products` (after offer discounts); nothing is written in any of these cases.
 - **Offer limits at checkout:** offers are checked again while the order is created, with the offers locked, so simultaneous checkouts can never use an offer beyond its `overallLimit` or `limitPerUser`. If a user offer ran out in the meantime, `createFromCart` throws `OfferLimitReachedError` (with `offerId` and `offerName`) and writes nothing. If a voucher applied to the cart can no longer be applied (it ran out, expired, was deactivated, or no longer matches the cart's products), `createFromCart` throws `VoucherNoLongerValidError` (with `offerId` and `voucherCode`) and writes nothing; the cart keeps its vouchers, so reload it with `getCartContentForSession(sessionId, true)` to drop the invalid one and show the new total.

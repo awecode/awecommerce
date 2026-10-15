@@ -5,7 +5,7 @@ import { CartService } from '@awecommerce/service/apps/cart/services/cart'
 import { orders } from '@awecommerce/service/apps/order/schemas'
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { ShippingMethodService } from '@awecommerce/service/apps/order/services/shipping-method'
-import { ProductService } from '@awecommerce/service/apps/product/services/product'
+import { ProductClassService, ProductService } from '@awecommerce/service/apps/product/services/product'
 import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import * as authSchema from '../../../packages/auth/server/db/schema'
 import { STAFF_EMAIL, setupBackoffice, signedInPage, url } from './helpers'
@@ -117,6 +117,32 @@ describe.skipIf(!url)('orders', async () => {
     await page.getByRole('button', { name: 'More actions' }).click()
     await page.getByRole('menuitem', { name: 'Move to Returned' }).click()
     await expect.poll(status).toBe('Returned')
+  })
+
+  test('an order with nothing to ship has no delivery, and goes Confirm, then Complete', async () => {
+    const slug = unique('e-book')
+    const digital = await new ProductClassService(db).create({ name: slug, slug, requiresShipping: false })
+    const ebook = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '12', stockQuantity: 10, status: 'Published', productClassId: digital.id })
+    const cart = await new CartService(db).create()
+    await new CartService(db).addToCart(cart.id, ebook.variants[0]!.id, 1)
+    const order = await new OrderService(db).createFromCart(cart.id, {
+      guestUser: { name: 'Fay', email: `${unique('fay')}@example.com` },
+      metadata: { paymentMethod: 'pay_later' },
+    })
+    const page = await openPage(`/orders/${order.id}`)
+    const status = async () => (await db.select().from(orders).where(eq(orders.id, order.id)))[0]!.status
+
+    await page.getByText('Nothing to ship').waitFor()
+    await page.getByText('Pay later').waitFor()
+    expect(await page.getByRole('heading', { name: 'Delivery address' }).count()).toBe(0)
+    for (const [button, next] of [
+      ['Confirm order', 'Confirmed'],
+      ['Complete', 'Completed'],
+    ] as const) {
+      await page.getByRole('button', { name: button, exact: true }).click()
+      await expect.poll(status).toBe(next)
+      await page.getByTestId('order-status').getByText(next).waitFor()
+    }
   })
 
   test('cancels an order with a reason', async () => {

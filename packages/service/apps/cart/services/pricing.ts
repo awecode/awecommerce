@@ -36,16 +36,32 @@ const priceCart = async (
         .filter((id): id is number => id !== null),
     ),
   ]
-  const classRates = new Map(
+  const classes = new Map(
     classIds.length
       ? (
           await db
-            .select({ id: productClasses.id, taxRate: productClasses.taxRate })
+            .select({
+              id: productClasses.id,
+              taxRate: productClasses.taxRate,
+              requiresShipping: productClasses.requiresShipping,
+            })
             .from(productClasses)
             .where(inArray(productClasses.id, classIds))
-        ).map((productClass) => [productClass.id, productClass.taxRate])
+        ).map((productClass) => [productClass.id, productClass])
       : [],
   )
+  // A product without a class is shipped
+  const shipsLine = content.lines.map(
+    (line) =>
+      (line.variant.product.productClassId !== null
+        ? classes.get(line.variant.product.productClassId)?.requiresShipping
+        : null) ?? true,
+  )
+  // Nothing to ship (digital goods only): no shipping method or charge
+  const requiresShipping = shipsLine.includes(true)
+  if (shippingMethod && !requiresShipping) {
+    throw new ValidationError('Nothing in the cart is shipped, so it takes no shipping method')
+  }
 
   // What each line costs after its sale price and offer discounts
   const lineAmounts = content.lines.map((line) => {
@@ -89,7 +105,7 @@ const priceCart = async (
     const { product } = variant
     const taxRate =
       (product.productClassId !== null
-        ? classRates.get(product.productClassId)
+        ? classes.get(product.productClassId)?.taxRate
         : null) ?? taxSettings.defaultRate
     return {
       cartLineId: line.id,
@@ -106,6 +122,7 @@ const priceCart = async (
       tax: calculateTax(taxable, taxRate, taxSettings.pricesIncludeTax).toString(),
       taxRate,
       quantity: line.quantity,
+      requiresShipping: shipsLine[index],
     }
   })
 
@@ -134,6 +151,7 @@ const priceCart = async (
   return {
     lines,
     shippingMethod,
+    requiresShipping,
     pricesIncludeTax: taxSettings.pricesIncludeTax,
     subtotal: subtotal.toString(),
     offerDiscount: offerDiscount.toString(),

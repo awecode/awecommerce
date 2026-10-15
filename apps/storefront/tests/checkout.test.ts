@@ -6,7 +6,7 @@ import { LoyaltyService } from '@awecommerce/service/apps/loyalty/services/loyal
 import { orders } from '@awecommerce/service/apps/order/schemas'
 import { ShippingMethodService } from '@awecommerce/service/apps/order/services/shipping-method'
 import { productVariants } from '@awecommerce/service/apps/product/schemas'
-import { ProductService } from '@awecommerce/service/apps/product/services/product'
+import { ProductClassService, ProductService } from '@awecommerce/service/apps/product/services/product'
 import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { setupStorefront, signedInPage, url } from './helpers'
 
@@ -69,6 +69,32 @@ describe.skipIf(!url)('checkout', async () => {
     })
     expect(order!.shippingMethod).toMatchObject({ id: courier.id })
     await page.getByRole('button', { name: 'Cart', exact: true }).waitFor()
+  })
+
+  test('a cart with nothing to ship skips the address and delivery, and pays later', async () => {
+    const slug = unique('e-book')
+    const digital = await new ProductClassService(db).create({ name: slug, slug, requiresShipping: false })
+    const ebook = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '12', stockQuantity: 10, status: 'Published', productClassId: digital.id })
+    const page = await createPage('/')
+    await checkoutWith(page, ebook.variants[0]!.id)
+    const email = `${unique('fay')}@example.com`
+
+    await page.getByRole('radio', { name: /Pay later/ }).waitFor()
+    expect(await page.getByRole('heading', { name: 'Delivery address' }).count()).toBe(0)
+    expect(await page.getByRole('radio', { name: new RegExp(courier.name) }).count()).toBe(0)
+    await page.getByLabel('Name', { exact: true }).fill('Fay Reader')
+    await page.getByLabel('Email').fill(email)
+    await total(page).getByText('$12.00').waitFor()
+    await page.getByRole('button', { name: /^Place order/ }).click()
+
+    await page.waitForURL(/\/orders\/\d+\?hash=/)
+    await page.getByText('Your purchase is confirmed').waitFor()
+    await page.getByText('Pay later').first().waitFor()
+    expect(await page.getByRole('heading', { name: 'Delivery address' }).count()).toBe(0)
+    const id = Number(new URL(page.url()).pathname.split('/').pop())
+    const [order] = await db.select().from(orders).where(eq(orders.id, id))
+    expect(order!.metadata).toEqual({ paymentMethod: 'pay_later' })
+    expect(order!.shippingMethod).toEqual({})
   })
 
   test('says which fields are missing', async () => {

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // Checkout on one page: contact, address, delivery, points (members), payment
-// and the summary. The order is placed for the total shown; if it changed in
+// and the summary. A cart with nothing to ship (digital goods) skips the
+// address and delivery, and pays later. The order is placed for the total shown; if it changed in
 // the meantime, the new total is shown and the buyer places it again.
 useSeoMeta({ title: 'Checkout', robots: 'noindex' })
 
 const { user } = useAuth()
-const { cart, refresh: refreshCart } = useCart()
+const { cart, loaded: cartLoaded, refresh: refreshCart } = useCart()
 const money = useMoney()
 const requestFetch = useRequestFetch()
 
@@ -15,6 +16,8 @@ const [{ data: methods }, { data: addresses }, { data: loyalty }] = await Promis
   // Members only
   useAsyncData('addresses', async () => (user.value ? ((await requestFetch('/api/store/addresses')) as Address[]) : [])),
   useAsyncData('loyalty', async () => (user.value ? await requestFetch('/api/store/loyalty') : null)),
+  // Whether it ships decides what the summary is asked for
+  cartLoaded,
 ])
 
 const state = reactive({
@@ -28,8 +31,10 @@ const state = reactive({
   // The cheapest to start with
   shippingMethodId: [...(methods.value ?? [])].sort((a, b) => Number(a.price) - Number(b.price))[0]?.id as number | undefined,
   points: 0,
-  paymentMethod: 'pay_on_delivery' as const,
 })
+
+// False when nothing in the cart is shipped
+const ships = computed(() => cart.value?.requiresShipping !== false)
 
 // The points previewed in the summary, set when the field is left
 const appliedPoints = ref(0)
@@ -38,7 +43,7 @@ const canRedeem = computed(() => Boolean(loyalty.value?.canRedeem && loyalty.val
 // The summary with the chosen delivery and points: its total is what the
 // order is placed for
 const summaryQuery = computed(() => ({
-  shippingMethodId: state.shippingMethodId,
+  shippingMethodId: ships.value ? state.shippingMethodId : undefined,
   redeemPoints: appliedPoints.value > 0 ? appliedPoints.value : undefined,
 }))
 const { data: summary, error: summaryError, refresh: refreshSummary } = await useFetch('/api/store/cart', {
@@ -64,7 +69,12 @@ const addressItems = computed(() => [
 const methodItems = computed(() =>
   (methods.value ?? []).map((m) => ({ label: m.name, description: Number(m.price) ? money(m.price) : 'Free', value: m.id })),
 )
-const paymentItems = [{ label: 'Pay on delivery', description: 'Pay the courier when your order arrives.', value: 'pay_on_delivery' }]
+// The one way to pay that fits the cart
+const paymentItems = computed(() =>
+  ships.value
+    ? [{ label: 'Pay on delivery', description: 'Pay the courier when your order arrives.', value: 'pay_on_delivery' }]
+    : [{ label: 'Pay later', description: 'We will contact you to arrange payment.', value: 'pay_later' }],
+)
 const newAddress = computed(() => state.addressId === 'new')
 
 // ---- checking the form
@@ -78,8 +88,8 @@ const validate = () => {
     if (!state.email.trim()) errors.push({ name: 'email', message: 'Enter your email' })
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(state.email.trim())) errors.push({ name: 'email', message: 'Enter a valid email' })
   }
-  if (newAddress.value) errors.push(...addressErrors(state.address))
-  if (methodItems.value.length && !state.shippingMethodId) errors.push({ name: 'shippingMethodId', message: 'Choose a delivery method' })
+  if (ships.value && newAddress.value) errors.push(...addressErrors(state.address))
+  if (ships.value && methodItems.value.length && !state.shippingMethodId) errors.push({ name: 'shippingMethodId', message: 'Choose a delivery method' })
   return errors
 }
 
@@ -98,16 +108,16 @@ const place = async () => {
     const order = await $fetch('/api/store/checkout', {
       method: 'POST',
       body: {
-        shippingMethodId: state.shippingMethodId,
+        shippingMethodId: summaryQuery.value.shippingMethodId,
         expectedTotal: summary.value.total,
-        ...(newAddress.value ? { shippingAddress: addressBody(state.address) } : { shippingAddressId: state.addressId as number }),
+        ...(!ships.value ? {} : newAddress.value ? { shippingAddress: addressBody(state.address) } : { shippingAddressId: state.addressId as number }),
         guestUser: user.value ? undefined : { name: state.name.trim(), email: state.email.trim(), phone: state.phone.trim() || undefined },
         redeemPoints: appliedPoints.value > 0 ? appliedPoints.value : undefined,
-        paymentMethod: state.paymentMethod,
+        paymentMethod: paymentItems.value[0]!.value as 'pay_on_delivery' | 'pay_later',
       },
     })
     // Saved once the order is placed; a failure here does not undo the order
-    if (user.value && newAddress.value && state.saveAddress) {
+    if (user.value && ships.value && newAddress.value && state.saveAddress) {
       // The first one saved becomes the default, as on the account's addresses
       const body = { ...addressBody(state.address), isDefault: !addresses.value?.length }
       await $fetch('/api/store/addresses', { method: 'POST', body }).catch(() => {})
@@ -152,7 +162,7 @@ const place = async () => {
                 <UInput v-model="state.email" type="email" autocomplete="email" size="lg" class="w-full" />
               </UFormField>
             </div>
-            <UFormField label="Phone" name="phone" hint="Optional" help="For the courier, if they need to reach you">
+            <UFormField label="Phone" name="phone" hint="Optional" :help="ships ? 'For the courier, if they need to reach you' : undefined">
               <UInput v-model="state.phone" type="tel" autocomplete="tel" size="lg" class="w-full sm:w-1/2" />
             </UFormField>
             <p class="text-sm text-muted">
@@ -161,7 +171,7 @@ const place = async () => {
           </template>
         </section>
 
-        <section class="space-y-4" aria-labelledby="address">
+        <section v-if="ships" class="space-y-4" aria-labelledby="address">
           <h2 id="address" class="text-2xl font-medium">Delivery address</h2>
           <URadioGroup v-if="addresses?.length" v-model="state.addressId" :items="addressItems" variant="table" aria-label="Delivery address" />
           <AddressFields v-if="newAddress" v-model="state.address">
@@ -169,7 +179,7 @@ const place = async () => {
           </AddressFields>
         </section>
 
-        <section v-if="methodItems.length" class="space-y-4" aria-labelledby="delivery">
+        <section v-if="ships && methodItems.length" class="space-y-4" aria-labelledby="delivery">
           <h2 id="delivery" class="text-2xl font-medium">Delivery method</h2>
           <UFormField name="shippingMethodId">
             <URadioGroup v-model="state.shippingMethodId" :items="methodItems" variant="table" aria-label="Delivery method" />
@@ -186,7 +196,7 @@ const place = async () => {
 
         <section class="space-y-4" aria-labelledby="payment">
           <h2 id="payment" class="text-2xl font-medium">Payment</h2>
-          <URadioGroup v-model="state.paymentMethod" :items="paymentItems" variant="table" aria-label="Payment" />
+          <URadioGroup :model-value="paymentItems[0]!.value" :items="paymentItems" variant="table" aria-label="Payment" />
         </section>
       </div>
 
@@ -221,7 +231,7 @@ const place = async () => {
             <dt>Points</dt>
             <dd class="whitespace-nowrap">−{{ money(summary.loyaltyDiscount) }}</dd>
           </div>
-          <div class="flex justify-between">
+          <div v-if="ships" class="flex justify-between">
             <dt>Delivery</dt>
             <dd>{{ state.shippingMethodId ? (Number(summary.shippingCharge) ? money(summary.shippingCharge) : 'Free') : '–' }}</dd>
           </div>

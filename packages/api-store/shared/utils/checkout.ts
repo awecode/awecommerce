@@ -35,19 +35,22 @@ export const checkoutSchema = z
     // method and points). Checkout fails with a 409 if the order would cost
     // anything else.
     expectedTotal: z.string().regex(/^\d+(\.\d+)?$/),
-    // An address, or the id of a saved one (signed in only)
+    // An address, or the id of a saved one (signed in only). Required when the
+    // cart has something to ship (the cart summary's `requiresShipping`), and
+    // ignored when it does not.
     shippingAddress: shippingAddressSchema.optional(),
     shippingAddressId: z.number().int().optional(),
     // Required when not signed in
     guestUser: guestUserSchema.optional(),
     // Loyalty points to redeem (signed in only)
     redeemPoints: z.number().positive().optional(),
-    // How the buyer pays. Only paying the courier on delivery for now; card
-    // and other gateways will add their own. Stored as the order's
-    // `metadata.paymentMethod`.
-    paymentMethod: z.enum(['pay_on_delivery']).default('pay_on_delivery'),
+    // How the buyer pays; card and other gateways will add their own. Stored
+    // as the order's `metadata.paymentMethod`. A cart with something to ship
+    // pays the courier on delivery; one with nothing to ship (digital goods)
+    // pays later, as arranged by the store. Defaults to the one that fits.
+    paymentMethod: z.enum(['pay_on_delivery', 'pay_later']).optional(),
   })
   .refine(
-    (body) => (body.shippingAddress === undefined) !== (body.shippingAddressId === undefined),
-    'Pass shippingAddress or shippingAddressId',
+    (body) => body.shippingAddress === undefined || body.shippingAddressId === undefined,
+    'Pass shippingAddress or shippingAddressId, not both',
   )
