@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getUserAgentInfo, renderTemplate, sendMagicLinkEmail } from '../server/utils/email'
+import { getUserAgentInfo, renderTemplate, sendEmail, sendMagicLinkEmail } from '../server/utils/email'
 
 const sendSesEmail = vi.hoisted(() => vi.fn())
 
@@ -102,5 +102,35 @@ describe('sendMagicLinkEmail', () => {
     expect(params.html).toContain('Firefox, Linux')
     expect(params.message).toContain('Log in - https://example.com/verify')
     expect(params.message).toContain('tok-1')
+  })
+})
+
+describe('sendEmail', () => {
+  const mail = { toEmails: ['a@example.com'], subject: 'Your order', message: 'Thanks', html: '<p>Thanks</p>' }
+
+  beforeEach(() => {
+    sendSesEmail.mockReset()
+    ses.secretKey = ''
+  })
+
+  it('sends through SES when the secret key is set', async () => {
+    ses.secretKey = 'secret'
+    await sendEmail(mail, { dev: false })
+    expect(sendSesEmail).toHaveBeenCalledWith(mail)
+  })
+
+  it('prints the message in development without a secret key', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await expect(sendEmail(mail, { dev: true })).resolves.toBeUndefined()
+    expect(sendSesEmail).not.toHaveBeenCalled()
+    expect(log.mock.calls.flat().join('\n')).toContain('Thanks')
+    log.mockRestore()
+    warn.mockRestore()
+  })
+
+  it('throws in production without a secret key', async () => {
+    await expect(sendEmail(mail, { dev: false })).rejects.toThrow('No SES configuration found.')
+    expect(sendSesEmail).not.toHaveBeenCalled()
   })
 })

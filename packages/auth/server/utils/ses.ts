@@ -1,6 +1,6 @@
 import { AwsClient } from 'aws4fetch'
 
-interface SendEmailParams {
+export interface SendEmailParams {
   toEmails: string[]
   replyToEmails?: string[]
   subject: string
@@ -17,7 +17,8 @@ export async function sendSesEmail({
 }: SendEmailParams): Promise<void> {
   const config = useRuntimeConfig()
 
-  const sesEndpoint = `https://email.${config.ses.region}.amazonaws.com/v2/email/outbound-emails`
+  const sesEndpoint = config.ses.endpoint
+    || `https://email.${config.ses.region}.amazonaws.com/v2/email/outbound-emails`
   const fromEmail = config.ses.fromEmail
 
   if (!fromEmail) {

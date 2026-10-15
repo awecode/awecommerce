@@ -1,5 +1,5 @@
 import type { GenericEndpointContext } from 'better-auth'
-import { sendSesEmail } from './ses'
+import { type SendEmailParams, sendSesEmail } from './ses'
 
 function htmlToText(html: string) {
   return html
@@ -66,24 +66,28 @@ export function getUserAgentInfo(ua: string): string {
   return browser || os || 'Unknown'
 }
 
-export const sendMagicLinkEmail = async (email: string, token: string, url: string, request?: GenericEndpointContext) => {
+// Sends a mail through SES. Without the SES secret key, development prints it
+// to the console instead, and production throws. `dev` is for tests.
+export const sendEmail = async (params: SendEmailParams, { dev = import.meta.dev } = {}): Promise<void> => {
   const { ses } = useRuntimeConfig()
-
-  let backend
   if (ses.secretKey) {
-    backend = sendSesEmail
+    await sendSesEmail(params)
+    return
   }
-  else if (import.meta.dev) {
-    console.warn('No SES configuration found, using console.log for dev mode.')
-    backend = (params: Record<string, string | string[]>) => {
-      console.log(`\x1b[33mTo:\x1b[0m      ${params.toEmails}`)
-      console.log(`\x1b[33mSubject:\x1b[0m ${params.subject}`)
-      console.log('\n\x1b[36m================================================================\x1b[0m')
-      console.log(params.message)
-      console.log('\n\x1b[36m================================================================\x1b[0m')
-    }
+  if (!dev) {
+    throw new Error('No SES configuration found.')
   }
-  else {
+  console.warn('No SES configuration found, using console.log for dev mode.')
+  console.log(`\x1b[33mTo:\x1b[0m      ${params.toEmails.join(', ')}`)
+  console.log(`\x1b[33mSubject:\x1b[0m ${params.subject}`)
+  console.log('\n\x1b[36m================================================================\x1b[0m')
+  console.log(params.message)
+  console.log('\n\x1b[36m================================================================\x1b[0m')
+}
+
+export const sendMagicLinkEmail = async (email: string, token: string, url: string, request?: GenericEndpointContext) => {
+  // Fail before rendering, as before, when production has no SES
+  if (!useRuntimeConfig().ses.secretKey && !import.meta.dev) {
     throw new Error('No SES configuration found.')
   }
 
@@ -106,7 +110,7 @@ export const sendMagicLinkEmail = async (email: string, token: string, url: stri
   }
   const html = renderTemplate(magicLinkTemplate, { email, token, url, date, time, useragent })
   const text = htmlToText(html)
-  await backend({
+  await sendEmail({
     toEmails: [email],
     subject: 'Log in to your account',
     html,

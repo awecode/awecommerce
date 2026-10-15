@@ -35,5 +35,7 @@ export default defineServiceHandler(async (event) => {
     metadata: { paymentMethod },
   })
   forgetCart(event)
+  // Logged, not thrown, when it fails: the order is placed either way
+  await sendOrderEmail(event, 'placed', order, { requestOrigin: true })
   return order
 })

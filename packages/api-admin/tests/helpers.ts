@@ -6,6 +6,7 @@ import pg from 'pg'
 import { afterAll } from 'vitest'
 import * as librarySchema from '@awecommerce/service/core/db/pg/schema'
 import * as authSchema from '../../auth/server/db/schema'
+import { startFakeSes } from '../../api-store/tests/fake-ses'
 
 export const url = process.env.TEST_POSTGRES_URL
 
@@ -18,6 +19,9 @@ export const setupAdminApi = async () => {
   process.env.NUXT_POSTGRES_URL = url
   process.env.BETTER_AUTH_URL = 'http://localhost:3000'
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
+  // Signs the links in order emails
+  process.env.ORDER_HASH_SECRET = 'test-secret'
+  ses = await startFakeSes()
   await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
 
   const pool = new pg.Pool({ connectionString: url })
@@ -26,6 +30,10 @@ export const setupAdminApi = async () => {
 }
 
 export type TestDb = Awaited<ReturnType<typeof setupAdminApi>>
+
+let ses: Awaited<ReturnType<typeof startFakeSes>> | undefined
+// The mails the server sent to this address through SES (see fake-ses.ts)
+export const mailsTo = (email: string) => ses!.to(email)
 
 let count = 0
 export const unique = (prefix: string) => `${prefix}-${Date.now()}-${++count}`

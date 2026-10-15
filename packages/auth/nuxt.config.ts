@@ -17,6 +17,9 @@ export default defineNuxtConfig({
       accessKeyId: process.env.NUXT_SES_ACCESS_KEY_ID || '',
       secretKey: process.env.NUXT_SES_SECRET_KEY || '',
       fromEmail: process.env.NUXT_SES_FROM_EMAIL || '',
+      // Another SES v2 endpoint, such as a local stand-in for tests; the real
+      // one for the region when empty
+      endpoint: process.env.NUXT_SES_ENDPOINT || '',
     },
     public: {
       auth: {
