@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, ilike, inArray, lte, or, SQL, sql } from 'drizz
 import { NotFoundError, ValidationError } from '../../../core/errors'
 import { Exact, paginate, PaginationArgs } from '../../../core/pagination'
 import { Database } from '../../types'
+import { ProductService } from '../../product/services/product'
 import {
   membershipPlans,
   memberships,
@@ -303,6 +304,59 @@ class MembershipService {
       where: eq(memberships.orderId, orderId),
       with: { plan: true },
     })
+  }
+
+  // Each plan the person holds now, waits for, or held until recently (ended
+  // in the last `endedWithinDays` days), from their memberships that were not
+  // cancelled: `state` (active, upcoming or ended), when the running or next
+  // one starts, and when the last one ends. Latest end first.
+  async currentPlans(userId: string, { endedWithinDays = 90 } = {}) {
+    const now = Date.now()
+    const since = now - endedWithinDays * 86_400_000
+    const byPlan = new Map<number, Awaited<ReturnType<MembershipService['history']>>>()
+    for (const membership of await this.history(userId)) {
+      if (membership.status === 'cancelled') continue
+      byPlan.set(membership.planId, [...(byPlan.get(membership.planId) ?? []), membership])
+    }
+    const plans = []
+    for (const rows of byPlan.values()) {
+      const time = (value: string) => new Date(value).getTime()
+      const running = rows.find((m) => time(m.startsAt) <= now && time(m.endsAt) > now)
+      const next = rows.filter((m) => time(m.startsAt) > now).sort((a, b) => time(a.startsAt) - time(b.startsAt))[0]
+      const last = rows.reduce((latest, m) => (time(m.endsAt) > time(latest.endsAt) ? m : latest))
+      const state = running ? 'active' : next ? 'upcoming' : 'ended'
+      if (state === 'ended' && time(last.endsAt) < since) continue
+      plans.push({
+        plan: last.plan,
+        state: state as 'active' | 'upcoming' | 'ended',
+        startsAt: (running ?? next ?? last).startsAt,
+        endsAt: last.endsAt,
+      })
+    }
+    return plans.sort((a, b) => new Date(b.endsAt).getTime() - new Date(a.endsAt).getTime())
+  }
+
+  // The terms on sale for these plans: the plan is active, and the variant is
+  // active and its product listed. Shortest first, each with its selling
+  // price and product slug.
+  async termsOnSale(planIds: number[]) {
+    if (!planIds.length) return []
+    const terms = await this.db.query.membershipTerms.findMany({
+      where: inArray(membershipTerms.planId, planIds),
+      with: { plan: true, variant: { with: { product: { columns: { id: true, slug: true } } } } },
+      orderBy: asc(membershipTerms.months),
+    })
+    const listed = new Set(await new ProductService(this.db).listedProductIds(terms.map((term) => term.variant.productId)))
+    return terms
+      .filter((term) => term.plan.isActive && term.variant.isActive && listed.has(term.variant.productId))
+      .map((term) => ({
+        id: term.id,
+        planId: term.planId,
+        months: term.months,
+        variantId: term.variantId,
+        price: term.variant.discountedPrice ?? term.variant.price,
+        productSlug: term.variant.product.slug,
+      }))
   }
 
   // Every membership the person had, newest first

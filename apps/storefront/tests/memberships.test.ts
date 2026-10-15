@@ -1,11 +1,13 @@
 import { createPage } from '@nuxt/test-utils/e2e'
+import { eq } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
 import { MembershipService } from '@awecommerce/service/apps/membership/services/membership'
 import { offerBenefits, offerConditions, offerRangeIncludedProducts, offerRanges, offers } from '@awecommerce/service/apps/offer/schemas'
+import { memberships as membershipRows } from '@awecommerce/service/apps/membership/schemas'
 import { productClasses } from '@awecommerce/service/apps/product/schemas'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
-import { setupStorefront, url } from './helpers'
+import { setupStorefront, signedInPage, url } from './helpers'
 
 type Page = Awaited<ReturnType<typeof createPage>>
 
@@ -74,5 +76,37 @@ describe.skipIf(!url)('memberships', async () => {
     await page.getByText('Not combined: a better discount applies').waitFor()
     await page.getByRole('button', { name: `Remove voucher ${voucher.voucherCode}` }).click()
     await expect.poll(() => page.getByText('Not combined: a better discount applies').count()).toBe(0)
+  })
+
+  test('a member renews from the account page, and sees the history', async () => {
+    const slug = unique('membership')
+    const [membershipClass] = await db.insert(productClasses).values({ name: slug, slug, requiresShipping: false, trackStock: false }).returning()
+    const gold = await memberships.createPlan({ name: unique('Gold'), slug: unique('gold'), program: unique('music'), rank: 1 })
+    const silver = await memberships.createPlan({ name: unique('Silver'), slug: unique('silver'), program: unique('films'), rank: 1 })
+    const goldYear = await product('99', membershipClass!.id)
+    await memberships.addTerm({ planId: gold.id, variantId: goldYear.variants[0]!.id, months: 12 })
+    const silverYear = await product('50', membershipClass!.id)
+    await memberships.addTerm({ planId: silver.id, variantId: silverYear.variants[0]!.id, months: 12 })
+
+    const page = await signedInPage(db, `${unique('mem')}@example.com`)
+    const userId = await page.evaluate(async () => (await (await fetch('/api/auth/get-session')).json()).user.id)
+    await memberships.grant({ userId, planId: gold.id, months: 1 })
+    const ended = await memberships.grant({ userId, planId: silver.id, months: 1 })
+    await db.update(membershipRows).set({ startsAt: '2020-01-01T00:00:00Z', endsAt: new Date(Date.now() - 5 * 86_400_000).toISOString() }).where(eq(membershipRows.id, ended.id))
+
+    await page.goto(`${process.env.BETTER_AUTH_URL}/account`)
+    const goldCard = page.getByRole('group', { name: `${gold.name} membership` })
+    await goldCard.getByText(/^Active until /).waitFor()
+    const silverCard = page.getByRole('group', { name: `${silver.name} membership` })
+    await silverCard.getByText(/^Ended on /).waitFor()
+    await silverCard.getByText('Renewing starts it again today.').waitFor()
+
+    await goldCard.getByRole('button', { name: 'Renew 12 months · $99.00' }).click()
+    await page.getByRole('dialog').getByText(goldYear.name).waitFor()
+
+    await page.goto(`${process.env.BETTER_AUTH_URL}/account/memberships`)
+    await page.getByRole('heading', { name: 'History' }).waitFor()
+    expect(await page.getByRole('listitem').filter({ hasText: gold.name }).count()).toBe(1)
+    expect(await page.getByRole('listitem').filter({ hasText: silver.name }).getByText('Ended').count()).toBe(1)
   })
 })

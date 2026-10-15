@@ -5,6 +5,7 @@ const { user, signOut } = useAuth()
 const links = [
   { label: 'Overview', to: '/account', exact: true },
   { label: 'Orders', to: '/account/orders' },
+  { label: 'Memberships', to: '/account/memberships' },
   { label: 'Addresses', to: '/account/addresses' },
 ]
 </script>

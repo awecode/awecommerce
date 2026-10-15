@@ -202,3 +202,55 @@ test('a term of a plan turned off is no longer sold', async () => {
   expect((await carts.getCartSummary(cart.sessionId)).lines[0].isAvailable).toBe(false)
   await expect(new OrderService(db).createFromCart(cart.id)).rejects.toThrow(`Product variant is not available: ${slug}`)
 })
+
+test('current plans: running, waiting, and recently ended, but not cancelled or long ended', async () => {
+  const userId = unique('member')
+  const music = await plan(unique('music'), 1, unique('Music'))
+  const films = await plan(unique('films'), 1, unique('Films'))
+  const games = await plan(unique('games'), 1, unique('Games'))
+  const books = await plan(unique('books'), 1, unique('Books'))
+  const first = await service.grant({ userId, planId: music.id, months: 1 })
+  const renewal = await service.grant({ userId, planId: music.id, months: 6 })
+  const waiting = await service.grant({ userId, planId: films.id, months: 1 })
+  await db.update(memberships).set({ startsAt: '2099-01-01T00:00:00Z', endsAt: '2099-02-01T00:00:00Z' }).where(eq(memberships.id, waiting.id))
+  const recent = await service.grant({ userId, planId: games.id, months: 1 })
+  const ended = new Date(Date.now() - 10 * 86_400_000).toISOString()
+  await db.update(memberships).set({ startsAt: '2020-01-01T00:00:00Z', endsAt: ended }).where(eq(memberships.id, recent.id))
+  const old = await service.grant({ userId, planId: books.id, months: 1 })
+  await db.update(memberships).set({ startsAt: '2020-01-01T00:00:00Z', endsAt: '2020-02-01T00:00:00Z' }).where(eq(memberships.id, old.id))
+  const cancelled = await service.grant({ userId, planId: books.id, months: 1 })
+  await service.cancel(cancelled.id, 'Asked to leave')
+
+  const current = await service.currentPlans(userId)
+  expect(current.map((c) => [c.plan.id, c.state])).toEqual([[films.id, 'upcoming'], [music.id, 'active'], [games.id, 'ended']])
+  const musicPlan = current.find((c) => c.plan.id === music.id)!
+  // From the running one to the end of the renewal
+  expect(new Date(musicPlan.startsAt).getTime()).toBe(new Date(first.startsAt).getTime())
+  expect(new Date(musicPlan.endsAt).getTime()).toBe(new Date(renewal.endsAt).getTime())
+  expect((await service.currentPlans(userId, { endedWithinDays: 5 })).map((c) => c.plan.id)).not.toContain(games.id)
+})
+
+test('terms on sale: active plan, active variant, listed product', async () => {
+  const music = await plan(unique('music'), 1)
+  const off = await plan(unique('music'), 1)
+  await service.updatePlan(off.id, { isActive: false })
+  const product = async (status: 'Published' | 'Draft', price = '40') => {
+    const slug = unique('term-product')
+    return await new ProductService(db).create({ name: slug, slug, sku: slug, price, stockQuantity: 0, status })
+  }
+  const year = await product('Published', '70')
+  const half = await product('Published', '40')
+  const draft = await product('Draft')
+  const retired = await product('Published')
+  await service.addTerm({ planId: music.id, variantId: year.variants[0].id, months: 12 })
+  await service.addTerm({ planId: music.id, variantId: half.variants[0].id, months: 6 })
+  await service.addTerm({ planId: music.id, variantId: draft.variants[0].id, months: 3 })
+  await service.addTerm({ planId: off.id, variantId: retired.variants[0].id, months: 1 })
+
+  expect(await service.termsOnSale([music.id, off.id])).toEqual([
+    expect.objectContaining({ planId: music.id, months: 6, variantId: half.variants[0].id, productSlug: half.slug }),
+    expect.objectContaining({ planId: music.id, months: 12, variantId: year.variants[0].id }),
+  ])
+  expect(Number((await service.termsOnSale([music.id]))[1].price)).toBe(70)
+  expect(await service.termsOnSale([])).toEqual([])
+})

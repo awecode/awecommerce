@@ -82,4 +82,26 @@ describe.skipIf(!url)('memberships in the store', async () => {
     await new ProductService(db).create({ name: plainSlug, slug: plainSlug, sku: plainSlug, price: '10', stockQuantity: 5, status: 'Published' })
     expect((await buyer()(`/api/store/products/${plainSlug}`)).body.variants[0].memberPrice).toBeNull()
   })
+
+  test('lists the buyer\'s memberships with the terms to renew them', async () => {
+    const platinum = await plan('Platinum')
+    const product = await membershipProduct(platinum.id, 12)
+    const { userId, token } = await createUser(db)
+    const running = await memberships.grant({ userId, planId: platinum.id, months: 1, grantedBy: 'staff' })
+    const request = buyer()
+    expect((await request('/api/store/memberships')).status).toBe(401)
+    request.signIn(token)
+
+    const { body } = await request('/api/store/memberships')
+    expect(body.current).toEqual([
+      expect.objectContaining({
+        state: 'active',
+        plan: { id: platinum.id, name: 'Platinum', program: platinum.program },
+        terms: [expect.objectContaining({ variantId: product.variants[0]!.id, months: 12, price: '99' })],
+      }),
+    ])
+    expect(body.history).toEqual([expect.objectContaining({ id: running.id, state: 'active', months: 1, orderId: null })])
+    // Not the member's internal fields
+    expect(body.history[0].grantedBy).toBeUndefined()
+  })
 })

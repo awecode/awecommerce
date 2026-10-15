@@ -1,0 +1,43 @@
+<script setup lang="ts">
+// The buyer's memberships: the plans they hold, wait for, or held until
+// recently, each with Renew, then every membership they have had
+definePageMeta({ auth: true })
+useSeoMeta({ title: 'Your memberships', robots: 'noindex' })
+
+const { data } = await useFetch('/api/store/memberships', { key: 'memberships' })
+const { data: settings } = useStoreSettings()
+const day = (value: string) => new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'medium' }).format(new Date(value))
+const stateLabels = { active: 'Active', upcoming: 'Upcoming', ended: 'Ended', cancelled: 'Cancelled' } as const
+const months = (n: number) => `${n} month${n === 1 ? '' : 's'}`
+</script>
+
+<template>
+  <AccountShell title="Your memberships">
+    <div v-if="!data?.history.length" class="py-8">
+      <p class="text-muted">You have no memberships yet.</p>
+    </div>
+    <div v-else class="space-y-12">
+      <section v-if="data.current.length" aria-labelledby="current" class="space-y-4">
+        <h2 id="current" class="text-2xl font-medium">Current</h2>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <AccountMembershipCard v-for="membership in data.current" :key="membership.plan.id" :membership="membership" class="rounded-sm bg-muted p-6" />
+        </div>
+      </section>
+      <section aria-labelledby="history" class="space-y-4">
+        <h2 id="history" class="text-2xl font-medium">History</h2>
+        <ul class="divide-y divide-default border-y border-default">
+          <li v-for="membership in data.history" :key="membership.id" class="flex flex-wrap items-center gap-x-4 gap-y-1 py-4">
+            <div class="min-w-0 flex-1">
+              <p class="font-medium">{{ membership.plan.name }} <span class="font-normal text-muted">· {{ months(membership.months) }}</span></p>
+              <p class="text-sm text-muted">
+                {{ day(membership.startsAt) }} to {{ day(membership.endsAt) }}
+                <template v-if="membership.orderId"> · <NuxtLink :to="`/orders/${membership.orderId}`" class="underline">Order {{ membership.orderId }}</NuxtLink></template>
+              </p>
+            </div>
+            <UBadge :label="stateLabels[membership.state]" color="neutral" :variant="membership.state === 'active' ? 'solid' : 'subtle'" />
+          </li>
+        </ul>
+      </section>
+    </div>
+  </AccountShell>
+</template>
