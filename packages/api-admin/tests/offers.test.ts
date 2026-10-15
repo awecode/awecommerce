@@ -167,4 +167,42 @@ describe.skipIf(!url)('admin offers API', async () => {
     })
     expect(missingRange.status).toBe(422)
   })
+
+  test('saves a whole offer with its parts, lists it by state, and deletes it with them', async () => {
+    const slug = unique('offer-product')
+    const product = await post('/api/admin/products', { name: slug, slug, sku: slug, price: '50' })
+    const name = unique('whole-offer')
+    const created = await post('/api/admin/offers/with-parts', {
+      name,
+      type: 'user',
+      includedMembershipPlanIds: [7],
+      combinesWithOtherOffers: false,
+      products: { all: false, products: [product.id] },
+      condition: { type: 'basket_quantity', value: '2' },
+      benefit: { type: 'percentage', value: '15', maxAffectedItems: 1 },
+      startDate: new Date(Date.now() + 86_400_000).toISOString(),
+    })
+
+    const shown = await admin(`/api/admin/offers/${created.id}/with-parts`)
+    expect(shown.body).toMatchObject({
+      name,
+      includedMembershipPlanIds: [7],
+      combinesWithOtherOffers: false,
+      condition: { type: 'basket_quantity' },
+      benefit: { type: 'percentage', maxAffectedItems: 1 },
+      products: { all: false, products: [{ id: product.id, name: slug }] },
+    })
+    const listed = await admin(`/api/admin/offers?q=${name}&state=scheduled`)
+    expect(listed.body.results.map((o: any) => [o.id, o.benefit.type])).toEqual([[created.id, 'percentage']])
+    expect((await admin(`/api/admin/offers?q=${name}&state=running`)).body.results).toEqual([])
+
+    const changed = await admin(`/api/admin/offers/${created.id}/with-parts`, { method: 'PATCH', body: { products: { all: true }, benefit: { type: 'fixed_amount', value: '5' } } })
+    expect(changed.status).toBe(200)
+    expect((await admin(`/api/admin/offers/${created.id}/with-parts`)).body).toMatchObject({ products: { all: true }, benefit: { type: 'fixed_amount' } })
+    expect((await admin('/api/admin/offers/with-parts', { method: 'POST', body: { name: 'No parts', type: 'site' } })).status).toBe(400)
+
+    expect((await admin(`/api/admin/offers/${created.id}/with-parts`, { method: 'DELETE' })).status).toBe(200)
+    expect((await admin(`/api/admin/offers/${created.id}/with-parts`)).status).toBe(404)
+    expect((await admin(`/api/admin/offer-conditions/${created.conditionId}`)).status).toBe(404)
+  })
 })

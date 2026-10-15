@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// Related products: the chosen ones, and a search to add more
+// Chosen products (related products, an offer's products), and a search to
+// add more
 const related = defineModel<{ id: number; name: string }[]>({ required: true })
-const props = defineProps<{ productId: number | null }>()
+const props = withDefaults(defineProps<{ productId?: number | null; placeholder?: string }>(), { productId: null, placeholder: 'Add a related product' })
 
 const searchTerm = ref('')
 const q = ref('')
@@ -39,7 +40,8 @@ const add = (id: number | undefined) => {
       :items="choices"
       value-key="value"
       ignore-filter
-      placeholder="Add a related product"
+      :placeholder="placeholder"
+      :aria-label="placeholder"
       icon="i-lucide-plus"
       class="w-64"
       @update:model-value="add"

@@ -4,6 +4,7 @@ import { CartContent, Database } from '../../types'
 import {
   and,
   desc,
+  getTableColumns,
   eq,
   gt,
   gte,
@@ -12,6 +13,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   SQL,
   sql,
@@ -68,6 +70,29 @@ const inAudience = (userId: string | null) =>
         AND ${memberships.planId}::text IN (SELECT jsonb_array_elements_text(${offers.includedMembershipPlanIds}))
     )`,
   )
+
+// Whether the outer query's product is in the outer query's range. With
+// inclusiveFilter, it must match every list (an `includeAll...` flag matches
+// anything); without, any one of them. Either way, a product on any excluded
+// list is left out.
+const listed = (included: any, column: any, all: any) =>
+  sql`(${all} = true OR EXISTS (SELECT 1 FROM ${included} WHERE ${included.rangeId} = ${offerRanges.id} AND ${column}))`
+const unlisted = (excluded: any, column: any) =>
+  sql`NOT EXISTS (SELECT 1 FROM ${excluded} WHERE ${excluded.rangeId} = ${offerRanges.id} AND ${column})`
+const inProducts = listed(offerRangeIncludedProducts, sql`${offerRangeIncludedProducts.productId} = ${products.id}`, offerRanges.includeAllProducts)
+const inBrands = listed(offerRangeIncludedBrands, sql`${offerRangeIncludedBrands.brandId} = ${products.brandId}`, offerRanges.includeAllBrands)
+const inCategories = listed(offerRangeIncludedCategories, sql`${offerRangeIncludedCategories.categoryId} = ${products.categoryId}`, offerRanges.includeAllCategories)
+const inClasses = listed(offerRangeIncludedProductClasses, sql`${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}`, offerRanges.includeAllProductClasses)
+const productInRange = sql`(
+  (
+    (${offerRanges.inclusiveFilter} = true AND ${inProducts} AND ${inBrands} AND ${inCategories} AND ${inClasses})
+    OR (${offerRanges.inclusiveFilter} = false AND (${inProducts} OR ${inBrands} OR ${inCategories} OR ${inClasses}))
+  )
+  AND ${unlisted(offerRangeExcludedProducts, sql`${offerRangeExcludedProducts.productId} = ${products.id}`)}
+  AND ${unlisted(offerRangeExcludedBrands, sql`${offerRangeExcludedBrands.brandId} = ${products.brandId}`)}
+  AND ${unlisted(offerRangeExcludedCategories, sql`${offerRangeExcludedCategories.categoryId} = ${products.categoryId}`)}
+  AND ${unlisted(offerRangeExcludedProductClasses, sql`${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}`)}
+)`
 
 // A copy of the cart content without any offer applied, to price a set of
 // offers on its own
@@ -706,6 +731,9 @@ interface OfferListFilter {
   benefit?: number
   isActive?: boolean
   isFeatured?: boolean
+  // By dates, whether active or not: running (started, not ended),
+  // scheduled (starts later) or ended
+  state?: 'running' | 'scheduled' | 'ended'
 }
 
 interface ActiveUserOfferListFilter {
@@ -725,11 +753,176 @@ const checkVoucherCode = (offer: { type?: string; voucherCode?: string | null })
   }
 }
 
+// Which products an offer covers, as the offer form edits them: every
+// product, or those in any of the lists; minus the exceptions either way
+type OfferProductLists = { products?: number[]; categories?: number[]; brands?: number[]; productClasses?: number[] }
+type OfferProducts = OfferProductLists & { all: boolean; except?: OfferProductLists }
+type OfferParts = {
+  products: OfferProducts
+  condition: { type: 'basket_quantity' | 'basket_total' | 'distinct_items'; value: string }
+  benefit: { type: 'fixed_amount' | 'percentage' | 'free_shipping' | 'fixed_price'; value: string; maxAffectedItems?: number | null }
+}
+type NewOfferWithParts = Omit<NewOffer, 'conditionId' | 'benefitId'> & OfferParts
+type UpdateOfferWithParts = Partial<Omit<NewOffer, 'conditionId' | 'benefitId'>> & Partial<OfferParts>
+
+// The range fields for these products
+const rangeFor = (name: string, products: OfferProducts): NewOfferRange => ({
+  name,
+  inclusiveFilter: products.all,
+  includeAllProducts: products.all,
+  includeAllBrands: products.all,
+  includeAllCategories: products.all,
+  includeAllProductClasses: products.all,
+  includedProducts: products.all ? [] : (products.products ?? []),
+  includedCategories: products.all ? [] : (products.categories ?? []),
+  includedBrands: products.all ? [] : (products.brands ?? []),
+  includedProductClasses: products.all ? [] : (products.productClasses ?? []),
+  excludedProducts: products.except?.products ?? [],
+  excludedCategories: products.except?.categories ?? [],
+  excludedBrands: products.except?.brands ?? [],
+  excludedProductClasses: products.except?.productClasses ?? [],
+})
+
 class OfferService {
   private db: Database
 
   constructor(dbInstance: any) {
     this.db = dbInstance as Database
+  }
+
+  // An offer with its range, condition and benefit, made together: what the
+  // backoffice's offer form saves. Each part is named after the offer.
+  async createWithParts({ products, condition, benefit, ...offer }: NewOfferWithParts) {
+    checkVoucherCode(offer)
+    return await this.db.transaction(async (tx) => {
+      const range = await new OfferRangeService(tx).create(rangeFor(offer.name, products))
+      const [newCondition] = await tx.insert(offerConditions).values({ ...condition, rangeId: range.id }).returning()
+      const [newBenefit] = await tx.insert(offerBenefits).values({ ...benefit, name: offer.name }).returning()
+      const [created] = await tx
+        .insert(offers)
+        .values({ ...offer, conditionId: newCondition.id, benefitId: newBenefit.id })
+        .returning()
+      return created
+    })
+  }
+
+  // The offer with its condition, benefit and products. `products` is null
+  // when its range is one the form cannot show (made through the range
+  // routes, such as one that must match every list): update it there.
+  async getWithParts(id: number) {
+    const offer = await this.get(id)
+    if (!offer) {
+      return null
+    }
+    const range = (await new OfferRangeService(this.db).get(offer.condition.rangeId))!
+    const everything =
+      range.inclusiveFilter &&
+      range.includeAllProducts &&
+      range.includeAllBrands &&
+      range.includeAllCategories &&
+      range.includeAllProductClasses
+    const chosen =
+      !range.inclusiveFilter &&
+      !range.includeAllProducts &&
+      !range.includeAllBrands &&
+      !range.includeAllCategories &&
+      !range.includeAllProductClasses
+    const named = (rows: { id: number; name: string }[]) => rows.map(({ id, name }) => ({ id, name }))
+    return {
+      ...offer,
+      products:
+        everything || chosen
+          ? {
+              all: Boolean(everything),
+              products: named(range.includedProducts),
+              categories: named(range.includedCategories),
+              brands: named(range.includedBrands),
+              productClasses: named(range.includedProductClasses),
+              except: {
+                products: named(range.excludedProducts),
+                categories: named(range.excludedCategories),
+                brands: named(range.excludedBrands),
+                productClasses: named(range.excludedProductClasses),
+              },
+            }
+          : null,
+    }
+  }
+
+  // Changes the offer and the parts given. A part another offer also uses
+  // (made through the part routes) is copied first, so that offer keeps it.
+  async updateWithParts(id: number, { products, condition, benefit, ...data }: UpdateOfferWithParts) {
+    return await this.db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(offers).where(eq(offers.id, id)).for('update')
+      if (!existing) {
+        throw new NotFoundError(`Offer not found: ${id}`)
+      }
+      checkVoucherCode({ ...existing, ...data })
+      const name = data.name ?? existing.name
+      const [currentCondition] = await tx.select().from(offerConditions).where(eq(offerConditions.id, existing.conditionId))
+      const shared = async (column: typeof offers.conditionId | typeof offers.benefitId, value: number) =>
+        (await tx.$count(offers, and(eq(column, value), ne(offers.id, id)))) > 0
+
+      let conditionId = existing.conditionId
+      if (products || condition) {
+        let rangeId = currentCondition.rangeId
+        if (products) {
+          const rangeShared =
+            (await tx.$count(offerConditions, and(eq(offerConditions.rangeId, rangeId), ne(offerConditions.id, conditionId)))) > 0 ||
+            (await shared(offers.conditionId, conditionId))
+          if (rangeShared) {
+            rangeId = (await new OfferRangeService(tx).create(rangeFor(name, products))).id
+          } else {
+            await new OfferRangeService(tx).update(rangeId, rangeFor(name, products))
+          }
+        }
+        const values = { rangeId, type: condition?.type ?? currentCondition.type, value: condition?.value ?? currentCondition.value }
+        if (await shared(offers.conditionId, conditionId)) {
+          conditionId = (await tx.insert(offerConditions).values(values).returning())[0].id
+        } else {
+          await tx.update(offerConditions).set({ ...values, updatedAt: new Date().toISOString() }).where(eq(offerConditions.id, conditionId))
+        }
+      }
+
+      let benefitId = existing.benefitId
+      if (benefit) {
+        if (await shared(offers.benefitId, benefitId)) {
+          benefitId = (await tx.insert(offerBenefits).values({ ...benefit, name }).returning())[0].id
+        } else {
+          await tx
+            .update(offerBenefits)
+            .set({ ...benefit, name, updatedAt: new Date().toISOString() })
+            .where(eq(offerBenefits.id, benefitId))
+        }
+      }
+
+      const [offer] = await tx
+        .update(offers)
+        .set({ ...data, conditionId, benefitId, updatedAt: new Date().toISOString() })
+        .where(eq(offers.id, id))
+        .returning()
+      return offer
+    })
+  }
+
+  // Deletes the offer, and its parts that no other offer uses
+  async deleteWithParts(id: number) {
+    return await this.db.transaction(async (tx) => {
+      const [offer] = await tx.delete(offers).where(eq(offers.id, id)).returning()
+      if (!offer) {
+        throw new NotFoundError(`Offer not found: ${id}`)
+      }
+      if (!(await tx.$count(offers, eq(offers.benefitId, offer.benefitId)))) {
+        await tx.delete(offerBenefits).where(eq(offerBenefits.id, offer.benefitId))
+      }
+      if (!(await tx.$count(offers, eq(offers.conditionId, offer.conditionId)))) {
+        const [condition] = await tx.delete(offerConditions).where(eq(offerConditions.id, offer.conditionId)).returning()
+        if (!(await tx.$count(offerConditions, eq(offerConditions.rangeId, condition.rangeId)))) {
+          await tx.delete(offerRanges).where(eq(offerRanges.id, condition.rangeId))
+        }
+      }
+      return offer
+    })
   }
 
   async create(data: NewOffer) {
@@ -814,11 +1007,32 @@ class OfferService {
       where.push(eq(offers.benefitId, filters.benefit))
     }
 
+    if (filters.state) {
+      const now = new Date().toISOString()
+      if (filters.state === 'scheduled') {
+        where.push(gt(offers.startDate, now))
+      } else if (filters.state === 'ended') {
+        where.push(lt(offers.endDate, now))
+      } else {
+        where.push(
+          and(or(isNull(offers.startDate), lte(offers.startDate, now)), or(isNull(offers.endDate), gte(offers.endDate, now)))!,
+        )
+      }
+    }
+
+    // Each with its benefit and condition, for lists
     const query = this.db
-      .select()
+      .select({
+        ...getTableColumns(offers),
+        benefit: { type: offerBenefits.type, value: offerBenefits.value },
+        condition: { type: offerConditions.type, value: offerConditions.value },
+      })
       .from(offers)
+      .innerJoin(offerBenefits, eq(offerBenefits.id, offers.benefitId))
+      .innerJoin(offerConditions, eq(offerConditions.id, offers.conditionId))
       .where(and(...where))
       .orderBy(desc(offers.createdAt))
+      .$dynamic()
     return await paginate(
       filters as F | undefined,
       (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
@@ -1004,101 +1218,7 @@ class OfferService {
                 SELECT 1 FROM ${offerRanges}
                 WHERE ${offerRanges.id} = ${offerConditions.rangeId}
                 AND ${offerRanges.isActive} = true
-                AND (
-                  (${offerRanges.inclusiveFilter} = true AND (
-                    (${offerRanges.includeAllProducts} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedProducts}
-                      WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
-                      AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedProducts}
-                      WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
-                      AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
-                    )
-                    AND (${offerRanges.includeAllBrands} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedBrands}
-                      WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
-                      AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedBrands}
-                      WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
-                      AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
-                    )
-                    AND (${offerRanges.includeAllCategories} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedCategories}
-                      WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                      AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedCategories}
-                      WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                      AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
-                    )
-                    AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedProductClasses}
-                      WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
-                      AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedProductClasses}
-                      WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
-                      AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
-                    )
-                  ))
-                  OR
-                  (${offerRanges.inclusiveFilter} = false AND (
-                    (
-                      (${offerRanges.includeAllProducts} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedProducts}
-                        WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
-                        AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedProducts}
-                        WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
-                        AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                    OR (
-                      (${offerRanges.includeAllBrands} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedBrands}
-                        WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
-                        AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedBrands}
-                        WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
-                        AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                    OR (
-                      (${offerRanges.includeAllCategories} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedCategories}
-                        WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                        AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedCategories}
-                        WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                        AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                    OR (
-                      (${offerRanges.includeAllProductClasses} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedProductClasses}
-                        WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
-                        AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedProductClasses}
-                        WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
-                        AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                  ))
-                )
+                AND ${productInRange}
               )
             )
           `
@@ -1172,101 +1292,7 @@ class OfferService {
                 SELECT 1 FROM ${offerRanges}
                 WHERE ${offerRanges.id} = ${offerConditions.rangeId}
                 AND ${offerRanges.isActive} = true
-                AND (
-                  (${offerRanges.inclusiveFilter} = true AND (
-                    (${offerRanges.includeAllProducts} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedProducts}
-                      WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
-                      AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedProducts}
-                      WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
-                      AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
-                    )
-                    AND (${offerRanges.includeAllBrands} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedBrands}
-                      WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
-                      AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedBrands}
-                      WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
-                      AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
-                    )
-                    AND (${offerRanges.includeAllCategories} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedCategories}
-                      WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                      AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedCategories}
-                      WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                      AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
-                    )
-                    AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
-                      SELECT 1 FROM ${offerRangeIncludedProductClasses}
-                      WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
-                      AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
-                    ))
-                    AND NOT EXISTS (
-                      SELECT 1 FROM ${offerRangeExcludedProductClasses}
-                      WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
-                      AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
-                    )
-                  ))
-                  OR
-                  (${offerRanges.inclusiveFilter} = false AND (
-                    (
-                      (${offerRanges.includeAllProducts} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedProducts}
-                        WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
-                        AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedProducts}
-                        WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
-                        AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                    OR (
-                      (${offerRanges.includeAllBrands} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedBrands}
-                        WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
-                        AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedBrands}
-                        WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
-                        AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                    OR (
-                      (${offerRanges.includeAllCategories} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedCategories}
-                        WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                        AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedCategories}
-                        WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                        AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                    OR (
-                      (${offerRanges.includeAllProductClasses} = true OR EXISTS (
-                        SELECT 1 FROM ${offerRangeIncludedProductClasses}
-                        WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
-                        AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                        SELECT 1 FROM ${offerRangeExcludedProductClasses}
-                        WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
-                        AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
-                      )
-                    )
-                  ))
-                )
+                AND ${productInRange}
               )
             )
           `
@@ -1388,93 +1414,7 @@ class OfferService {
               ${offerRanges.id} = ${rangeId}
               AND
               ${offerRanges.isActive} = true
-              AND (
-                  (${offerRanges.inclusiveFilter} = true AND (
-                      (${offerRanges.includeAllProducts} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedProducts}
-                          WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
-                          AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedProducts}
-                          WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
-                          AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
-                      )
-                      AND (${offerRanges.includeAllBrands} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedBrands}
-                          WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
-                          AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedBrands}
-                          WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
-                          AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
-                      )
-                      AND (${offerRanges.includeAllCategories} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedCategories}
-                          WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                          AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedCategories}
-                          WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                          AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
-                      )
-                      AND (${offerRanges.includeAllProductClasses} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedProductClasses}
-                          WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
-                          AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedProductClasses}
-                          WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
-                          AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
-                      )
-                  ))
-                  OR
-                  (${offerRanges.inclusiveFilter} = false AND (
-                      ((${offerRanges.includeAllProducts} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedProducts}
-                          WHERE ${offerRangeIncludedProducts.productId} = ${products.id}
-                          AND ${offerRangeIncludedProducts.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedProducts}
-                          WHERE ${offerRangeExcludedProducts.productId} = ${products.id}
-                          AND ${offerRangeExcludedProducts.rangeId} = ${offerRanges.id}
-                      ))
-                      OR ((${offerRanges.includeAllBrands} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedBrands}
-                          WHERE ${offerRangeIncludedBrands.brandId} = ${products.brandId}
-                          AND ${offerRangeIncludedBrands.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedBrands}
-                          WHERE ${offerRangeExcludedBrands.brandId} = ${products.brandId}
-                          AND ${offerRangeExcludedBrands.rangeId} = ${offerRanges.id}
-                      ))
-                      OR ((${offerRanges.includeAllCategories} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedCategories}
-                          WHERE ${offerRangeIncludedCategories.categoryId} = ${products.categoryId}
-                          AND ${offerRangeIncludedCategories.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedCategories}
-                          WHERE ${offerRangeExcludedCategories.categoryId} = ${products.categoryId}
-                          AND ${offerRangeExcludedCategories.rangeId} = ${offerRanges.id}
-                      ))
-                      OR ((${offerRanges.includeAllProductClasses} = true OR EXISTS (
-                          SELECT 1 FROM ${offerRangeIncludedProductClasses}
-                          WHERE ${offerRangeIncludedProductClasses.productClassId} = ${products.productClassId}
-                          AND ${offerRangeIncludedProductClasses.rangeId} = ${offerRanges.id}
-                      ))
-                      AND NOT EXISTS (
-                          SELECT 1 FROM ${offerRangeExcludedProductClasses}
-                          WHERE ${offerRangeExcludedProductClasses.productClassId} = ${products.productClassId}
-                          AND ${offerRangeExcludedProductClasses.rangeId} = ${offerRanges.id}
-                      ))
-                  ))
-              )
+              AND ${productInRange}
           )
           `,
         ),

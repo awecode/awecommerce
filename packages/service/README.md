@@ -173,6 +173,8 @@ The applied offers are listed in `siteOfferDiscounts`, `userOfferDiscounts` and 
 
 **Offers that do not combine:** an offer with `combinesWithOtherOffers: false` is not added to others. The offers that combine are applied together, as above, and each one that does not is priced alone; the cart gets whichever gives the biggest discount (on a tie, the ones that combine). The total is the same in the summary and at checkout. Free shipping counts as no discount in this comparison. A voucher that loses stays applied to the cart and is listed in `notCombinedVoucherOffers` (`id`, `name`, `voucherCode`): it gives nothing, is not used up, and does not fail checkout. `applyVoucherCode` prices a voucher that does not combine on the cart without its other offers, so it applies even where it would not fit on top of them.
 
+A range covers every product, or chosen ones. With `inclusiveFilter`, a product must match every list (products, brands, categories, classes; an `includeAll…` flag matches anything); without, any one of them. Either way, a product on any excluded list is left out: "Shirts, except brand Acme" leaves out Acme shirts. A category covers the products directly in it, not those in its subcategories.
+
 Conditions are checked against the cart lines in the offer's range:
 
 - `basket_quantity`: a product's quantity, across its variants, reaches the value. Only that product's lines get the benefit.
@@ -188,7 +190,9 @@ Benefits apply per unit, to at most `maxAffectedItems` units per line when it is
 
 A voucher that gives nothing throws `Voucher code is not applicable to any product in the cart`.
 
-Managing offers: `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` and `OfferService` create, get, update, delete and list them. `update` and `delete` throw `NotFoundError` for a missing record, and `delete` returns the deleted one. `OfferService.create` and `update` throw `ValidationError` for a voucher without a `voucherCode` (`A voucher needs a voucher code`) and for another offer with one (`Only vouchers have a voucher code`). `OfferService.get` includes the offer's `condition` and `benefit`; `OfferRangeService.get` lists the range's included and excluded products, brands, categories and classes by id and name.
+Managing offers: `OfferRangeService`, `OfferConditionService`, `OfferBenefitService` and `OfferService` create, get, update, delete and list them. `update` and `delete` throw `NotFoundError` for a missing record, and `delete` returns the deleted one. `OfferService.create` and `update` throw `ValidationError` for a voucher without a `voucherCode` (`A voucher needs a voucher code`) and for another offer with one (`Only vouchers have a voucher code`). `OfferService.get` includes the offer's `condition` and `benefit`; `OfferService.list` rows have the benefit's and condition's `type` and `value`, and `state` (`running`, `scheduled` or `ended`) filters by dates; `OfferRangeService.get` lists the range's included and excluded products, brands, categories and classes by id and name.
+
+**An offer with its parts** (what the backoffice's offer form saves): `OfferService.createWithParts({ ...offer, products, condition, benefit })` makes the offer and its own range, condition and benefit in one transaction, each named after the offer. `products` is `{ all, products?, categories?, brands?, productClasses?, except? }`: every product, or any of the lists, minus the `except` lists. `getWithParts(id)` gives it back with `products` (by id and name), or `products: null` for a range made through `OfferRangeService` in a way this shape cannot show. `updateWithParts(id, changes)` changes the offer and the parts given; a part another offer also uses is copied first, so that offer keeps it. `deleteWithParts(id)` deletes the offer and the parts no other offer uses.
 
 ### Cart summary
 

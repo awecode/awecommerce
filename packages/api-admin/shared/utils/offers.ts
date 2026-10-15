@@ -86,3 +86,16 @@ const offerFields = z.object({
 })
 export const createOfferSchema = offerFields
 export const updateOfferSchema = offerFields.partial()
+
+// One offer with its parts, as the backoffice's offer form saves it. Which
+// products: every product (`all`), or those in any of the lists; minus the
+// `except` lists either way.
+const productLists = z.object({ products: ids.optional(), categories: ids.optional(), brands: ids.optional(), productClasses: ids.optional() })
+export const offerProductsSchema = productLists.extend({ all: z.boolean(), except: productLists.optional() })
+const offerWithPartsFields = offerFields.omit({ conditionId: true, benefitId: true }).extend({
+  products: offerProductsSchema,
+  condition: z.object({ type: offerConditionType, value: decimal }),
+  benefit: z.object({ type: offerBenefitType, value: decimal, maxAffectedItems: z.number().int().min(1).nullable().optional() }),
+})
+export const createOfferWithPartsSchema = offerWithPartsFields
+export const updateOfferWithPartsSchema = offerWithPartsFields.partial()

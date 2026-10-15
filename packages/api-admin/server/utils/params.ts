@@ -58,6 +58,8 @@ export const offerListQuery = z.object({
   featured: z.stringbool().optional(),
   condition: z.coerce.number().int().optional(),
   benefit: z.coerce.number().int().optional(),
+  // By dates: running, scheduled or ended
+  state: z.enum(['running', 'scheduled', 'ended']).optional(),
   ...pageFields,
 })
 
