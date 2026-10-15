@@ -102,6 +102,47 @@ const update = async (id: number) => {
   await refetch()
 }
 
+// ---- images chosen on the form: uploaded when the product is saved
+// Each preview (a blob: URL in state.images) and its file
+const pendingImages = reactive(new Map<string, File>())
+const dropPendingImages = () => {
+  for (const preview of pendingImages.keys()) URL.revokeObjectURL(preview)
+  pendingImages.clear()
+}
+onUnmounted(dropPendingImages)
+
+// Uploads the images still on the form, in order, each under the slug, and
+// puts its public URL in its place (the thumbnail too). Stops at the first
+// failure: the ones already uploaded keep their URL, so a retry skips them.
+// True when nothing is left to upload.
+const uploadPendingImages = async () => {
+  const waiting = state.images.filter((image) => pendingImages.has(image))
+  if (!waiting.length) return true
+  const slug = state.slug.trim()
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+    form.value?.setErrors([{ name: 'slug', message: 'Images are stored under the slug: use lowercase letters, numbers and hyphens' }], 'slug')
+    toast.add({ title: 'Check the highlighted fields', color: 'error', icon: 'i-lucide-circle-alert' })
+    return false
+  }
+  for (const preview of waiting) {
+    const file = pendingImages.get(preview)!
+    const body = new FormData()
+    body.append('slug', slug)
+    body.append('file', file)
+    try {
+      const { url } = await api<{ url: string }>('/api/admin/product-images', { method: 'POST', body })
+      state.images = state.images.map((image) => (image === preview ? url : image))
+      if (state.thumbnail === preview) state.thumbnail = url
+      pendingImages.delete(preview)
+      URL.revokeObjectURL(preview)
+    } catch (error) {
+      toast.add({ title: `Could not upload ${file.name}`, description: apiErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
+      return false
+    }
+  }
+  return true
+}
+
 // True when everything was saved
 const save = async () => {
   if (saving.value) return false
@@ -113,6 +154,8 @@ const save = async () => {
   }
   saving.value = true
   try {
+    // Nothing is saved when an image does not upload
+    if (!(await uploadPendingImages())) return false
     if (productId.value === null) await create()
     else await update(productId.value)
     return true
@@ -124,7 +167,11 @@ const save = async () => {
   }
 }
 
-const discard = () => load(clone(savedForm.value))
+// Back to the saved product; images not uploaded yet are dropped
+const discard = () => {
+  dropPendingImages()
+  return load(clone(savedForm.value))
+}
 
 defineShortcuts({ meta_s: { usingInput: true, handler: () => save() } })
 
@@ -270,7 +317,7 @@ const linkPlaceholder = 'https://…'
 
             <section class="space-y-3">
               <h2 class="text-sm font-semibold text-highlighted">Images</h2>
-              <ProductsImagesEditor v-model:images="state.images" v-model:thumbnail="state.thumbnail" />
+              <ProductsImagesEditor v-model:images="state.images" v-model:thumbnail="state.thumbnail" :pending="pendingImages" />
             </section>
 
             <section class="space-y-3">

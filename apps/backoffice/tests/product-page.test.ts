@@ -43,11 +43,12 @@ describe.skipIf(!url)('product page', async () => {
     expect(Number(created?.variants[0].price)).toBe(24.5)
   })
 
-  test('edits the details, images and status, and saves with ⌘S', async () => {
+  test('edits the details, uploads an image, sets the status, and saves with ⌘S', async () => {
     const category = await new CategoryService(db).create({ name: unique('Bags'), slug: unique('bags') })
     const saved = await product(unique('tote'))
     const page = await open(`/products/${saved.id}`)
-    const image = `https://example.com/${unique('tote')}.jpg`
+    // Uploaded on save under the product's slug (see product-images.test.ts)
+    const image = `http://cdn.test/${saved.slug}.png`
 
     await page.getByLabel('Name', { exact: true }).fill(`${saved.name} large`)
     await page.locator('[contenteditable="true"]').first().click()
@@ -56,8 +57,11 @@ describe.skipIf(!url)('product page', async () => {
     await page.getByRole('option', { name: category.name }).click()
     await page.getByLabel('Status').click()
     await page.getByRole('option', { name: 'Published' }).click()
-    await page.getByLabel('Image URL').fill(image)
-    await page.getByRole('button', { name: 'Add image' }).click()
+    await page.getByLabel('Choose images').setInputFiles({
+      name: 'tote.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2]),
+    })
     // The first image becomes the thumbnail
     await page.getByText('Thumbnail', { exact: true }).waitFor()
     await page.getByText('Unsaved changes').waitFor()

@@ -7,6 +7,7 @@ import pg from 'pg'
 import { afterAll } from 'vitest'
 import * as librarySchema from '@awecommerce/service/core/db/pg/schema'
 import * as authSchema from '../../../packages/auth/server/db/schema'
+import { startFakeS3 } from '../../../packages/api-admin/tests/fake-s3'
 
 export const url = process.env.TEST_POSTGRES_URL
 
@@ -36,6 +37,7 @@ export const setupBackoffice = async () => {
   process.env.BETTER_AUTH_URL = `http://127.0.0.1:${port}`
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   process.env.NUXT_AUTH_ADMIN_EMAILS = STAFF_EMAIL
+  bucket = await startFakeS3()
   await setup({
     rootDir: fileURLToPath(new URL('..', import.meta.url)),
     port,
@@ -52,6 +54,10 @@ export const setupBackoffice = async () => {
 }
 
 export type TestDb = Awaited<ReturnType<typeof setupBackoffice>>
+
+let bucket: Awaited<ReturnType<typeof startFakeS3>> | undefined
+// The product image bucket the server uploads to (public URL http://cdn.test/)
+export const fakeBucket = () => bucket!
 
 // Signs a new browser page in as `email` through the emailed link's confirm
 // page: the token is stored the way Better Auth's magic link plugin stores it,

@@ -44,6 +44,9 @@ export async function sendSesEmail({
   const aws = new AwsClient({
     accessKeyId: config.ses.accessKeyId,
     secretAccessKey: config.ses.secretKey,
+    // A failing SES answers within about a second (aws4fetch's default is 10
+    // retries, ~25s), as mail is sent before the request answers
+    retries: 2,
   })
 
   const emailParams = {

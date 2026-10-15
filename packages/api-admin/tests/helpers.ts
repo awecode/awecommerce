@@ -7,6 +7,7 @@ import { afterAll } from 'vitest'
 import * as librarySchema from '@awecommerce/service/core/db/pg/schema'
 import * as authSchema from '../../auth/server/db/schema'
 import { startFakeSes } from '../../api-store/tests/fake-ses'
+import { startFakeS3 } from './fake-s3'
 
 export const url = process.env.TEST_POSTGRES_URL
 
@@ -22,6 +23,7 @@ export const setupAdminApi = async () => {
   // Signs the links in order emails
   process.env.ORDER_HASH_SECRET = 'test-secret'
   ses = await startFakeSes()
+  bucket = await startFakeS3()
   await setup({ rootDir: fileURLToPath(new URL('..', import.meta.url)) })
 
   const pool = new pg.Pool({ connectionString: url })
@@ -32,6 +34,9 @@ export const setupAdminApi = async () => {
 export type TestDb = Awaited<ReturnType<typeof setupAdminApi>>
 
 let ses: Awaited<ReturnType<typeof startFakeSes>> | undefined
+let bucket: Awaited<ReturnType<typeof startFakeS3>> | undefined
+// The product image bucket the server uploads to (see fake-s3.ts)
+export const fakeBucket = () => bucket!
 // The mails the server sent to this address through SES (see fake-ses.ts)
 export const mailsTo = (email: string) => ses!.to(email)
 
