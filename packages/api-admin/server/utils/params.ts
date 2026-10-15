@@ -89,6 +89,8 @@ export const userListQuery = z.object({
   // Part of the email
   q: z.string().trim().min(1).optional(),
   role: z.enum(['admin', 'user']).optional(),
+  // Banned users only (instead of a role)
+  banned: z.stringbool().optional(),
   ...pageFields,
 })
 

@@ -44,7 +44,7 @@ const listQuery = computed(() => ({
 }))
 const { data, isLoading } = useQuery({
   key: () => ['orders', listQuery.value],
-  query: () => $fetch('/api/admin/orders', { query: listQuery.value }),
+  query: () => apiGet('/api/admin/orders', { query: listQuery.value }),
 })
 type Order = NonNullable<typeof data.value>['results'][number]
 

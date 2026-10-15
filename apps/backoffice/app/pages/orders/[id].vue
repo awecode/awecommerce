@@ -15,7 +15,7 @@ const cancelModal = useOverlay().create(CancelOrderModal)
 const id = computed(() => Number(route.params.id))
 const { data: order, error } = useQuery({
   key: () => ['order', id.value],
-  query: () => $fetch(`/api/admin/orders/${id.value}`),
+  query: () => apiGetAt('/api/admin/orders/:id', `/api/admin/orders/${id.value}`),
 })
 useSeoMeta({ title: () => `Order #${id.value}` })
 

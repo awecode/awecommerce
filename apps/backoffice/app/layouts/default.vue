@@ -10,6 +10,7 @@ const links: NavigationMenuItem[][] = [
     { label: 'Orders', icon: 'i-lucide-receipt', to: '/orders', onSelect: close },
     { label: 'Products', icon: 'i-lucide-package', to: '/products', onSelect: close },
     { label: 'Offers', icon: 'i-lucide-badge-percent', to: '/offers', onSelect: close },
+    { label: 'Customers', icon: 'i-lucide-users', to: '/customers', onSelect: close },
   ],
   [
     { label: 'Catalog', type: 'label' },
@@ -48,6 +49,7 @@ const groups = computed(() => [
       { label: 'New product class', icon: 'i-lucide-plus', to: '/catalog/product-classes?new=1' },
       { label: 'New membership plan', icon: 'i-lucide-plus', to: '/memberships/plans?new=1' },
       { label: 'Grant membership', icon: 'i-lucide-plus', to: '/memberships?grant=1' },
+      { label: 'Add staff', icon: 'i-lucide-plus', to: '/customers?add=1' },
     ],
   },
 ])

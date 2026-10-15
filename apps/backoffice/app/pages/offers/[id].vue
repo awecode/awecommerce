@@ -24,7 +24,7 @@ const { data: offer, error } = useQuery({
 })
 const { data: plans } = useQuery({
   key: ['membership-plans', 'all'],
-  query: () => $fetch('/api/admin/membership-plans', { query: { size: 100 } }),
+  query: () => apiGet('/api/admin/membership-plans', { query: { size: 100 } }),
 })
 const planItems = computed(() => (plans.value?.results ?? []).map((plan) => ({ label: `${plan.name} (${plan.program})`, value: plan.id })))
 

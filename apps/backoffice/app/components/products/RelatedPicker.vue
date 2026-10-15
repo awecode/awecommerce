@@ -13,7 +13,7 @@ watch(searchTerm, (value) => {
 })
 const { data } = useQuery({
   key: () => ['products', 'related-search', q.value],
-  query: () => $fetch('/api/admin/products', { query: { q: q.value || undefined, size: 20 } }),
+  query: () => apiGet('/api/admin/products', { query: { q: q.value || undefined, size: 20 } }),
 })
 const choices = computed(() =>
   (data.value?.results ?? [])

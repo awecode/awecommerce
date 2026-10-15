@@ -16,7 +16,7 @@ const api = $fetch as <T = unknown>(url: string, options?: Record<string, unknow
 
 const { data: methods, isLoading } = useQuery({
   key: ['shipping-methods'],
-  query: () => $fetch('/api/admin/shipping-methods'),
+  query: () => apiGet('/api/admin/shipping-methods'),
 })
 type Method = NonNullable<typeof methods.value>[number]
 const refresh = () => queryCache.invalidateQueries({ key: ['shipping-methods'] })

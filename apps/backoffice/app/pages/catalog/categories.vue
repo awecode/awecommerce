@@ -21,7 +21,7 @@ const columns: TableColumn<Category>[] = [
 // Every category, for the parent picker
 const { data: all } = useQuery({
   key: ['categories', 'all'],
-  query: () => $fetch('/api/admin/categories', { query: { size: 100 } }),
+  query: () => apiGet('/api/admin/categories', { query: { size: 100 } }),
 })
 
 // Parents a category can move under: not itself, nor one of its subcategories

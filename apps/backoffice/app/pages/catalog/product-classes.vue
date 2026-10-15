@@ -5,7 +5,7 @@ type ProductClass = CatalogRow & { taxRate: string | null; trackStock: boolean |
 
 useSeoMeta({ title: 'Product classes' })
 
-const { data: tax } = useQuery({ key: ['tax-settings'], query: () => $fetch('/api/admin/settings/tax') })
+const { data: tax } = useQuery({ key: ['tax-settings'], query: () => apiGet('/api/admin/settings/tax') })
 
 const columns: TableColumn<ProductClass>[] = [
   {

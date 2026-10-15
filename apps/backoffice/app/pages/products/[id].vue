@@ -19,7 +19,7 @@ const isNew = computed(() => productId.value === null)
 
 const { data: product, error, refetch } = useQuery({
   key: () => ['product', productId.value],
-  query: () => $fetch(`/api/admin/products/${productId.value}`),
+  query: () => apiGetAt('/api/admin/products/:id', `/api/admin/products/${productId.value}`),
   enabled: () => !isNew.value,
 })
 
@@ -66,8 +66,7 @@ const saveFailed = (error: unknown) =>
 
 const create = async () => {
   const { sku, price, discountedPrice, inventoryCost, stockQuantity } = variantBody(state.variants[0]!)
-  const created = await $fetch('/api/admin/products', {
-    method: 'POST',
+  const created = await apiPost('/api/admin/products', {
     body: { ...productBody(state), sku, price, discountedPrice, inventoryCost, stockQuantity },
   })
   toast.add({ title: `Created ${state.name}`, color: 'success', icon: 'i-lucide-check' })

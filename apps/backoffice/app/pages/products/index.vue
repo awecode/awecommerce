@@ -55,7 +55,7 @@ const listQuery = computed(() => ({
 }))
 const { data, isLoading } = useQuery({
   key: () => ['products', listQuery.value],
-  query: () => $fetch('/api/admin/products', { query: listQuery.value }),
+  query: () => apiGet('/api/admin/products', { query: listQuery.value }),
 })
 type Product = NonNullable<typeof data.value>['results'][number]
 const refresh = () => queryCache.invalidateQueries({ key: ['products'] })
@@ -152,7 +152,7 @@ const bulkActions = [
 ]
 const change = async (ids: number[], action: (typeof bulkActions)[number]) => {
   try {
-    await $fetch('/api/admin/products/bulk', { method: 'POST', body: { ids, changes: action.changes } })
+    await apiPost('/api/admin/products/bulk', { body: { ids, changes: action.changes } })
     toast.add({ title: `${action.done} ${plural(ids.length)}`, color: 'success', icon: 'i-lucide-check' })
     rowSelection.value = {}
   } catch (error) {

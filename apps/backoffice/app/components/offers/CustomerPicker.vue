@@ -11,7 +11,7 @@ watch(searchTerm, (value) => {
 })
 const { data } = useQuery({
   key: () => ['users', 'offer-search', q.value],
-  query: () => $fetch('/api/admin/users', { query: { q: q.value || undefined, size: 20 } }),
+  query: () => apiGet('/api/admin/users', { query: { q: q.value || undefined, size: 20 } }),
 })
 const choices = computed(() =>
   (data.value?.results ?? [])

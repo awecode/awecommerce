@@ -28,8 +28,13 @@ export const changePaymentStatusSchema = z.object({
   paymentStatus: z.enum(['Pending', 'Paid', 'Refunded']),
 })
 
-// admin: staff, with access to the backoffice; user: a customer
-export const changeUserRoleSchema = z.object({ role: z.enum(['admin', 'user']) })
+// role admin: staff, with access to the backoffice; user: a customer
+export const updateUserSchema = z
+  .object({ role: z.enum(['admin', 'user']).optional(), name: z.string().trim().min(1).optional() })
+  .refine((body) => body.role !== undefined || body.name !== undefined, 'Pass role or name')
+
+// Makes the account with this email staff, creating it when there is none
+export const addStaffSchema = z.object({ email: z.email(), name: z.string().trim().min(1).optional() })
 
 export const banUserSchema = z.object({
   reason: z.string().trim().min(1).optional(),

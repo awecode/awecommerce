@@ -27,7 +27,7 @@ watch(searchTerm, (value) => {
 })
 const { data: found } = useQuery({
   key: () => ['products', 'term-search', q.value],
-  query: () => $fetch('/api/admin/products', { query: { q: q.value || undefined, size: 20 } }),
+  query: () => apiGet('/api/admin/products', { query: { q: q.value || undefined, size: 20 } }),
 })
 const productItems = computed(() => (found.value?.results ?? []).map((product) => ({ label: product.name, value: product.id })))
 const productId = ref<number | undefined>()

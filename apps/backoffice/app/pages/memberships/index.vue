@@ -31,14 +31,14 @@ const pageSize = 50
 const listQuery = computed(() => ({ q: param('q'), plan: param('plan'), state: param('state'), page: page.value, size: pageSize }))
 const { data, isLoading } = useQuery({
   key: () => ['memberships', listQuery.value],
-  query: () => $fetch('/api/admin/memberships', { query: listQuery.value }),
+  query: () => apiGet('/api/admin/memberships', { query: listQuery.value }),
 })
 type Membership = NonNullable<typeof data.value>['results'][number]
 const refresh = () => queryCache.invalidateQueries({ key: ['memberships'] })
 
 const { data: plans } = useQuery({
   key: ['membership-plans', 'all'],
-  query: () => $fetch('/api/admin/membership-plans', { query: { size: 100 } }),
+  query: () => apiGet('/api/admin/membership-plans', { query: { size: 100 } }),
 })
 const planItems = computed(() => [
   { label: 'Any plan', value: 'any' },
@@ -77,7 +77,7 @@ watch(userSearch, (value) => {
 })
 const { data: users } = useQuery({
   key: () => ['users', 'grant-search', userQ.value],
-  query: () => $fetch('/api/admin/users', { query: { q: userQ.value || undefined, size: 20 } }),
+  query: () => apiGet('/api/admin/users', { query: { q: userQ.value || undefined, size: 20 } }),
   enabled: () => grantOpen.value,
 })
 const userItems = computed(() => (users.value?.results ?? []).map((user) => ({ label: user.email, description: user.name, value: user.id })))

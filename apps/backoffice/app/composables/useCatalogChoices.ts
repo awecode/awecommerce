@@ -2,9 +2,9 @@
 // 100 is the most the API gives at once.
 export const useCatalogChoices = () => {
   const lookups = { query: { size: 100 } }
-  const { data: categories } = useQuery({ key: ['categories', 'all'], query: () => $fetch('/api/admin/categories', lookups) })
-  const { data: brands } = useQuery({ key: ['brands', 'all'], query: () => $fetch('/api/admin/brands', lookups) })
-  const { data: classes } = useQuery({ key: ['product-classes', 'all'], query: () => $fetch('/api/admin/product-classes', lookups) })
+  const { data: categories } = useQuery({ key: ['categories', 'all'], query: () => apiGet('/api/admin/categories', lookups) })
+  const { data: brands } = useQuery({ key: ['brands', 'all'], query: () => apiGet('/api/admin/brands', lookups) })
+  const { data: classes } = useQuery({ key: ['product-classes', 'all'], query: () => apiGet('/api/admin/product-classes', lookups) })
   return {
     // Sorted by path ("Clothing › Shirts"), so subcategories follow their parent
     categories: computed(() =>

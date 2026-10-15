@@ -15,7 +15,7 @@ watch(search, (value) => {
 
 const { data, isLoading } = useQuery({
   key: () => ['products', 'side', q.value],
-  query: () => $fetch('/api/admin/products', { query: { q: q.value || undefined, size: 50 } }),
+  query: () => apiGet('/api/admin/products', { query: { q: q.value || undefined, size: 50 } }),
 })
 </script>
 

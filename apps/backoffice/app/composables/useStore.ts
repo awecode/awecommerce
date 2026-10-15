@@ -2,7 +2,7 @@
 export const useStoreSettings = () =>
   useQuery({
     key: ['store-settings'],
-    query: () => $fetch('/api/admin/settings/store'),
+    query: () => apiGet('/api/admin/settings/store'),
     staleTime: Infinity,
   })
 
