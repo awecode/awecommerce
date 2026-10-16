@@ -89,7 +89,7 @@ const remove = async (method: Method) => {
 }
 
 const formRef = useTemplateRef('form')
-defineShortcuts({ meta_s: { usingInput: true, handler: () => { if (open.value && !saving.value) formRef.value?.submit() } } })
+defineShortcuts({ meta_s: { usingInput: true, handler: async () => { if (!open.value || saving.value) return; await commitFocusedField(); formRef.value?.submit() } } })
 </script>
 
 <template>

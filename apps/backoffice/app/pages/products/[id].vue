@@ -172,7 +172,7 @@ const discard = () => {
   return load(clone(savedForm.value))
 }
 
-defineShortcuts({ meta_s: { usingInput: true, handler: () => save() } })
+defineShortcuts({ meta_s: { usingInput: true, handler: async () => { await commitFocusedField(); await save() } } })
 
 // Enter in a field does not save; only Save and ⌘S do
 const keepEnter = (event: KeyboardEvent) => {

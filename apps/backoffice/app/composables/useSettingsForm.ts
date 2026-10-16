@@ -64,7 +64,7 @@ export const useSettingsForm = <S extends Record<string, unknown>>(options: {
   }
   const discard = () => data.value && load(data.value)
 
-  defineShortcuts({ meta_s: { usingInput: true, handler: () => save() } })
+  defineShortcuts({ meta_s: { usingInput: true, handler: async () => { await commitFocusedField(); await save() } } })
   onBeforeRouteLeave(async () =>
     !dirty.value || (await confirm({ title: 'Discard changes?', description: 'Your changes have not been saved.', confirmLabel: 'Discard', color: 'error' })))
   const beforeUnload = (event: BeforeUnloadEvent) => {

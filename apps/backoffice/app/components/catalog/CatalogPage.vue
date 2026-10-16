@@ -168,7 +168,7 @@ const rowMenu = (row: Row) => [
 const searchInput = useTemplateRef('searchInput')
 defineShortcuts({
   '/': () => searchInput.value?.inputRef?.focus(),
-  meta_s: { usingInput: true, handler: () => { if (open.value && !saving.value) formRef.value?.submit() } },
+  meta_s: { usingInput: true, handler: async () => { if (!open.value || saving.value) return; await commitFocusedField(); formRef.value?.submit() } },
 })
 const formRef = useTemplateRef('form')
 

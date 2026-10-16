@@ -28,10 +28,12 @@ describe.skipIf(!url)('memberships', async () => {
     await page.getByRole('button', { name: 'New membership plan' }).click()
     await page.getByLabel('Name').fill(name)
     await page.getByLabel('Program').fill('music')
-    await page.getByRole('button', { name: /^Save/ }).click()
+    // Typed just before ⌘S, the rank still counts
+    await page.getByLabel('Rank').fill('3')
+    await page.keyboard.press('ControlOrMeta+s')
     await page.getByText(`Created ${name}`).first().waitFor()
     const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.name, name))
-    expect(plan).toMatchObject({ program: 'music', rank: 1, isActive: true })
+    expect(plan).toMatchObject({ program: 'music', rank: 3, isActive: true })
 
     // Terms are added from the plan's panel, and saved at once
     await page.getByPlaceholder('Search…').fill(name)

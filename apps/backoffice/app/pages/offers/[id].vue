@@ -197,7 +197,7 @@ const discard = () => {
   pendingImage.value = null
   load(savedForm.value)
 }
-defineShortcuts({ meta_s: { usingInput: true, handler: () => save() } })
+defineShortcuts({ meta_s: { usingInput: true, handler: async () => { await commitFocusedField(); await save() } } })
 // Enter in a field does not save; only Save and ⌘S do
 const keepEnter = (event: KeyboardEvent) => {
   if ((event.target as HTMLElement).tagName === 'INPUT') event.preventDefault()

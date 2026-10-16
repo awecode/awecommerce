@@ -15,7 +15,7 @@ const { state, loaded, dirty, saving, save, discard } = useSettingsForm({
     isEnabled: Boolean(settings.isEnabled),
     earnRate: settings.earnRate === null ? '' : trimDecimal(settings.earnRate),
     redeemRate: settings.redeemRate === null ? '' : trimDecimal(settings.redeemRate),
-    // Text, so ⌘S right after typing saves it (a number field commits on blur)
+    // Text, so it can be left empty for never
     expiresAfterInDays: settings.expiresAfterInDays === null ? '' : String(settings.expiresAfterInDays),
   }),
   body: (state) => ({

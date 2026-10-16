@@ -74,11 +74,16 @@ describe.skipIf(!url)('offers', async () => {
     await row.click()
     await page.waitForURL(`**/offers/${offer.id}`)
 
+    // A number typed just before ⌘S counts
+    await page.getByLabel('Overall').fill('50')
+    await page.keyboard.press('ControlOrMeta+s')
+    await page.getByText(`Saved ${name}`).first().waitFor()
+    expect((await offers.getWithParts(offer.id))!.overallLimit).toBe(50)
+
     await page.getByRole('switch', { name: /Combines with other offers/ }).click()
     await page.getByTestId('offer-preview').getByText('Does not combine with other offers').waitFor()
     await page.getByRole('button', { name: /^Save/ }).click()
-    await page.getByText(`Saved ${name}`).first().waitFor()
-    expect((await offers.getWithParts(offer.id))!.combinesWithOtherOffers).toBe(false)
+    await expect.poll(async () => (await offers.getWithParts(offer.id))!.combinesWithOtherOffers).toBe(false)
 
     await page.getByRole('button', { name: 'More actions' }).click()
     await page.getByRole('menuitem', { name: 'Delete offer' }).click()
