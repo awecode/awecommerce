@@ -286,3 +286,35 @@ test('plans to join: other programs, and higher tiers of the one held', async ()
   expect(forGuest.map((o) => o.plan.id)).toEqual([cinema.id, gold.id, silver.id, bronze.id])
   expect(forGuest.every((o) => o.replaces === null)).toBe(true)
 })
+
+test('a membership added to the cart replaces the ones of its program', async () => {
+  const program = unique('music')
+  const [silver, gold, films] = [await plan(program, 1), await plan(program, 2), await plan(unique('films'), 1)]
+  const term = async (planId: number, months: number) => {
+    const slug = unique('membership-product')
+    const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '99', stockQuantity: 10, status: 'Published' })
+    await service.addTerm({ planId, variantId: product.variants[0].id, months })
+    return product.variants[0].id
+  }
+  const [silverYear, silverMonth, goldYear, filmsYear] = [await term(silver.id, 12), await term(silver.id, 1), await term(gold.id, 12), await term(films.id, 12)]
+  const other = await new ProductService(db).create({ name: unique('mug'), slug: unique('mug'), sku: unique('mug'), price: '5', stockQuantity: 10, status: 'Published' })
+  const carts = new CartService(db)
+  const cart = await carts.create(unique('member'))
+  const variants = async () => (await carts.getCartContentForSession(cart.sessionId)).lines.map((l) => [l.variantId, l.quantity]).sort()
+
+  await carts.addToCart(cart.id, other.variants[0].id, 1)
+  await carts.addToCart(cart.id, filmsYear, 1)
+  await carts.addToCart(cart.id, silverYear, 1)
+  // The same term again, another term, then another plan of the program
+  await carts.addToCart(cart.id, silverYear, 1)
+  expect(await variants()).toEqual([[other.variants[0].id, 1], [filmsYear, 1], [silverYear, 1]].sort())
+  await carts.addToCart(cart.id, silverMonth, 1)
+  await carts.addToCart(cart.id, goldYear, 1)
+  expect(await variants()).toEqual([[other.variants[0].id, 1], [filmsYear, 1], [goldYear, 1]].sort())
+
+  // Signing in: the guest cart's plan of a program wins over the account's
+  const guest = await carts.create()
+  await carts.addToCart(guest.id, silverMonth, 1)
+  const merged = await carts.mergeCarts(cart.userId!, guest.sessionId)
+  expect(merged.lines.map((l) => [l.variantId, l.quantity]).sort()).toEqual([[other.variants[0].id, 1], [filmsYear, 1], [silverMonth, 1]].sort())
+})

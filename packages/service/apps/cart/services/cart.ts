@@ -21,6 +21,7 @@ import { CartContent, CartContentWithoutOfferInfo, Database } from '../../types'
 import { priceCart } from './pricing'
 import { LoyaltyService } from '../../loyalty/services/loyalty'
 import { MembershipService } from '../../membership/services/membership'
+import { membershipPlans, membershipTerms } from '../../membership/schemas'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -120,7 +121,9 @@ class CartService {
 
   // Adds a variant with the buyer's answers to the product's custom fields. The
   // same variant with the same answers adds to that line's quantity; different
-  // answers make a separate line.
+  // answers make a separate line. A membership term replaces the cart's lines
+  // of its program instead (any of its plans and terms, this one too): a
+  // person holds one plan of a program at a time.
   async addToCart(
     cartId: number,
     variantId: number,
@@ -151,6 +154,20 @@ class CartService {
       throw new ValidationError('Product price not found')
     }
     const customizations = validateCustomizations(row.product.customFields, answers)
+    const term = (await new MembershipService(this.db).termsForVariants([variantId])).get(variantId)
+    if (term) {
+      return await this.db.transaction(async (tx) => {
+        await tx.delete(cartLines).where(
+          and(
+            eq(cartLines.cartId, cartId),
+            inArray(cartLines.variantId, this.programVariants(tx, term.plan.program)),
+          ),
+        )
+        await new ProductVariantService(tx).checkStock(new Map([[variantId, quantity]]))
+        const [line] = await tx.insert(cartLines).values({ cartId, variantId, quantity, customizations }).returning()
+        return line
+      })
+    }
     // Counts the variant's other lines in the cart too
     await new ProductVariantService(this.db).checkStock(
       new Map([[variantId, (await this.quantityInCart(cartId, variantId)) + quantity]]),
@@ -172,6 +189,15 @@ class CartService {
       .returning()
 
     return result[0]
+  }
+
+  // The variants that sell a plan of this membership program
+  private programVariants(db: Database, program: string) {
+    return db
+      .select({ id: membershipTerms.variantId })
+      .from(membershipTerms)
+      .innerJoin(membershipPlans, eq(membershipPlans.id, membershipTerms.planId))
+      .where(eq(membershipPlans.program, program))
   }
 
   // Replaces the buyer's answers on a line, for example after checkout or the
@@ -482,8 +508,16 @@ class CartService {
         return { ...userCart, lines: userCart.lines.map(withLineVariant) }
       }
 
+      // A membership program the guest cart has a plan of keeps that one
+      const terms = await new MembershipService(tx).termsForVariants(
+        [...userCart.lines, ...sessionCart.lines].map((line) => line.variantId),
+      )
+      const program = (line: CartLine) => terms.get(line.variantId)?.plan.program
+      const sessionPrograms = new Set(sessionCart.lines.map(program).filter(Boolean))
+      const userLines = userCart.lines.filter((line) => !sessionPrograms.has(program(line)))
+
       const lines: NewCartLine[] = []
-      for (const userLine of userCart.lines) {
+      for (const userLine of userLines) {
         const sessionLine = sessionCart.lines.find((l: CartLine) =>
           sameLine(l, userLine),
         )
@@ -508,7 +542,7 @@ class CartService {
       }
 
       for (const sessionLine of sessionCart.lines) {
-        if (!userCart.lines.find((l: CartLine) => sameLine(l, sessionLine))) {
+        if (!userLines.find((l: CartLine) => sameLine(l, sessionLine))) {
           lines.push({
             id: sessionLine.id,
             cartId: sessionLine.cartId,
