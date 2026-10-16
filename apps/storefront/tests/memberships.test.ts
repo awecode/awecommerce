@@ -109,4 +109,33 @@ describe.skipIf(!url)('memberships', async () => {
     expect(await page.getByRole('listitem').filter({ hasText: gold.name }).count()).toBe(1)
     expect(await page.getByRole('listitem').filter({ hasText: silver.name }).getByText('Ended').count()).toBe(1)
   })
+
+  test('a signed-in buyer joins a plan, or upgrades the one they hold, from the account page', async () => {
+    const slug = unique('membership')
+    const [membershipClass] = await db.insert(productClasses).values({ name: slug, slug, requiresShipping: false, trackStock: false }).returning()
+    const program = unique('music')
+    const silver = await memberships.createPlan({ name: unique('Silver'), slug: unique('silver'), program, rank: 1 })
+    const gold = await memberships.createPlan({ name: unique('Gold'), slug: unique('gold'), program, rank: 2, description: 'Every album, a week early' })
+    const cinema = await memberships.createPlan({ name: unique('Cinema'), slug: unique('cinema'), program: unique('films'), rank: 1 })
+    for (const [planId, price] of [[silver.id, '50'], [gold.id, '90'], [cinema.id, '40']] as const) {
+      await memberships.addTerm({ planId, variantId: (await product(price, membershipClass!.id)).variants[0]!.id, months: 12 })
+    }
+
+    const page = await signedInPage(db, `${unique('join')}@example.com`)
+    await page.goto(`${process.env.BETTER_AUTH_URL}/account/memberships`)
+    await page.getByText('You have no memberships yet.').waitFor()
+    const cinemaCard = page.getByRole('group', { name: `Join ${cinema.name}` })
+    await cinemaCard.getByRole('button', { name: 'Join 12 months · $40.00' }).click()
+    await page.getByRole('dialog', { name: 'Your cart (1)' }).waitFor()
+
+    const userId = await page.evaluate(async () => (await (await fetch('/api/auth/get-session')).json()).user.id)
+    await memberships.grant({ userId, planId: silver.id, months: 1 })
+    await page.reload()
+    await page.getByRole('group', { name: `${silver.name} membership` }).getByText(/^Active until /).waitFor()
+    expect(await page.getByRole('group', { name: `Join ${silver.name}` }).count()).toBe(0)
+    const goldCard = page.getByRole('group', { name: `Join ${gold.name}` })
+    await goldCard.getByText('Every album, a week early').waitFor()
+    await goldCard.getByText(`Starts today and replaces your ${silver.name} membership.`).waitFor()
+    await goldCard.getByRole('button', { name: 'Upgrade 12 months · $90.00' }).waitFor()
+  })
 })

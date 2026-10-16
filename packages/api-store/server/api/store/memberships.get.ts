@@ -5,6 +5,9 @@ import { MembershipService } from '@awecommerce/service/apps/membership/services
 //   (`state` active, upcoming or ended, `startsAt`, `endsAt`), with the
 //   `terms` on sale to renew it (variant id, months, price). A renewal starts
 //   when the current one ends; for an ended one, at once.
+// - `toJoin`: the plans they can join (other programs, or a higher tier of
+//   one they hold, which `replaces` it and starts now), with the `terms` on
+//   sale.
 // - `history`: every membership, latest start first, with its `state`.
 export default defineServiceHandler(async (event) => {
   const user = await requireUser(event)
@@ -16,6 +19,11 @@ export default defineServiceHandler(async (event) => {
       ...rest,
       plan: { id: plan.id, name: plan.name, program: plan.program },
       terms: terms.filter((term) => term.planId === plan.id),
+    })),
+    toJoin: (await service.plansToJoin(user.id)).map(({ plan, replaces, terms }) => ({
+      plan: { id: plan.id, name: plan.name, program: plan.program, description: plan.description },
+      replaces,
+      terms: terms.map(({ id, variantId, months, price }) => ({ id, variantId, months, price })),
     })),
     history: (await service.list({ userId: user.id })).map(({ id, plan, state, months, startsAt, endsAt, orderId, cancellationReason }) => ({
       id,

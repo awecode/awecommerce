@@ -104,4 +104,25 @@ describe.skipIf(!url)('memberships in the store', async () => {
     // Not the member's internal fields
     expect(body.history[0].grantedBy).toBeUndefined()
   })
+
+  test('lists the plans a buyer can join, with upgrades over the one they hold', async () => {
+    const program = unique('music')
+    const silver = await memberships.createPlan({ name: 'Silver', slug: unique('silver'), program, rank: 1 })
+    const gold = await memberships.createPlan({ name: 'Gold', slug: unique('gold'), program, rank: 2, description: 'Everything, sooner' })
+    await membershipProduct(silver.id)
+    const goldYear = await membershipProduct(gold.id)
+    const { userId, token } = await createUser(db)
+    await memberships.grant({ userId, planId: silver.id, months: 1 })
+    const request = buyer()
+    request.signIn(token)
+
+    const { body } = await request('/api/store/memberships')
+    const ids = body.toJoin.map((option: { plan: { id: number } }) => option.plan.id)
+    expect(ids).not.toContain(silver.id)
+    expect(body.toJoin.find((option: { plan: { id: number } }) => option.plan.id === gold.id)).toEqual({
+      plan: { id: gold.id, name: 'Gold', program, description: 'Everything, sooner' },
+      replaces: { id: silver.id, name: 'Silver' },
+      terms: [{ id: expect.any(Number), variantId: goldYear.variants[0]!.id, months: 12, price: '99' }],
+    })
+  })
 })

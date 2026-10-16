@@ -254,3 +254,30 @@ test('terms on sale: active plan, active variant, listed product', async () => {
   expect(Number((await service.termsOnSale([music.id]))[1].price)).toBe(70)
   expect(await service.termsOnSale([])).toEqual([])
 })
+
+test('plans to join: other programs, and higher tiers of the one held', async () => {
+  const userId = unique('member')
+  const music = unique('music')
+  const films = unique('films')
+  const silver = await plan(music, 1)
+  const gold = await plan(music, 2)
+  const bronze = await plan(music, 0)
+  const cinema = await plan(films, 1)
+  const noTerms = await plan(films, 2)
+  const closed = await plan(films, 3)
+  await service.updatePlan(closed.id, { isActive: false })
+  for (const { id } of [silver, gold, bronze, cinema, closed]) {
+    const slug = unique('join-product')
+    const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '10', stockQuantity: 0, status: 'Published' })
+    await service.addTerm({ planId: id, variantId: product.variants[0].id, months: 12 })
+  }
+  await service.grant({ userId, planId: silver.id, months: 1 })
+
+  const options = (await service.plansToJoin(userId)).filter((o) => [music, films].includes(o.plan.program))
+  // By program (films, then music): bronze and silver itself are left out
+  expect(options.map((o) => [o.plan.id, o.replaces?.id ?? null, o.terms.length])).toEqual([
+    [cinema.id, null, 1],
+    [gold.id, silver.id, 1],
+  ])
+  expect(options.map((o) => o.plan.id)).not.toContain(noTerms.id)
+})

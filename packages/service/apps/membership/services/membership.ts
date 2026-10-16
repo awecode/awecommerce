@@ -359,6 +359,38 @@ class MembershipService {
       }))
   }
 
+  // The plans the person can join, each with its terms on sale (plans with
+  // none are left out): not among their currentPlans, and in a program they
+  // hold no running or upcoming membership in, or ranked above it. Such an
+  // upgrade starts now and `replaces` that plan. By program, then highest
+  // rank first.
+  async plansToJoin(userId: string) {
+    const current = await this.currentPlans(userId)
+    const shown = new Set(current.map((c) => c.plan.id))
+    const held = new Map<string, (typeof current)[number]['plan']>()
+    for (const { plan, state } of current) {
+      const top = held.get(plan.program)
+      if (state !== 'ended' && (!top || plan.rank > top.rank)) held.set(plan.program, plan)
+    }
+    const plans = (
+      await this.db.query.membershipPlans.findMany({
+        where: eq(membershipPlans.isActive, true),
+        orderBy: [asc(membershipPlans.program), desc(membershipPlans.rank), asc(membershipPlans.name)],
+      })
+    ).filter((plan) => !shown.has(plan.id) && plan.rank > (held.get(plan.program)?.rank ?? -Infinity))
+    const terms = await this.termsOnSale(plans.map((plan) => plan.id))
+    return plans
+      .map((plan) => {
+        const replaces = held.get(plan.program)
+        return {
+          plan,
+          replaces: replaces ? { id: replaces.id, name: replaces.name } : null,
+          terms: terms.filter((term) => term.planId === plan.id),
+        }
+      })
+      .filter((option) => option.terms.length)
+  }
+
   // Every membership the person had, newest first
   async history(userId: string) {
     return await this.db.query.memberships.findMany({
