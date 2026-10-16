@@ -1,10 +1,11 @@
-// What the customer is told when their order is placed, shipped or cancelled:
-// the subject, an HTML message in the magic-link mail's style, and its plain
-// text. Sent by sendOrderEmail (server/utils/orderEmails.ts).
+// What the customer is told when their order is placed (offline payment),
+// confirmed (paid online), shipped or cancelled: the subject, an HTML message
+// in the magic-link mail's style, and its plain text. Sent by sendOrderEmail
+// (server/utils/orderEmails.ts).
 
 import type { FulfillmentNote } from './utils/fulfillment'
 
-export type OrderEmailKind = 'placed' | 'shipped' | 'cancelled'
+export type OrderEmailKind = 'placed' | 'confirmed' | 'shipped' | 'cancelled'
 
 export type OrderEmailOrder = {
   id: number
@@ -17,7 +18,7 @@ export type OrderEmailOrder = {
     quantity: number
     price: string | null
     discount: string
-    // The line's fulfilment note, in the placed email
+    // The line's fulfilment note, in the placed and confirmed emails
     note?: FulfillmentNote | null
   }[]
 }
@@ -60,7 +61,9 @@ export const orderEmailContent = (
     new Intl.NumberFormat(store.locale || 'en-US', { style: 'currency', currency: store.currency || 'USD' }).format(Number(value))
   const number = `#${order.id}`
 
-  if (kind === 'placed') {
+  // Placed: paid later (cash on delivery, pay later). Confirmed: paid online.
+  if (kind === 'placed' || kind === 'confirmed') {
+    const intro = kind === 'placed' ? 'is placed' : 'is confirmed and paid'
     const lines = order.lines.map((line) => ({
       name: line.productName,
       options: line.options.map((o) => `${o.name}: ${o.value}`).join(', '),
@@ -80,9 +83,9 @@ export const orderEmailContent = (
             </tr>`)
       .join('\n')
     return {
-      subject: `Your ${storeName} order ${number}`,
+      subject: kind === 'placed' ? `Your ${storeName} order ${number}` : `Your ${storeName} order ${number} is confirmed`,
       html: frame([
-        paragraph(`Thank you for your order. Order <strong>${number}</strong> is placed.`),
+        paragraph(`Thank you for your order. Order <strong>${number}</strong> ${intro}.`),
         `          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="color: #ffffff; font-size: 15px;">
 ${rows}
             <tr>
@@ -94,7 +97,7 @@ ${rows}
         paragraph(`Sent by ${escape(storeName)} about your order ${number}.`, 'color: #868686; font-size: 12px;'),
       ].join('\n')),
       text: [
-        `Thank you for your order. Order ${number} is placed.`,
+        `Thank you for your order. Order ${number} ${intro}.`,
         '',
         ...lines.flatMap((line) => [
           `${line.name}${line.options ? ` (${line.options})` : ''} × ${line.quantity}: ${line.amount}`,

@@ -6,7 +6,8 @@ import { ValidationError } from '@awecommerce/service/core/errors'
 // Places the order for the buyer's cart. Prices, offers and shipping are read
 // from the database; the buyer's confirmed total only has to match them. A
 // cart with nothing to ship (digital goods) takes no address. Runs the placed
-// fulfilment hooks, then emails the buyer. With an online payment method, it
+// fulfilment hooks, then emails the buyer (for an online payment, once it is
+// paid instead). With an online payment method, it
 // then starts the payment: `payment.redirectUrl` is where to send the buyer
 // (null when the payment could not be started: the order page offers Pay now).
 // The order is placed either way.
@@ -58,8 +59,10 @@ export default defineServiceHandler(async (event) => {
   })
   forgetCart(event)
   await runFulfillment(event, 'placed', order.id)
-  // Logged, not thrown, when it fails: the order is placed either way
-  await sendOrderEmail(event, 'placed', order, { requestOrigin: true })
+  // Paid later: the order is placed now. Paid online: confirmed once paid
+  // (see settlePayment). Logged, not thrown, when it fails: the order is
+  // placed either way.
+  if (!method.online) await sendOrderEmail(event, 'placed', order, { requestOrigin: true })
   let redirectUrl: string | null = null
   if (method.online) {
     try {

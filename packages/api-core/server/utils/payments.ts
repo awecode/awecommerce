@@ -88,6 +88,10 @@ export const registerPaymentProvider = (provider: PaymentProvider): void => {
 // since)
 export const paymentProvider = (id: string | null | undefined): PaymentProvider | undefined => (id ? providers.get(id) : undefined)
 
+// Whether the order's method takes the money online (a card, a wallet). Such
+// an order is confirmed to the buyer once it is paid, not when it is placed.
+export const paysOnline = (order: { paymentMethod: string | null }): boolean => Boolean(paymentProvider(order.paymentMethod)?.online)
+
 const warned = new Set<string>()
 const warnOnce = (message: string) => {
   if (warned.has(message)) return
@@ -160,7 +164,10 @@ export const startPayment = async (event: H3Event, order: Order, provider: Payme
   const orders = new OrderService(useDb())
   if (!provider.online || !provider.start) {
     if (order.paymentMethod !== provider.id) {
+      const wasOnline = paysOnline(order)
       await orders.updatePayment(order.id, { paymentMethod: provider.id, paymentTry: null }, `Payment method changed to ${provider.label}`)
+      // From paying online to paying later: now it is placed, as at checkout
+      if (wasOnline) await sendOrderEmail(event, 'placed', (await orders.get(order.id))!, { requestOrigin: true })
     }
     return { redirectUrl: null }
   }
@@ -183,7 +190,8 @@ export const startPayment = async (event: H3Event, order: Order, provider: Payme
 }
 
 // Asks the gateway about a payment and acts on it: a paid one is recorded
-// (once) and runs the paid fulfilment hooks; a failed one marks the order's
+// (once), runs the paid fulfilment hooks and emails the buyer the confirmed
+// order; a failed one marks the order's
 // latest try failed, when it is that try. Returns the check.
 export const settlePayment = async (event: H3Event, order: Order, provider: PaymentProvider, reference: string, options: { cancelled?: boolean } = {}): Promise<PaymentCheck> => {
   if (!provider.check) return { status: 'open' }
@@ -200,7 +208,10 @@ export const settlePayment = async (event: H3Event, order: Order, provider: Paym
       metadata: { attempt: reference, ...result.details },
     })
     if (isLatest) await orders.updatePayment(order.id, { paymentTry: null })
-    if (recorded === 'paid') await runFulfillment(event, 'paid', order.id)
+    if (recorded === 'paid') {
+      await runFulfillment(event, 'paid', order.id)
+      await sendOrderEmail(event, 'confirmed', (await orders.get(order.id))!, { requestOrigin: true })
+    }
   } else if (result.status === 'failed' && isLatest && latest.status !== 'failed') {
     await orders.updatePayment(
       order.id,

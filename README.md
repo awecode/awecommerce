@@ -287,10 +287,13 @@ Product images live in object storage and are shown from its public URL. The bac
 
 ## Order emails
 
-The customer gets an email when their order is placed (after checkout), shipped (when staff move it to Shipped; setting it again, any other status, or an order with nothing to ship sends nothing) and cancelled (with the reason, not the staff remarks). Nothing else is sent: no staff copies, nothing for other statuses or payment changes.
+The customer gets an email when their order is placed or confirmed, shipped (when staff move it to Shipped; setting it again, any other status, or an order with nothing to ship sends nothing) and cancelled (with the reason, not the staff remarks). Nothing else is sent: no staff copies, nothing for other statuses or payment changes.
+
+- **Placed or confirmed** depends on the payment method. Paid later (cash on delivery, pay later): "Order #123 is placed", right after checkout. Paid online (a card, Thuprai Pay): nothing at checkout, then "Order #123 is confirmed and paid" once the payment is confirmed, or when staff mark it paid by hand; never, if it is never paid. An online order switched to an offline method through Pay now gets the placed email then. Both list the lines, with their fulfilment notes, and the total.
+- **Cancelled** is not sent for an order to be paid online that never was: its buyer was never told it was confirmed.
 
 - It goes to the guest's email, or the member's account email; without one, nothing is sent.
-- Each has the order number and a link to the order on the storefront with the checkout hash (`{NUXT_PUBLIC_SITE_URL}/orders/{id}?hash=…`), which opens without signing in. The placed email also lists the lines, with their fulfilment notes, and the total. They use the store's name, currency and locale.
+- Each has the order number and a link to the order on the storefront with the checkout hash (`{NUXT_PUBLIC_SITE_URL}/orders/{id}?hash=…`), which opens without signing in. They use the store's name, currency and locale.
 - `sendOrderEmail(event, kind, order)` (api-core, `server/utils/orderEmails.ts`) sends them before the route answers; the content is in `server/order-emails.ts`. It never throws: a missing address or storefront URL, or a failed send, is logged, and the order, status change or cancellation stands.
 - They go through the auth layer's `sendEmail()`, the same SES sender and development console fallback as the sign-in email. A failing SES is retried twice (aws4fetch's default is 10 retries, about 25 seconds), so a send that fails does not hold up the request for long; the image upload's storage client does the same. `NUXT_SES_ENDPOINT` points it at another SES v2 endpoint (the API tests use a local stand-in that records the mails).
 - The backoffice sends the shipped and cancelled emails, so it needs `NUXT_PUBLIC_SITE_URL` (the storefront's address; without it they are not sent) and the storefront's `ORDER_HASH_SECRET`. The storefront links to its own address when `NUXT_PUBLIC_SITE_URL` is not set.

@@ -7,11 +7,11 @@ import { type OrderEmailKind, type OrderEmailOrder, orderEmailContent } from '..
 
 type MailableOrder = OrderEmailOrder & { userId: string | null; guestUser: Record<string, any> | null }
 
-// Emails the customer that their order was placed, shipped or cancelled, with
-// a link to the order on the storefront that works without signing in (the
-// checkout hash). It goes to the guest's email, or to the member's account
-// email; with neither, nothing is sent. The placed email has each line's
-// fulfilment note.
+// Emails the customer that their order was placed, confirmed (paid online),
+// shipped or cancelled, with a link to the order on the storefront that works
+// without signing in (the checkout hash). It goes to the guest's email, or to
+// the member's account email; with neither, nothing is sent. The placed and
+// confirmed emails have each line's fulfilment note.
 //
 // Never throws: a missing address or storefront URL, or a failed send, is
 // logged, and the order, status change or cancellation stays as it is.
@@ -39,7 +39,7 @@ export const sendOrderEmail = async (
     const hash = new OrderService(db).generateHash(String(order.id))
     const link = `${origin}/orders/${order.id}?hash=${encodeURIComponent(hash)}`
     const store = await new StoreSettingsService(db).getSettings()
-    const notes = kind === 'placed' ? await fulfillmentNotes(order.id) : new Map<number, FulfillmentNote>()
+    const notes = kind === 'placed' || kind === 'confirmed' ? await fulfillmentNotes(order.id) : new Map<number, FulfillmentNote>()
     const lines = order.lines.map((line) => ({ ...line, note: notes.get(line.id) }))
     const { subject, html, text } = orderEmailContent(kind, { ...order, lines }, store, link)
     await sendEmail({ toEmails: [to], subject, html, message: text })

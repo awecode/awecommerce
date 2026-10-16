@@ -6,12 +6,11 @@ import { paymentEvents } from '@awecommerce/service/apps/order/schemas'
 import { productClasses } from '@awecommerce/service/apps/product/schemas'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
-import { buyer, createProduct, setupApi, unique, url } from '../../api-store/tests/helpers'
+import { buyer, createProduct, mailsTo, setupApi, unique, url } from '../../api-store/tests/helpers'
 import { createUser } from '../../api-admin/tests/helpers'
 import { startFakeStripe, WEBHOOK_SECRET } from './fake-stripe'
 
 const shippingAddress = { line1: '1 Main St', city: 'Pokhara', country: 'Nepal' }
-const guestUser = { name: 'Guest', email: 'guest@example.com' }
 
 describe.skipIf(!url)('paying with Stripe', async () => {
   const stripe = await startFakeStripe()
@@ -20,12 +19,16 @@ describe.skipIf(!url)('paying with Stripe', async () => {
   process.env.NUXT_STRIPE_SECRET_KEY = 'sk_test_fake'
   process.env.NUXT_STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET
   process.env.NUXT_STRIPE_API_BASE = stripe.base
+  // Where order emails link to
+  process.env.NUXT_PUBLIC_SITE_URL = 'http://storefront.test'
   const db = await setupApi({ rootDir: '../../payment-stripe/tests/app' })
   await new StoreSettingsService(db).updateSettings({ currency: 'USD' })
   const orders = new OrderService(db)
 
-  // A guest who checked out one item at 25 with Stripe
+  // A guest who checked out one item at 25 with Stripe, with an email of
+  // their own
   const placeOrder = async () => {
+    const guestUser = { name: 'Guest', email: `${unique('guest')}@example.com` }
     const request = buyer()
     await request('/api/store/cart/lines', { method: 'POST', body: { variantId: await createProduct(db, '25'), quantity: 1 } })
     const { body: summary } = await request('/api/store/cart')
@@ -34,7 +37,7 @@ describe.skipIf(!url)('paying with Stripe', async () => {
       body: { expectedTotal: summary.total, shippingAddress, guestUser, paymentMethod: 'stripe' },
     })
     expect(placed.status).toBe(200)
-    return { request, order: placed.body, session: stripe.sessionFor(placed.body.id)! }
+    return { request, order: placed.body, session: stripe.sessionFor(placed.body.id)!, email: guestUser.email }
   }
   // Follows a link back from Stripe; returns where the store sends the buyer
   const back = async (link: string) => {
@@ -63,10 +66,12 @@ describe.skipIf(!url)('paying with Stripe', async () => {
     await digital('/api/store/cart/lines', { method: 'POST', body: { variantId: product.variants[0]!.id, quantity: 1 } })
     expect((await digital('/api/store/payment-methods')).body.map((m: { id: string }) => m.id)).toEqual(['stripe'])
 
-    const { request: guest, order, session } = await placeOrder()
+    const { request: guest, order, session, email } = await placeOrder()
     expect(order.paymentMethod).toBe('stripe')
     expect(order.payment.redirectUrl).toBe(session.url)
-    expect(session).toMatchObject({ amount_total: 2500, currency: 'usd', customer_email: 'guest@example.com', client_reference_id: String(order.id) })
+    expect(session).toMatchObject({ amount_total: 2500, currency: 'usd', customer_email: email, client_reference_id: String(order.id) })
+    // Not confirmed to the buyer until it is paid
+    expect(mailsTo(email)).toHaveLength(0)
     expect((await orderPage(guest, order)).payment).toMatchObject({ canPay: true, latestTry: { status: 'open' } })
 
     stripe.pay(session.id)
@@ -77,9 +82,14 @@ describe.skipIf(!url)('paying with Stripe', async () => {
     const [payment] = await payments(order.id)
     expect(payment).toMatchObject({ type: 'Paid', reference: session.payment_intent, metadata: { method: 'stripe', attempt: session.id } })
 
-    // Stripe's webhook for the same payment changes nothing
+    // One email, now: confirmed and paid, with the lines
+    expect(mailsTo(email).map((mail) => mail.subject)).toEqual([expect.stringMatching(new RegExp(`order #${order.id} is confirmed$`))])
+    expect(mailsTo(email)[0]!.text).toContain(`Order #${order.id} is confirmed and paid.`)
+
+    // Stripe's webhook for the same payment changes nothing, and sends nothing
     expect((await sendWebhook('checkout.session.completed', session)).status).toBe(200)
     expect(await payments(order.id)).toHaveLength(1)
+    expect(mailsTo(email)).toHaveLength(1)
   })
 
   test('a webhook alone marks the order paid; a wrong signature is refused', async () => {
@@ -95,7 +105,7 @@ describe.skipIf(!url)('paying with Stripe', async () => {
   })
 
   test('a cancelled payment fails; Pay now starts another, or switches to cash on delivery', async () => {
-    const { request, order, session } = await placeOrder()
+    const { request, order, session, email } = await placeOrder()
     await back(session.cancel_url)
     expect(stripe.sessions.get(session.id)!.status).toBe('expired')
     const failed = (await orderPage(request, order)).payment
@@ -113,6 +123,8 @@ describe.skipIf(!url)('paying with Stripe', async () => {
     const switched = await orderPage(request, order)
     expect(switched.paymentMethod).toBe('cash_on_delivery')
     expect(switched.payment).toMatchObject({ canPay: false, method: { id: 'cash_on_delivery', label: 'Cash on delivery' } })
+    // Placed now, as an order paid on delivery is at checkout
+    expect(mailsTo(email).map((mail) => mail.text)).toEqual([expect.stringContaining(`Order #${order.id} is placed.`)])
     // Nothing more to pay online
     expect((await request(`/api/store/orders/${order.id}/pay`, { method: 'POST', body: { paymentMethod: 'stripe', hash: order.hash } })).status).toBe(422)
   })
@@ -153,5 +165,17 @@ describe.skipIf(!url)('paying with Stripe', async () => {
     expect(stripe.refunds.at(-1)!.payment_intent).toBe(stripe.sessions.get(session.id)!.payment_intent)
     expect((await payments(order.id)).map((p) => p.type).sort()).toEqual(['Paid', 'Refund'])
     expect((await staff(`/api/admin/orders/${order.id}`)).body.payment.canRefund).toBe(false)
+  })
+
+  test('staff marking a card order paid confirm it to the buyer; cancelling one never paid sends nothing', async () => {
+    const staff = buyer()
+    staff.signIn(await createUser(db as never, 'admin'))
+    const paidByHand = await placeOrder()
+    await staff(`/api/admin/orders/${paidByHand.order.id}/payment-status`, { method: 'POST', body: { paymentStatus: 'Paid' } })
+    expect(mailsTo(paidByHand.email).map((mail) => mail.subject)).toEqual([expect.stringMatching(/is confirmed$/)])
+
+    const neverPaid = await placeOrder()
+    expect((await staff(`/api/admin/orders/${neverPaid.order.id}/cancel`, { method: 'POST', body: { reason: 'Not paid' } })).status).toBe(200)
+    expect(mailsTo(neverPaid.email)).toHaveLength(0)
   })
 })
