@@ -33,6 +33,10 @@ export const categories = pgTable('category', {
   parentId: integer().references((): any => categories.id),
   description: text(),
   logo: text(),
+  // Shown as a row of its products on the store's home page
+  isFeatured: boolean().notNull().default(false),
+  // Position in the menu and on the home page, lowest first
+  order: integer().default(1),
   isActive: boolean().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),

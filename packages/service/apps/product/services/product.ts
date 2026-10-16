@@ -1035,6 +1035,7 @@ interface CategoryFilter {
   // Only categories with a product the store shows (see listedProduct), in
   // them or in a category under them
   hasListedProducts?: boolean
+  isFeatured?: boolean
   pagination?: PaginationArgs
 }
 
@@ -1223,6 +1224,10 @@ class CategoryService {
       where.push(sql`${categories.id} IN ${categoriesWithListedProducts}`)
     }
 
+    if (filter?.isFeatured !== undefined) {
+      where.push(eq(categories.isFeatured, filter.isFeatured))
+    }
+
     const parentCategories = alias(categories, 'parent_categories')
 
     const query = this.db
@@ -1233,7 +1238,7 @@ class CategoryService {
       .from(categories)
       .leftJoin(parentCategories, eq(parentCategories.id, categories.parentId))
       .where(and(...where))
-      .orderBy(desc(categories.createdAt))
+      .orderBy(asc(categories.order), asc(categories.name))
 
     return await paginate(
       filter as F | undefined,

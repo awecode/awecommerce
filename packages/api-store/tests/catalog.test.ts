@@ -6,6 +6,7 @@ import {
   ProductVariantService,
   RelatedProductService,
 } from '@awecommerce/service/apps/product/services/product'
+import { OfferService } from '@awecommerce/service/apps/offer/services/offer'
 import type { NewProduct } from '@awecommerce/service/apps/product/schemas'
 import { buyer, setupApi, unique, url } from './helpers'
 
@@ -177,11 +178,39 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect(ids).not.toContain(hidden.id)
     expect(ids).not.toContain(emptyCategory.id)
     expect(categories.find((c: any) => c.id === child.id).parent.id).toBe(parent.id)
+    // With what the home page uses
+    expect(categories.find((c: any) => c.id === child.id)).toMatchObject({ isFeatured: false, order: 1 })
 
     const brandIds = (await request('/api/store/brands')).body.map((b: any) => b.id)
     expect(brandIds).toContain(stocked.id)
     expect(brandIds).not.toContain(empty.id)
     expect(brandIds).not.toContain(draftOnly.id)
+  })
+
+  test('lists the featured offers anyone can use, without their targeting', async () => {
+    const offers = new OfferService(db)
+    const parts = {
+      products: { all: true },
+      condition: { type: 'basket_quantity' as const, value: '1' },
+      benefit: { type: 'percentage' as const, value: '10' },
+      isFeatured: true,
+    }
+    const voucher = await offers.createWithParts({ ...parts, name: unique('Welcome'), type: 'voucher', voucherCode: unique('WELCOME'), includeAllUsers: true, description: 'Your first order' })
+    const private_ = await offers.createWithParts({ ...parts, name: unique('Mine'), type: 'voucher', voucherCode: unique('MINE'), includedUserIds: ['someone'] })
+
+    const { body } = await request('/api/store/offers')
+    expect(body.find((offer: any) => offer.id === voucher.id)).toEqual({
+      id: voucher.id,
+      name: voucher.name,
+      description: 'Your first order',
+      image: null,
+      type: 'voucher',
+      voucherCode: voucher.voucherCode,
+      endDate: null,
+      benefit: { type: 'percentage', value: expect.any(String) },
+      condition: { type: 'basket_quantity', value: expect.any(String) },
+    })
+    expect(body.map((offer: any) => offer.id)).not.toContain(private_.id)
   })
 
   test('shows the store settings', async () => {

@@ -124,6 +124,9 @@ describe.skipIf(!url)('admin catalog API', async () => {
     const parent = (await admin('/api/admin/categories', { method: 'POST', body: { name, slug: name } })).body
     const child = unique('child')
     await admin('/api/admin/categories', { method: 'POST', body: { name: child, slug: child, parentId: parent.id } })
+    // Featured on the home page, at a position
+    const featured = await admin(`/api/admin/categories/${parent.id}`, { method: 'PATCH', body: { isFeatured: true, order: 3 } })
+    expect(featured.body).toMatchObject({ isFeatured: true, order: 3 })
     const inUse = await admin(`/api/admin/categories/${parent.id}`, { method: 'DELETE' })
     expect(inUse.status).toBe(409)
     expect(inUse.body.data.code).toBe('InUse')

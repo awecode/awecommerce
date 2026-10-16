@@ -1051,6 +1051,37 @@ class OfferService {
     )
   }
 
+  // The featured offers anyone can use now, to show in the store: active,
+  // running, not used up, and either automatic (site) or a voucher open to
+  // every customer (not to chosen ones or to members). Highest priority
+  // first, then newest; each with its benefit and condition.
+  async featuredForEveryone() {
+    const now = new Date().toISOString()
+    return await this.db
+      .select({
+        ...getTableColumns(offers),
+        benefit: { type: offerBenefits.type, value: offerBenefits.value },
+        condition: { type: offerConditions.type, value: offerConditions.value },
+      })
+      .from(offers)
+      .innerJoin(offerBenefits, eq(offerBenefits.id, offers.benefitId))
+      .innerJoin(offerConditions, eq(offerConditions.id, offers.conditionId))
+      .where(
+        and(
+          eq(offers.isActive, true),
+          eq(offers.isFeatured, true),
+          or(isNull(offers.startDate), lte(offers.startDate, now)),
+          or(isNull(offers.endDate), gte(offers.endDate, now)),
+          or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+          or(
+            eq(offers.type, 'site'),
+            and(eq(offers.type, 'voucher'), eq(offers.includeAllUsers, true), sql`${offers.includedMembershipPlanIds} = '[]'::jsonb`),
+          ),
+        ),
+      )
+      .orderBy(desc(offers.priority), desc(offers.createdAt))
+  }
+
   async markAsActive(id: number) {
     const [offer] = await this.db
       .update(offers)

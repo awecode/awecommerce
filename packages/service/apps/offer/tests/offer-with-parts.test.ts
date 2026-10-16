@@ -127,3 +127,29 @@ test('lists offers by state, with their benefit and condition', async () => {
   expect(await ids('ended')).toEqual([ended.id])
   expect((await service.list({ q: running.name }))[0]).toMatchObject({ benefit: { type: 'percentage' }, condition: { type: 'basket_quantity' } })
 })
+
+test('featured offers for everyone: running, not used up, automatic or open vouchers', async () => {
+  const featured = (values: Partial<Parameters<OfferService['createWithParts']>[0]>) =>
+    service.createWithParts({ ...base(), isFeatured: true, ...values })
+  const day = 86_400_000
+  const site = await featured({ priority: 1 })
+  const voucher = await featured({ type: 'voucher', voucherCode: unique('OPEN'), includeAllUsers: true, priority: 5 })
+  const hidden = [
+    await featured({ isFeatured: false }),
+    await featured({ isActive: false }),
+    await featured({ startDate: new Date(Date.now() + day).toISOString() }),
+    await featured({ endDate: new Date(Date.now() - day).toISOString() }),
+    await featured({ type: 'voucher', voucherCode: unique('MINE'), includedUserIds: ['someone'] }),
+    await featured({ type: 'voucher', voucherCode: unique('MEMBERS'), includeAllUsers: true, includedMembershipPlanIds: [1] }),
+    await featured({ type: 'user', includeAllUsers: true }),
+  ]
+  const usedUp = await featured({ overallLimit: 1 })
+  await service.update(usedUp.id, { usageCount: 1 })
+
+  const shown = await service.featuredForEveryone()
+  const ids = shown.map((offer) => offer.id)
+  expect(ids.indexOf(voucher.id)).toBeLessThan(ids.indexOf(site.id))
+  expect(ids).not.toContain(usedUp.id)
+  for (const offer of hidden) expect(ids).not.toContain(offer.id)
+  expect(shown.find((offer) => offer.id === site.id)).toMatchObject({ benefit: { type: 'percentage' }, condition: { type: 'basket_quantity' } })
+})

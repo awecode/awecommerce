@@ -101,6 +101,10 @@ const categoryFields = z.object({
   parentId: id.nullable().optional(),
   logo: optionalText,
   description: optionalText,
+  // A row of its products on the store's home page
+  isFeatured: z.boolean().optional(),
+  // Menu and home page position, lowest first
+  order: z.number().int().optional(),
   isActive: z.boolean().optional(),
 })
 export const createCategorySchema = categoryFields

@@ -7,6 +7,7 @@ import {
   ProductVariantService,
   RelatedProductService,
 } from '@awecommerce/service/apps/product/services/product'
+import { OfferService } from '@awecommerce/service/apps/offer/services/offer'
 import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { setupStorefront, url } from './helpers'
 
@@ -32,6 +33,53 @@ describe.skipIf(!url)('browsing', async () => {
     await page.getByRole('region', { name: 'Featured' }).getByText(featured.name).waitFor()
     await page.getByRole('region', { name: 'Best sellers' }).getByText(best.name).waitFor()
     expect(await page.getByRole('region', { name: 'Featured' }).getByText(best.name).count()).toBe(0)
+  })
+
+  test('the home page shows offers, featured category rows, new arrivals and brands, in order', async () => {
+    const categories = new CategoryService(db)
+    const first = await categories.create({ name: unique('Lamps'), slug: unique('lamps'), isFeatured: true, order: 0 })
+    const second = await categories.create({ name: unique('Rugs'), slug: unique('rugs'), isFeatured: true, order: 2 })
+    const lamp = await product(unique('Desk Lamp'), { categoryId: first.id, isFeatured: true })
+    await product(unique('Wool Rug'), { categoryId: second.id })
+    const brand = await new BrandService(db).create({ name: unique('Acme'), slug: unique('acme') })
+    await product(unique('Acme Kettle'), { brandId: brand.id })
+    await product(unique('Best Chair'), { isBestSeller: true })
+    const newest = await product(unique('Newest Vase'))
+    const code = unique('HELLO').toUpperCase()
+    await new OfferService(db).createWithParts({
+      name: unique('Hello offer'),
+      description: 'For your first order',
+      type: 'voucher',
+      voucherCode: code,
+      includeAllUsers: true,
+      isFeatured: true,
+      products: { all: true },
+      condition: { type: 'basket_quantity', value: '1' },
+      benefit: { type: 'percentage', value: '15' },
+    })
+    const page = await createPage('/')
+
+    const offer = page.getByRole('group', { name: /^Hello offer/ }).filter({ hasText: code })
+    await offer.getByText('15% off').waitFor()
+    await offer.getByText('For your first order').waitFor()
+    await offer.getByRole('button', { name: `Copy code ${code}` }).waitFor()
+    const lamps = page.getByRole('region', { name: first.name })
+    await lamps.getByText(lamp.name).waitFor()
+    await page.getByRole('region', { name: 'New arrivals' }).getByText(newest.name).waitFor()
+    await page.getByRole('region', { name: 'Shop by brand' }).getByRole('link', { name: brand.name }).waitFor()
+
+    const headings = await page.locator('main h2').allTextContents()
+    const at = (heading: string) => headings.indexOf(heading)
+    expect(at('Offers')).toBeLessThan(at('Featured'))
+    expect(at('Featured')).toBeLessThan(at('Shop by category'))
+    expect(at('Shop by category')).toBeLessThan(at(first.name))
+    expect(at(first.name)).toBeLessThan(at(second.name))
+    expect(at(second.name)).toBeLessThan(at('New arrivals'))
+    expect(at('New arrivals')).toBeLessThan(at('Best sellers'))
+    expect(at('Best sellers')).toBeLessThan(at('Shop by brand'))
+
+    await lamps.getByRole('link', { name: 'View all' }).click()
+    await page.waitForURL(`**/categories/${first.slug}`)
   })
 
   test('a category lists its products and its subcategories, sorted and paged in the URL', async () => {

@@ -127,3 +127,15 @@ test('a category cannot be its own parent or sit under its own subcategory', asy
   expect((await categoryService.update(child.id, { parentId: other.id })).parentId).toBe(other.id)
   expect((await categoryService.update(child.id, { parentId: null })).parentId).toBeNull()
 })
+
+test('categories list by position, then name, and filter by featured', async () => {
+  const later = await categoryService.create({ name: unique('b-ordered'), slug: unique('b-ordered'), order: -5, isFeatured: true })
+  const first = await categoryService.create({ name: unique('a-ordered'), slug: unique('a-ordered'), order: -5 })
+  const top = await categoryService.create({ name: unique('z-ordered'), slug: unique('z-ordered'), order: -10, isFeatured: true })
+
+  const listed = (await categoryService.list({})).map((c) => c.id).filter((id) => [later.id, first.id, top.id].includes(id))
+  expect(listed).toEqual([top.id, first.id, later.id])
+  const featured = (await categoryService.list({ isFeatured: true })).map((c) => c.id)
+  expect(featured).toEqual(expect.arrayContaining([top.id, later.id]))
+  expect(featured).not.toContain(first.id)
+})
