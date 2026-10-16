@@ -35,6 +35,24 @@ describe.skipIf(!url)('browsing', async () => {
     expect(await page.getByRole('region', { name: 'Featured' }).getByText(best.name).count()).toBe(0)
   })
 
+  test('shop by category shows images only once a category has a logo, the default for the rest', async () => {
+    const categories = new CategoryService(db)
+    const plain = await categories.create({ name: unique('Plain'), slug: unique('plain') })
+    await product(unique('Plain Cup'), { categoryId: plain.id })
+    const shop = (page: Awaited<ReturnType<typeof createPage>>) => page.getByRole('region', { name: 'Shop by category' })
+    const page = await createPage('/')
+    await shop(page).getByRole('link', { name: plain.name }).waitFor()
+    expect(await shop(page).locator('img').count()).toBe(0)
+
+    const pictured = await categories.create({ name: unique('Pictured'), slug: unique('pictured'), logo: '/pictured.jpg' })
+    await product(unique('Pictured Cup'), { categoryId: pictured.id })
+    await page.reload()
+    await shop(page).getByRole('link', { name: pictured.name }).waitFor()
+    expect(await shop(page).getByRole('link', { name: pictured.name }).locator('img').getAttribute('src')).toBe('/pictured.jpg')
+    expect(await shop(page).getByRole('link', { name: plain.name }).locator('img').getAttribute('src')).toBe('/images/category.svg')
+    await categories.update(pictured.id, { logo: null })
+  })
+
   test('the home page shows offers, featured category rows, new arrivals and brands, in order', async () => {
     const categories = new CategoryService(db)
     const first = await categories.create({ name: unique('Lamps'), slug: unique('lamps'), isFeatured: true, order: 0 })

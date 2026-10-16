@@ -23,6 +23,10 @@ const [{ data: categories }, { data: brands }, { data: offers }, { data: feature
     useFetch('/api/store/products', { key: 'home-best-sellers', query: { bestSeller: true, size: 4 } }),
   ])
 
+// Shop by category: images only when some category has a logo; then the
+// others get the default image
+const categoryImages = computed(() => menu.value.some((category) => category.logo))
+
 // Each featured category with its 4 newest products (and its subcategories')
 const featuredCategories = computed(() => (categories.value ?? []).filter((category) => category.isFeatured))
 const { data: categoryRows } = await useAsyncData(
@@ -57,9 +61,19 @@ const { data: categoryRows } = await useAsyncData(
       <h2 id="shop-by-category" class="mb-8 text-3xl font-medium tracking-tight">Shop by category</h2>
       <ul class="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4">
         <li v-for="category in menu" :key="category.id">
-          <NuxtLink :to="`/categories/${category.slug}`" class="group relative flex aspect-square items-end overflow-hidden rounded-sm bg-elevated p-5">
-            <img v-if="category.logo" :src="category.logo" alt="" loading="lazy" class="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]">
-            <span class="relative font-serif text-xl text-highlighted" :class="{ 'rounded-sm bg-default/90 px-3 py-1': category.logo }">{{ category.name }}</span>
+          <NuxtLink
+            :to="`/categories/${category.slug}`"
+            class="group relative flex items-end overflow-hidden rounded-sm bg-elevated p-5"
+            :class="categoryImages ? 'aspect-square' : 'min-h-24 transition hover:bg-accented'"
+          >
+            <img
+              v-if="categoryImages"
+              :src="category.logo || '/images/category.svg'"
+              alt=""
+              loading="lazy"
+              class="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            >
+            <span class="relative font-serif text-xl text-highlighted" :class="{ 'rounded-sm bg-default/90 px-3 py-1': categoryImages }">{{ category.name }}</span>
           </NuxtLink>
         </li>
       </ul>
