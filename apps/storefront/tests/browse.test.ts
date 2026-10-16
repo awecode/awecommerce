@@ -53,7 +53,7 @@ describe.skipIf(!url)('browsing', async () => {
     await categories.update(pictured.id, { logo: null })
   })
 
-  test('the home page shows offers, featured category rows, new arrivals and brands, in order', async () => {
+  test('the home page shows offers, best sellers, new arrivals, featured category rows and brands, in order', async () => {
     const categories = new CategoryService(db)
     const first = await categories.create({ name: unique('Lamps'), slug: unique('lamps'), isFeatured: true, order: 0 })
     const second = await categories.create({ name: unique('Rugs'), slug: unique('rugs'), isFeatured: true, order: 2 })
@@ -90,11 +90,11 @@ describe.skipIf(!url)('browsing', async () => {
     const at = (heading: string) => headings.indexOf(heading)
     expect(at('Offers')).toBeLessThan(at('Featured'))
     expect(at('Featured')).toBeLessThan(at('Shop by category'))
-    expect(at('Shop by category')).toBeLessThan(at(first.name))
+    expect(at('Shop by category')).toBeLessThan(at('Best sellers'))
+    expect(at('Best sellers')).toBeLessThan(at('New arrivals'))
+    expect(at('New arrivals')).toBeLessThan(at(first.name))
     expect(at(first.name)).toBeLessThan(at(second.name))
-    expect(at(second.name)).toBeLessThan(at('New arrivals'))
-    expect(at('New arrivals')).toBeLessThan(at('Best sellers'))
-    expect(at('Best sellers')).toBeLessThan(at('Shop by brand'))
+    expect(at(second.name)).toBeLessThan(at('Shop by brand'))
 
     await lamps.getByRole('link', { name: 'View all' }).click()
     await page.waitForURL(`**/categories/${first.slug}`)

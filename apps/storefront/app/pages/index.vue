@@ -3,8 +3,8 @@ import type { CardProduct } from '~/components/ProductCard.vue'
 
 // The home page, in order: the hero, featured offers, featured products,
 // the membership plans on sale (for a member, the ones they can join), shop
-// by category, a row of the newest products for each featured category, new
-// arrivals, best sellers, then shop by brand. Flags and order are set in the
+// by category, best sellers, new arrivals, a row of the newest products for
+// each featured category, then shop by brand. Flags and order are set in the
 // backoffice; empty sections are left out.
 const { store } = useAppConfig()
 useSeoMeta({ description: store.description })
@@ -80,6 +80,9 @@ const { data: categoryRows } = await useAsyncData(
     </UContainer>
   </section>
 
+  <ProductShelf title="Best sellers" :products="bestSellers?.results ?? []" />
+  <ProductShelf title="New arrivals" :products="newest?.results ?? []" />
+
   <ProductShelf
     v-for="row in categoryRows ?? []"
     :key="row.category.id"
@@ -87,9 +90,6 @@ const { data: categoryRows } = await useAsyncData(
     :products="row.products"
     :more="`/categories/${row.category.slug}`"
   />
-
-  <ProductShelf title="New arrivals" :products="newest?.results ?? []" />
-  <ProductShelf title="Best sellers" :products="bestSellers?.results ?? []" />
 
   <section v-if="brands?.length" aria-labelledby="shop-by-brand" class="py-12">
     <UContainer>
