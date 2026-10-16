@@ -32,7 +32,8 @@ const months = (n: number) => `${n} month${n === 1 ? '' : 's'}`
   <div class="space-y-3" :aria-label="`Join ${option.plan.name}`" role="group">
     <div>
       <p class="font-medium">{{ option.plan.name }}</p>
-      <p v-if="option.plan.description" class="text-sm text-muted">{{ option.plan.description }}</p>
+      <!-- Rich text, written by staff in the backoffice -->
+      <div v-if="option.plan.description" class="rich-text mt-2 text-sm text-muted" v-html="option.plan.description" />
     </div>
     <div class="space-y-2">
       <p v-if="option.replaces" class="text-xs text-muted">Starts today and replaces your {{ option.replaces.name }} membership.</p>

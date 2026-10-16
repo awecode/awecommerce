@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { EditorToolbarItem } from '@nuxt/ui'
-
 // One product, new (/products/new) or saved: its fields and variants are
 // edited together and saved with Save or ⌘S. Leaving with unsaved changes asks
 // first. On wide screens the product list sits beside it.
@@ -237,21 +235,6 @@ const beforeUnload = (event: BeforeUnloadEvent) => {
 onMounted(() => window.addEventListener('beforeunload', beforeUnload))
 onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
 
-const editorItems: EditorToolbarItem[][] = [
-  [
-    { kind: 'heading', level: 2, icon: 'i-lucide-heading-2', 'aria-label': 'Heading' },
-    { kind: 'heading', level: 3, icon: 'i-lucide-heading-3', 'aria-label': 'Subheading' },
-  ],
-  [
-    { kind: 'mark', mark: 'bold', icon: 'i-lucide-bold', 'aria-label': 'Bold' },
-    { kind: 'mark', mark: 'italic', icon: 'i-lucide-italic', 'aria-label': 'Italic' },
-  ],
-  [
-    { kind: 'bulletList', icon: 'i-lucide-list', 'aria-label': 'Bulleted list' },
-    { kind: 'orderedList', icon: 'i-lucide-list-ordered', 'aria-label': 'Numbered list' },
-    { kind: 'blockquote', icon: 'i-lucide-text-quote', 'aria-label': 'Quote' },
-  ],
-]
 const none = { label: 'None', value: null }
 // In the script, not the template: see the vue-tsc note in pages/catalog/brands.vue
 const linkPlaceholder = 'https://…'
@@ -306,11 +289,7 @@ const linkPlaceholder = 'https://…'
                 <UInput v-model="state.name" size="lg" class="w-full" :autofocus="isNew" />
               </UFormField>
               <UFormField label="Description">
-                <div class="rounded-md border border-default">
-                  <UEditor :key="`description-${productId}`" v-slot="{ editor }" v-model="state.description" content-type="html" :image="false" :mention="false" placeholder="What buyers should know" class="min-h-36 px-3 py-2">
-                    <UEditorToolbar :editor="editor" :items="editorItems" class="-mx-3 -mt-2 mb-2 border-b border-default px-1.5 py-1" />
-                  </UEditor>
-                </div>
+                <RichTextEditor :key="`description-${productId}`" v-model="state.description" placeholder="What buyers should know" />
               </UFormField>
             </section>
 
@@ -358,11 +337,7 @@ const linkPlaceholder = 'https://…'
 
             <section class="space-y-3">
               <h2 class="text-sm font-semibold text-highlighted">Specification</h2>
-              <div class="rounded-md border border-default">
-                <UEditor :key="`specification-${productId}`" v-slot="{ editor }" v-model="state.specification" content-type="html" :image="false" :mention="false" placeholder="Materials, sizes, care" class="min-h-24 px-3 py-2">
-                  <UEditorToolbar :editor="editor" :items="editorItems" class="-mx-3 -mt-2 mb-2 border-b border-default px-1.5 py-1" />
-                </UEditor>
-              </div>
+              <RichTextEditor :key="`specification-${productId}`" v-model="state.specification" placeholder="Materials, sizes, care" />
             </section>
 
             <section class="space-y-3">

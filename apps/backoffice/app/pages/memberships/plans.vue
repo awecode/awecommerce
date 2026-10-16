@@ -43,8 +43,8 @@ const columns: TableColumn<Plan>[] = [
       <UFormField label="Rank" name="rank" required help="Higher is better: buying a higher tier replaces a lower one">
         <UInputNumber v-model="form.state.rank" :min="0" class="w-32" />
       </UFormField>
-      <UFormField label="Description" name="description">
-        <UTextarea v-model="form.state.description" :rows="2" autoresize class="w-full" />
+      <UFormField label="Description" name="description" help="What members get, shown with the plan in the store">
+        <RichTextEditor :key="form.editing?.id ?? 'new'" v-model="form.state.description" placeholder="Perks, what is included" />
       </UFormField>
       <UFormField v-if="form.editing" label="Sold as" help="Each product variant here sells the plan for its months, at the variant's price. Add saves at once; so does Save, for one picked but not added.">
         <MembershipsPlanTerms ref="terms" :plan-id="form.editing.id" />

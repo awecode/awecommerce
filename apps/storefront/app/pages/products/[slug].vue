@@ -236,6 +236,14 @@ useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
             </div>
           </UForm>
 
+          <section v-if="variant?.membership" aria-labelledby="membership" data-testid="membership" class="space-y-2 rounded-sm bg-muted p-5">
+            <h2 id="membership" class="font-sans text-xs font-medium tracking-wider text-muted uppercase">What members get</h2>
+            <p class="font-medium">
+              {{ variant.membership.planName }} membership · {{ variant.membership.months }} month{{ variant.membership.months === 1 ? '' : 's' }}
+            </p>
+            <div v-if="variant.membership.description" class="rich-text text-sm text-default" v-html="variant.membership.description" />
+          </section>
+
           <div v-if="product.description" class="rich-text text-default" v-html="product.description" />
 
           <UAccordion

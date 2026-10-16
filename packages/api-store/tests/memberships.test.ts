@@ -149,5 +149,14 @@ describe.skipIf(!url)('memberships in the store', async () => {
     const { body: forMember } = await member('/api/store/membership-plans')
     expect(inProgram(forMember)).toEqual([[gold.id, { id: silver.id, name: 'Silver' }]])
   })
+
+  test('a membership product says which plan each variant sells', async () => {
+    const plan = await memberships.createPlan({ name: 'Patron', slug: unique('patron'), program: unique('patrons'), rank: 1, description: '<p>Early <strong>tickets</strong></p>' })
+    const product = await membershipProduct(plan.id, 6)
+    const { body } = await buyer()(`/api/store/products/${product.slug}`)
+    expect(body.variants[0].membership).toEqual({ planId: plan.id, planName: 'Patron', description: '<p>Early <strong>tickets</strong></p>', months: 6 })
+    const other = await new ProductService(db).create({ name: unique('mug'), slug: unique('mug'), sku: unique('mug'), price: '5', stockQuantity: 5, status: 'Published' })
+    expect((await buyer()(`/api/store/products/${other.slug}`)).body.variants[0].membership).toBeNull()
+  })
 })
 

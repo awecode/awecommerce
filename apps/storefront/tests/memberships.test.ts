@@ -142,12 +142,14 @@ describe.skipIf(!url)('memberships', async () => {
   test('the home page shows the plans: guests sign in to join, members join', async () => {
     const slug = unique('membership')
     const [membershipClass] = await db.insert(productClasses).values({ name: slug, slug, requiresShipping: false, trackStock: false }).returning()
-    const club = await memberships.createPlan({ name: unique('Club'), slug: unique('club'), program: unique('club'), rank: 1, description: 'Free tickets every month' })
+    const club = await memberships.createPlan({ name: unique('Club'), slug: unique('club'), program: unique('club'), rank: 1, description: '<p>Free tickets <strong>every month</strong></p><ul><li>Meet the team</li></ul>' })
     await memberships.addTerm({ planId: club.id, variantId: (await product('30', membershipClass!.id)).variants[0]!.id, months: 12 })
 
     const guest = await createPage('/')
     const guestCard = guest.getByRole('group', { name: `Join ${club.name}` })
-    await guestCard.getByText('Free tickets every month').waitFor()
+    // The description's rich text, as formatted text
+    await guestCard.locator('strong', { hasText: 'every month' }).waitFor()
+    await guestCard.getByRole('listitem').filter({ hasText: 'Meet the team' }).waitFor()
     await guestCard.getByText('12 months · $30.00').waitFor()
     await guestCard.getByRole('link', { name: 'Sign in to join' }).click()
     await guest.waitForURL('**/login?redirect=/')
@@ -178,5 +180,23 @@ describe.skipIf(!url)('memberships', async () => {
     await page.getByRole('group', { name: `${plan.name} membership` }).waitFor()
     expect(await page.getByRole('link', { name: 'Join a membership' }).count()).toBe(0)
   })
-})
 
+  test('a membership product page says what members get', async () => {
+    const slug = unique('membership')
+    const [membershipClass] = await db.insert(productClasses).values({ name: slug, slug, requiresShipping: false, trackStock: false }).returning()
+    const plan = await memberships.createPlan({ name: unique('Patron'), slug: unique('patron'), program: unique('patrons'), rank: 1, description: '<ul><li>Early tickets</li></ul>' })
+    const year = await product('60', membershipClass!.id)
+    await memberships.addTerm({ planId: plan.id, variantId: year.variants[0]!.id, months: 12 })
+
+    const page = await createPage(`/products/${year.slug}`)
+    const section = page.getByTestId('membership')
+    await section.getByText(`${plan.name} membership · 12 months`).waitFor()
+    await section.getByRole('listitem').filter({ hasText: 'Early tickets' }).waitFor()
+
+    // Not on other products
+    const plain = await product('10')
+    await page.goto(`${process.env.BETTER_AUTH_URL}/products/${plain.slug}`)
+    await page.getByRole('heading', { level: 1, name: plain.name }).waitFor()
+    expect(await page.getByTestId('membership').count()).toBe(0)
+  })
+})

@@ -48,6 +48,21 @@ describe.skipIf(!url)('memberships', async () => {
     expect((await memberships.getPlan(plan!.id))!.terms).toMatchObject([{ months: 6, variantId: product.variants[0]!.id }])
   })
 
+  test('a plan description is rich text', async () => {
+    const plan = await memberships.createPlan({ name: unique('Silver'), slug: unique('silver'), program: 'music', rank: 1 })
+    const page = await openPage(`/memberships/plans?q=${plan.name}`)
+    await page.getByRole('row', { name: new RegExp(plan.name) }).click()
+    const editor = page.locator('.tiptap')
+    await editor.click()
+    await page.getByRole('button', { name: 'Bold' }).click()
+    // The toolbar gives the focus back to the editor a moment later
+    await page.locator('.tiptap:focus').waitFor()
+    await page.keyboard.type('Early tickets')
+    await page.getByRole('button', { name: /^Save/ }).click()
+    await page.getByText(`Saved ${plan.name}`).first().waitFor()
+    expect((await memberships.getPlan(plan.id))!.description).toBe('<p><strong>Early tickets</strong></p>')
+  })
+
   test('Save adds a term picked but not added', async () => {
     const productName = unique('Gold year')
     const product = await new ProductService(db).create({ name: productName, slug: unique('gold-year'), sku: unique('GOLD'), price: '60', stockQuantity: 0 })

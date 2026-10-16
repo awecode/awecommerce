@@ -9,7 +9,12 @@ import { products } from '@awecommerce/service/apps/product/schemas'
 // variant says whether it is in stock: its stock is not counted (the product
 // class does not track stock), or some is left, and its `memberPrice` when
 // members of a plan pay less for one: the buyer's own (`isYours`) when they
-// hold such a plan, otherwise the lowest, or null.
+// hold such a plan, otherwise the lowest, or null. A variant that sells a
+// membership has `membership`: the plan's id, name and description (rich
+// text) and the months; null otherwise.
+const membershipOf = (term?: { planId: number; months: number; plan: { name: string; description: string | null } }) =>
+  term ? { planId: term.planId, planName: term.plan.name, description: term.plan.description, months: term.months } : null
+
 export default defineServiceHandler(async (event) => {
   const productService = new ProductService(useDb())
   const found = await productService.getBySlug(getRouterParam(event, 'slug')!)
@@ -28,6 +33,7 @@ export default defineServiceHandler(async (event) => {
   const planIds = user ? (await new MembershipService(useDb()).activeMemberships(user.id)).map((m) => m.planId) : []
   const yours = await offerService.memberPrices(variants, planIds)
   const lowest = await offerService.memberPrices(variants)
+  const terms = await new MembershipService(useDb()).termsForVariants(variants.map((variant) => variant.id))
   return {
     ...product,
     variants: variants.map((variant) => {
@@ -37,6 +43,7 @@ export default defineServiceHandler(async (event) => {
         ...storeVariant(variant),
         inStock: product.productClass?.trackStock === false || (variant.stockQuantity ?? 0) > 0,
         memberPrice,
+        membership: membershipOf(terms.get(variant.id)),
       }
     }),
     relatedProducts,
