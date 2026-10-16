@@ -31,6 +31,26 @@ pnpm dev:storefront   # storefront only
 pnpm dev:backoffice   # backoffice only
 ```
 
+### Database connections, on Node and Cloudflare Workers
+
+`useDb()` (`packages/api-core/server/utils/db.ts`) works on both, from the same build settings:
+
+- **Node:** one connection pool for the server, from `NUXT_POSTGRES_URL`.
+- **Cloudflare Workers** (`NITRO_PRESET=cloudflare-module`): a connection cannot be used by another request there, so each request gets a small pool of its own (at most 5 connections), closed after the response. It connects through a Hyperdrive binding named `HYPERDRIVE` when there is one (on the request, Nitro's `__env__` or global), and through `NUXT_POSTGRES_URL` otherwise. Outside a request, such as in a scheduled task, each call gets its own connection.
+- **What makes it work:** Nitro's async context (`nitro.experimental.asyncContext`), so `useDb()` finds the current request without being passed it. Also `pg-native` and `cloudflare:sockets` marked external, and Node.js compatibility on, all set in api-core. The Worker needs `compatibility_flags = ["nodejs_compat"]`.
+- **Hyperdrive:** create it with caching off (`npx wrangler hyperdrive create <name> --connection-string=... --caching-disabled`). Cached reads would show carts, stock, voucher usage and memberships from before the last change. In `wrangler.toml`:
+
+```toml
+compatibility_flags = ["nodejs_compat"]
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "<the Hyperdrive id>"
+# For wrangler dev: localConnectionString = "postgres://user:password@localhost:5432/shop"
+```
+
+The store API tests check the Workers path on Node: every request is made to look like a Workers request with a Hyperdrive binding (`packages/api-store/tests/workers-app`), and `NUXT_POSTGRES_URL` points nowhere.
+
 ## Backoffice
 
 `apps/backoffice` is the staff app: Nuxt UI 4 on Tailwind 4, an SPA (`ssr: false`), with data loaded through Pinia Colada.

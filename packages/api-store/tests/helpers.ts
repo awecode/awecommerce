@@ -16,9 +16,11 @@ export const url = process.env.TEST_POSTGRES_URL
 // database. Call at the top of a describe block.
 // `rootDir`: another app to build, relative to the tests (such as
 // 'fulfillment-app', with the test fulfilment hooks)
-export const setupApi = async ({ rootDir = '..' } = {}) => {
+// `postgresUrl`: what the server gets as NUXT_POSTGRES_URL, when not the test
+// database
+export const setupApi = async ({ rootDir = '..', postgresUrl = url } = {}) => {
   // The built server reads these
-  process.env.NUXT_POSTGRES_URL = url
+  process.env.NUXT_POSTGRES_URL = postgresUrl
   process.env.ORDER_HASH_SECRET = 'test-secret'
   process.env.BETTER_AUTH_URL = 'http://localhost:3000'
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
