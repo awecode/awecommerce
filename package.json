@@ -16,7 +16,7 @@
     "dev:storefront": "pnpm --filter @awecommerce/storefront dev",
     "dev:backoffice": "pnpm --filter @awecommerce/backoffice dev",
     "test:api": "pnpm --filter @awecommerce/api-store --filter @awecommerce/api-admin test",
-    "test:payments": "pnpm --filter @awecommerce/payment-stripe test",
+    "test:payments": "pnpm --filter @awecommerce/payment-stripe --filter @awecommerce/payment-thuprai-pay test",
     "test:auth": "pnpm --filter @awecommerce/auth test",
     "migrate:auth": "pnpm --filter @awecommerce/auth migrate",
     "generate:auth": "pnpm --filter @awecommerce/auth generate",

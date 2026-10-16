@@ -1,6 +1,7 @@
 export default defineNuxtConfig({
-  // Refunds card payments through Stripe, for orders paid with it
-  extends: ['@awecommerce/api-admin', '@awecommerce/payment-stripe'],
+  // The payment providers, so their orders show their method (and card
+  // payments can be refunded through Stripe)
+  extends: ['@awecommerce/api-admin', '@awecommerce/payment-stripe', '@awecommerce/payment-thuprai-pay'],
   modules: ['@nuxt/ui', '@pinia/nuxt', '@pinia/colada-nuxt'],
   css: ['~/assets/css/main.css'],
   compatibilityDate: '2026-10-14',

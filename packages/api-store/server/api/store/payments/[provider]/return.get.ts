@@ -4,11 +4,19 @@ import type { PaymentTry } from '@awecommerce/service/apps/order/services/order'
 // Where a gateway sends the buyer back, from the return or cancel link (with
 // `cancelled=1`). Asks the gateway how the payment went and acts on it, then
 // sends the buyer to the order page. The query alone is never trusted.
+// A gateway may add its own query with a second "?" (?orderId=&status=), which
+// would end up in our last value
+const beforeQuestionMark = (value: unknown) => (typeof value === 'string' ? value.split('?')[0] : value)
+
 export default defineServiceHandler(async (event) => {
   const { provider: id } = await getValidatedRouterParams(event, z.object({ provider: z.string() }).parse)
   const query = await getValidatedQuery(
     event,
-    z.object({ order: z.coerce.number().int(), hash: z.string(), cancelled: z.literal('1').optional() }).parse,
+    z.object({
+      order: z.preprocess(beforeQuestionMark, z.coerce.number().int()),
+      hash: z.preprocess(beforeQuestionMark, z.string()),
+      cancelled: z.preprocess(beforeQuestionMark, z.literal('1').optional()),
+    }).parse,
   )
   const order = await buyerOrder(event, query.order, query.hash)
   const provider = paymentProvider(id)

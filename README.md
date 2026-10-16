@@ -304,6 +304,7 @@ Payment methods are **providers**, registered in code and switched on by listing
 | `cash_on_delivery` | offline, built in | When the cart has something to ship | The courier collects; staff mark the order paid |
 | `pay_later` | offline, built in | When nothing is shipped (digital goods), and no online method is on (unless `NUXT_PAY_LATER_WITH_ONLINE=true`) | The store arranges payment; staff mark the order paid |
 | `stripe` | online, `packages/payment-stripe` | Any cart, once its keys are set | The buyer pays by card on Stripe Checkout |
+| `thuprai_pay` | online, `packages/payment-thuprai-pay` | Any cart, once its keys are set | The buyer pays on Thuprai Pay's page with eSewa, Khalti, Fonepay, ConnectIPS, NamastePay or a card |
 
 A listed id that no provider has, or a provider without its keys, is skipped with a warning in the server log.
 
@@ -325,6 +326,16 @@ Unpaid orders are never cancelled on their own: staff cancel them, which gives t
 3. In Stripe, add a webhook endpoint at `https://<storefront>/api/store/payments/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`; its signing secret is `NUXT_STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:3000/api/store/payments/stripe/webhook` prints one.
 
 The buyer pays the order's total, in the store's currency, as one line ("Order 123"). It uses Stripe's SDK through `fetch`, so it runs on Node and on Cloudflare Workers. `pnpm test:payments` runs its tests against a stand-in for Stripe's API (`packages/payment-stripe/tests/fake-stripe.ts`); the storefront's and backoffice's payment tests use it too.
+
+### Thuprai Pay
+
+Thuprai Pay (pay.awecode.com) puts Nepali wallets and banks, and cards, on one hosted page; the money settles into the merchant's own gateway accounts.
+
+1. Add `@awecommerce/payment-thuprai-pay` to both apps' `extends` (the base apps have it), and `thuprai_pay` to `NUXT_PAYMENT_METHODS`.
+2. In the storefront, set `NUXT_THUPRAI_PAY_API_KEY` (`ps_…`) and `NUXT_THUPRAI_PAY_WEBHOOK_SECRET`, both from Awecode. For the sandbox, also `NUXT_THUPRAI_PAY_API_BASE=https://ps-stg.awecode.workers.dev`; without it, the live service is used.
+3. Have Thuprai Pay send webhooks to `https://<storefront>/api/store/payments/thuprai_pay/webhook`.
+
+Checkout shows it as Thuprai Pay, "Pay with a Nepali wallet or bank" (`NUXT_THUPRAI_PAY_LABEL` and `NUXT_THUPRAI_PAY_DESCRIPTION` change them). The total goes in the currency's minor unit (paisa for NPR), with the order's id as `orderId` and a reference of its own for each try, so Pay now can start another. A payment counts only when Thuprai Pay's verify call says `fulfilled`, on the buyer's return and on each signed webhook (`X-Webhook-Signature`, an HMAC-SHA256 of the body, checked with Web Crypto so it runs on Workers). Coming back through the failure link while the payment is still open cancels it there. Its API refunds cash sales only, so the backoffice has no Refund through button for it: refund in the wallet or bank, then Mark as refunded. Its tests run against a stand-in (`packages/payment-thuprai-pay/tests/fake-thuprai-pay.ts`).
 
 ### Adding a payment method
 

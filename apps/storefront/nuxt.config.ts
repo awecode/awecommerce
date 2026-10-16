@@ -1,6 +1,8 @@
 export default defineNuxtConfig({
-  // Card payments through Stripe: offered once stripe is in NUXT_PAYMENT_METHODS
-  extends: ['@awecommerce/api-store', '@awecommerce/payment-stripe'],
+  // Payment providers: each is offered once its id is in NUXT_PAYMENT_METHODS
+  // and its keys are set (stripe for cards, thuprai_pay for Nepali wallets
+  // and banks)
+  extends: ['@awecommerce/api-store', '@awecommerce/payment-stripe', '@awecommerce/payment-thuprai-pay'],
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
   compatibilityDate: '2026-10-14',

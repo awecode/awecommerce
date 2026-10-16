@@ -1,0 +1,24 @@
+{
+  "name": "@awecommerce/payment-thuprai-pay",
+  "private": true,
+  "type": "module",
+  "description": "Nuxt layer: Nepali wallets and banks (eSewa, Khalti, Fonepay, ConnectIPS and more) through Thuprai Pay, as the thuprai_pay payment method",
+  "main": "./nuxt.config.ts",
+  "scripts": {
+    "test": "node ../service/scripts/test-pg.mjs --if-available"
+  },
+  "dependencies": {
+    "@awecommerce/api-core": "workspace:*",
+    "@awecommerce/service": "workspace:*"
+  },
+  "devDependencies": {
+    "@awecommerce/api-admin": "workspace:*",
+    "@awecommerce/api-store": "workspace:*",
+    "@nuxt/test-utils": "^4.3.3",
+    "@types/pg": "^8.23.1",
+    "drizzle-orm": "^0.45.4",
+    "nuxt": "^4.6.1",
+    "pg": "^8.23.1",
+    "vitest": "^5.0.4"
+  }
+}
