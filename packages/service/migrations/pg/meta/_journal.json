@@ -120,6 +120,13 @@
       "when": 1792137158881,
       "tag": "0016_category_featured_order",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792142148749,
+      "tag": "0017_order_payment_method",
+      "breakpoints": true
     }
   ]
 }

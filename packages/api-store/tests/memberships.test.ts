@@ -56,7 +56,7 @@ describe.skipIf(!url)('memberships in the store', async () => {
     await member('/api/store/cart/lines', { method: 'POST', body: { variantId: product.variants[0]!.id, quantity: 1 } })
     const placed = await member('/api/store/checkout', { method: 'POST', body: { expectedTotal: (await member('/api/store/cart')).body.total } })
     expect(placed.status).toBe(200)
-    expect(placed.body.metadata).toEqual({ paymentMethod: 'pay_later' })
+    expect(placed.body.paymentMethod).toBe('pay_later')
     const shown = await member(`/api/store/orders/${placed.body.id}`)
     expect(shown.body.lines[0].note).toEqual({ title: 'Platinum membership', text: 'It starts once your payment is confirmed.' })
   })

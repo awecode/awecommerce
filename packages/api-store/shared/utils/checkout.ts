@@ -44,13 +44,19 @@ export const checkoutSchema = z
     guestUser: guestUserSchema.optional(),
     // Loyalty points to redeem (signed in only)
     redeemPoints: z.number().positive().optional(),
-    // How the buyer pays; card and other gateways will add their own. Stored
-    // as the order's `metadata.paymentMethod`. A cart with something to ship
-    // pays the courier on delivery; one with nothing to ship (digital goods)
-    // pays later, as arranged by the store. Defaults to the one that fits.
-    paymentMethod: z.enum(['pay_on_delivery', 'pay_later']).optional(),
+    // How the buyer pays: the id of one of /api/store/payment-methods (such as
+    // cash_on_delivery or stripe), stored as the order's `paymentMethod`.
+    // Optional when there is only one.
+    paymentMethod: z.string().trim().min(1).optional(),
   })
   .refine(
     (body) => body.shippingAddress === undefined || body.shippingAddressId === undefined,
     'Pass shippingAddress or shippingAddressId, not both',
   )
+
+// Pay now on an order page: the method (one of the order's `payment.methods`),
+// and the hash from the order's link when not signed in as its owner
+export const payOrderSchema = z.object({
+  paymentMethod: z.string().trim().min(1),
+  hash: z.string().optional(),
+})

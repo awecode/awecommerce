@@ -16,7 +16,7 @@ Each app extends one API layer, so it serves only that API and `useFetch` knows 
 
 ## Run the apps
 
-Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`) and `BETTER_AUTH_SECRET`. Migrate the database first, for the library's tables and the auth tables:
+Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`) and `BETTER_AUTH_SECRET`. The storefront also needs `NUXT_PAYMENT_METHODS` (such as `cash_on_delivery,pay_later`): no payment method is on by default, and without one no order can be placed (see Payments). Migrate the database first, for the library's tables and the auth tables:
 
 ```sh
 pnpm migrate        # library tables (see packages/service/README.md)
@@ -149,8 +149,11 @@ Adding more than is in stock, or raising a quantity past it, gives 409 with `dat
 | Route | Body | Does |
 |---|---|---|
 | `GET /api/store/shipping-methods` | | The shipping methods |
-| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress or shippingAddressId, guestUser?, redeemPoints?, paymentMethod? }` | Places the order, runs the placed fulfilment hooks and clears the cart cookie. Returns the order with its `hash`. `paymentMethod` is `pay_on_delivery` for a cart with something to ship and `pay_later` for one with nothing to ship (each the default and the only one allowed, 422 otherwise), stored as the order's `metadata.paymentMethod`. |
-| `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page, for whoever holds the link, with each line's fulfilment `note` (or `null`). A wrong hash gives 404. |
+| `GET /api/store/payment-methods` | | The payment methods for the buyer's cart, in the store's order: `{ id, label, description, online }` (see Payments). Empty when none is set up. |
+| `POST /api/store/checkout` | `{ shippingMethodId?, expectedTotal, shippingAddress or shippingAddressId, guestUser?, redeemPoints?, paymentMethod? }` | Places the order, runs the placed fulfilment hooks and clears the cart cookie. Returns the order with its `hash` and `payment: { redirectUrl }`. `paymentMethod` is one of the payment methods' `id`s (optional when there is only one; 422 for one the cart cannot use, and `Payments are not set up yet` when there is none), stored as the order's `paymentMethod`. For an online one, the payment is started: send the buyer to `redirectUrl` (null if it could not be started; the order is placed either way, and its page offers Pay now). |
+| `GET /api/store/orders/:id?hash=` | | The order, for its confirmation page, for whoever holds the link, with each line's fulfilment `note` (or `null`) and its `payment` (see Payments). A wrong hash gives 404. |
+| `POST /api/store/orders/:id/pay` | `{ paymentMethod, hash? }` | Pay now, for an unpaid order with an online method (`payment.canPay`): any of its `payment.methods`. Returns `{ redirectUrl }`: the gateway, or null when an offline method was chosen (the order is switched to it). 422 when the order cannot be paid now. |
+| `POST /api/store/orders/:id/payment-check` | `{ hash? }` | While the latest payment try is open: asks the gateway how it went, and acts on it. Returns the order's `payment`. |
 
 - `expectedTotal` is the cart summary's `total` the buyer confirmed (with the same `shippingMethodId`). If the order would cost anything else, checkout gives 409 with `data.code` `OrderTotalMismatchError` and `data.actualTotal`, and the cart stays as it is.
 - The other 409s: `OutOfStockError`, `VoucherNoLongerValidError`, `OfferLimitReachedError` and `CustomizationsNoLongerValidError`, with their fields in `data` (see the library README). Reload the cart and show the buyer what changed.
@@ -257,10 +260,11 @@ Body schemas are in `packages/api-admin/shared/utils/orders.ts`. Each change rec
 | Route | Body or query | Does |
 |---|---|---|
 | `GET /api/admin/orders` | `q` (order id, user id, or part of the customer's email or name, members' included), `status`, `tab` (`Active`, `Inactive`, `Cancelled`, `Completed`), `paymentStatus`, `userId`, `createdAt` (`YYYY-MM-DD`), `page`, `size` | Orders, newest first, each with `customer` (`name`, `email`, `guest`) and `items` (how many), without their lines |
-| `GET /api/admin/orders/:id` | | The order with its lines, payments, `customer`, and `logs` (what changed, when, by whom and their `loggedByEmail`) |
+| `GET /api/admin/orders/:id` | | The order with its lines, payments, `customer`, `logs` (what changed, when, by whom and their `loggedByEmail`), and `payment`: its `method` (`{ id, label, online }`) and `canRefund` (it can be refunded through the method) |
 | `POST /api/admin/orders/:id/status` | `{ status }` | Moves it to another status. Not `Cancelled` (400): cancel it instead. A cancelled order cannot change (422). |
 | `POST /api/admin/orders/:id/cancel` | `{ reason, remarks? }` | Cancels it, giving back its offer usage and redeemed loyalty points, and runs the cancelled fulfilment hooks |
 | `POST /api/admin/orders/:id/payment-status` | `{ paymentStatus }` | Sets `Pending`, `Paid` or `Refunded` by hand, for example for cash on delivery or pay later. A change to `Paid` runs the paid fulfilment hooks, and a change to `Refunded` the refunded ones. |
+| `POST /api/admin/orders/:id/refund` | | Refunds the whole payment through the order's payment method (such as back to the card), records it, marks the order Refunded, and runs the refunded fulfilment hooks. 422 unless `payment.canRefund`. |
 | `GET /api/admin/users` | `q` (part of the email), `role` (`admin` or `user`) or `banned`, `page`, `size` | Customers and staff, newest first |
 | `POST /api/admin/users` | `{ email, name? }` | Adds staff: the account with that email (in any case) becomes staff, or one is made with the staff role, named after the email unless `name` is given. Answers `{ user, created }`. |
 | `GET /api/admin/users/:id` | | A person for their page: `user` (name, email, role, ban), `orders` (the 5 latest, each with its number of `items`, and the `total` count), `memberships` (with their `state`), `addresses` and `loyalty` (`points`, `value`) |
@@ -291,13 +295,76 @@ The customer gets an email when their order is placed (after checkout), shipped 
 - They go through the auth layer's `sendEmail()`, the same SES sender and development console fallback as the sign-in email. A failing SES is retried twice (aws4fetch's default is 10 retries, about 25 seconds), so a send that fails does not hold up the request for long; the image upload's storage client does the same. `NUXT_SES_ENDPOINT` points it at another SES v2 endpoint (the API tests use a local stand-in that records the mails).
 - The backoffice sends the shipped and cancelled emails, so it needs `NUXT_PUBLIC_SITE_URL` (the storefront's address; without it they are not sent) and the storefront's `ORDER_HASH_SECRET`. The storefront links to its own address when `NUXT_PUBLIC_SITE_URL` is not set.
 
+## Payments
+
+Payment methods are **providers**, registered in code and switched on by listing their ids in `NUXT_PAYMENT_METHODS` (comma separated), in the order checkout shows them. None is on by default.
+
+| Id | Kind | Offered | What happens |
+|---|---|---|---|
+| `cash_on_delivery` | offline, built in | When the cart has something to ship | The courier collects; staff mark the order paid |
+| `pay_later` | offline, built in | When nothing is shipped (digital goods), and no online method is on (unless `NUXT_PAY_LATER_WITH_ONLINE=true`) | The store arranges payment; staff mark the order paid |
+| `stripe` | online, `packages/payment-stripe` | Any cart, once its keys are set | The buyer pays by card on Stripe Checkout |
+
+A listed id that no provider has, or a provider without its keys, is skipped with a warning in the server log.
+
+**An order and its payment.** The order is placed first, with payment Pending, and holds its stock, offer usage and redeemed points as any order does; the method is the order's `paymentMethod`. With an online method:
+
+1. Checkout starts the payment and sends the buyer to the gateway. The order log says "Payment started with Card", and the order's `metadata.payment` keeps the latest try (`provider`, the gateway's `reference`, `status` `open` or `failed`, a failure `message`, `startedAt`).
+2. The gateway sends the buyer back to `/api/store/payments/:provider/return` (or its cancel link), and calls `/api/store/payments/:provider/webhook`. Neither is trusted as it is: each time, the provider asks the gateway how the payment went.
+3. A paid payment is recorded as a payment event under the gateway's payment id, once however often it is reported, and the order is marked Paid and runs the paid fulfilment hooks (memberships, downloads). One of another amount than the order's total, for a cancelled order, or for one already paid, is recorded but not marked: the order log says why, for staff.
+4. A failed one (declined, cancelled, expired) marks the try failed. The buyer lands on the order page either way.
+
+The storefront's order page then shows the result. Paid: done. Open (we have not heard back yet): "Confirming your payment…", checking a few times. Failed: "Your last payment did not go through", and **Pay now**, which is also there for any unpaid order with an online method. Pay now offers every method the order can use: another online one starts a new payment, and an offline one (such as cash on delivery) switches the order to it.
+
+Unpaid orders are never cancelled on their own: staff cancel them, which gives the stock, offer usage and points back. In the backoffice, an unpaid order with an online method says **Awaiting payment** instead of Confirm order (offline methods are confirmed as before), and a paid one has **Refund through Card**, which refunds the whole payment through the gateway. Mark as paid and Mark as refunded stay for anything done outside it.
+
+### Stripe
+
+1. Add `@awecommerce/payment-stripe` to both apps' `extends` (the base apps have it), and `stripe` to `NUXT_PAYMENT_METHODS`.
+2. Set `NUXT_STRIPE_SECRET_KEY` (`sk_test_…` while testing) in both apps, and `NUXT_STRIPE_WEBHOOK_SECRET` in the storefront. `NUXT_STRIPE_LABEL` renames the method (Card by default).
+3. In Stripe, add a webhook endpoint at `https://<storefront>/api/store/payments/stripe/webhook` for `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired`; its signing secret is `NUXT_STRIPE_WEBHOOK_SECRET`. Locally: `stripe listen --forward-to localhost:3000/api/store/payments/stripe/webhook` prints one.
+
+The buyer pays the order's total, in the store's currency, as one line ("Order 123"). It uses Stripe's SDK through `fetch`, so it runs on Node and on Cloudflare Workers. `pnpm test:payments` runs its tests against a stand-in for Stripe's API (`packages/payment-stripe/tests/fake-stripe.ts`); the storefront's and backoffice's payment tests use it too.
+
+### Adding a payment method
+
+A provider is a Nitro plugin calling `registerPaymentProvider` (`packages/api-core/server/utils/payments.ts`, where the type is documented): an `id`, a `label`, `online`, and for an online one `start` (create the payment at the gateway: where to send the buyer and the gateway's reference), `check` (ask the gateway about that reference: `paid` with the amount and payment id, `failed`, or `open`), `webhook` (check the signature, and say which order and reference it is about) and optionally `refund`, `available` and `configured`. The core does the rest: checkout, Pay now, the return and webhook routes, recording the payment, the order log and the hooks.
+
+Put it in a layer of its own, as `packages/payment-stripe` is (its `nuxt.config.ts` and one plugin), and add that layer to both apps' `extends`. In a copy of this repository, that keeps your code in files the base never touches, so pulling the base's changes (`git pull upstream main`) does not conflict with it:
+
+```ts
+// layers/payment-mygateway/server/plugins/mygateway.ts
+export default defineNitroPlugin(() => {
+  registerPaymentProvider({
+    id: 'mygateway',
+    label: 'My gateway',
+    online: true,
+    configured: () => Boolean(useRuntimeConfig().mygateway.secretKey),
+    start: async ({ order, amount, currency, returnUrl, cancelUrl }) => {
+      const payment = await createPaymentAtGateway({ orderId: order.id, amount, currency, returnUrl, cancelUrl })
+      return { redirectUrl: payment.url, reference: payment.id }
+    },
+    check: async ({ reference }) => {
+      const payment = await readPaymentFromGateway(reference)
+      return payment.paid ? { status: 'paid', amount: payment.amount, reference: payment.transactionId } : payment.failed ? { status: 'failed', message: payment.reason } : { status: 'open' }
+    },
+    webhook: async (event) => {
+      const body = await readRawBody(event, 'utf8')
+      // Check the gateway's signature here, and throw a 400 when it is wrong
+      const data = JSON.parse(body!)
+      return { orderId: Number(data.orderId), reference: data.paymentId }
+    },
+  })
+})
+```
+
 ## Digital goods
 
 A product class has `requiresShipping` (Ships to the buyer in the backoffice), on by default; products without a class are shipped too. Turn it off for digital goods (e-books, licences, gift cards, courses).
 
-- **Cart and checkout:** a cart with nothing to ship takes no address and no shipping method, and pays later (`pay_later`: the store contacts the buyer, and staff mark it paid). A mixed cart is shipped as before: an address, a method, and pay on delivery.
+- **Cart and checkout:** a cart with nothing to ship takes no address and no shipping method. It pays online, or later (`pay_later`: the store contacts the buyer, and staff mark it paid) when no online method is on (see Payments). A mixed cart is shipped as before: an address, a method, and cash on delivery or an online method.
 - **Orders:** each line records `requiresShipping` when the order is placed, so changing the class later does not change past orders. An order with nothing to ship goes Confirm order, then Complete in the backoffice, and never gets the shipped email.
-- **Fulfilment hooks** (`packages/api-core/server/utils/fulfillment.ts`): `registerFulfillment({ name, productClasses?, products?, match?, on?, note? })` matches order lines by their product's class slug or product slug, or by `match(line)`. `on.placed` runs after checkout, `on.paid` when staff change the payment to Paid, `on.refunded` when they change it to Refunded, and `on.cancelled` when the order is cancelled, each with the order and its matching lines, before the route answers. A hook that throws is logged; the order and the other hooks are not affected. `note({ order, line })` returns `{ title, text, link?: { label, url } }` (or nothing), read whenever the order is shown, so it can follow the payment; the first matching hook's note is used. A line with nothing to ship and no note gets "Your purchase is confirmed" (not once the order is cancelled). Notes show on the storefront's order page and in the placed email.
+- **Fulfilment hooks** (`packages/api-core/server/utils/fulfillment.ts`): `registerFulfillment({ name, productClasses?, products?, match?, on?, note? })` matches order lines by their product's class slug or product slug, or by `match(line)`. `on.placed` runs after checkout, `on.paid` when the order is paid (staff change the payment to Paid, or a gateway confirms it), `on.refunded` when it is refunded (by hand, or through the payment method), and `on.cancelled` when the order is cancelled, each with the order and its matching lines, before the route answers. A hook that throws is logged; the order and the other hooks are not affected. `note({ order, line })` returns `{ title, text, link?: { label, url } }` (or nothing), read whenever the order is shown, so it can follow the payment; the first matching hook's note is used. A line with nothing to ship and no note gets "Your purchase is confirmed" (not once the order is cancelled). Notes show on the storefront's order page and in the placed email.
 - **Registering hooks:** from a Nitro plugin in a layer both apps extend, as the storefront places orders and shows the notes while the backoffice marks them paid and cancels them:
 
 ```ts
@@ -322,7 +389,7 @@ The API tests register theirs in `packages/api-core/tests/fulfillment-hooks`.
 Plans, such as Platinum, are grouped by `program` (such as `music`): a person holds at most one plan per program, and any number of programs. See Memberships in the library README for the rules.
 
 - **Selling one:** make a product in a class that is not shipped and does not track stock, and link each variant to a plan and a number of months (Memberships, then Plans, in the backoffice). Its price is the variant's. A plan turned off is no longer sold: its terms show as unavailable in the cart, and checkout refuses them.
-- **Buying:** only a signed-in buyer can check out a cart with a membership; the storefront's checkout asks a guest to sign in. The order pays later. When staff mark it paid, the built-in membership hook (`packages/api-core/server/plugins/membership.ts`) grants the plan for the term's months times the quantity, to the order's user. Cancelling the order, or marking it refunded, cancels what it granted.
+- **Buying:** only a signed-in buyer can check out a cart with a membership; the storefront's checkout asks a guest to sign in. When the order is paid (online, or marked paid by staff), the built-in membership hook (`packages/api-core/server/plugins/membership.ts`) grants the plan for the term's months times the quantity, to the order's user. Cancelling the order, or marking it refunded, cancels what it granted.
 - **Renewing:** the account overview and `/account/memberships` show each plan the member holds, waits for, or held until the last 90 days ("Active until …", "Starts …", "Ended on …"), with a Renew button per term on sale (the plan active, the variant active, its product listed). Renew adds the term to the cart and opens the cart drawer; checkout is as usual. A renewal starts when the current one ends, or at once for an ended one. Only the same plan is offered: no upgrades yet, and no reminder emails.
 - **The order page** says "It starts once your payment is confirmed", then "Active until …" (or when it starts, for a renewal that waits for the current one to end).
 - **Perks:** user offers and vouchers with `includedMembershipPlanIds` apply to the plan's active members, in the cart and at checkout. An expired or cancelled membership stops them on the next read.

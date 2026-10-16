@@ -45,4 +45,3 @@ export const unshippedNextStep: Partial<Record<OrderStatus, { status: OrderStatu
 }
 
 export const paymentColor: Record<string, Color> = { Pending: 'warning', Paid: 'success', Refunded: 'neutral' }
-export const paymentMethods: Record<string, string> = { pay_on_delivery: 'Pay on delivery', pay_later: 'Pay later' }

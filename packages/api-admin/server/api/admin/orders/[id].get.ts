@@ -1,7 +1,8 @@
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
 
 // An order with its lines, payments, `customer`, and log (status changes, who
-// made them and their email)
+// made them and their email). `payment`: its method (`online`: paid at a
+// gateway) and whether it can be refunded through it (`canRefund`).
 export default defineServiceHandler(async (event) => {
   const { id } = await getValidatedRouterParams(event, idParams.parse)
   const orderService = new OrderService(useDb())
@@ -11,6 +12,7 @@ export default defineServiceHandler(async (event) => {
   return {
     ...order,
     customer: customerOf(order, people),
+    payment: adminOrderPayment(order),
     logs: logs.map((log) => ({ ...log, loggedByEmail: log.loggedBy ? (people.get(log.loggedBy)?.email ?? null) : null })),
   }
 })

@@ -52,20 +52,20 @@ describe.skipIf(!url)('checkout', async () => {
     await fillGuest(page, email)
     await page.getByRole('radio', { name: new RegExp(courier.name) }).click()
     await total(page).getByText('$45.00').waitFor()
-    await page.getByRole('radio', { name: /Pay on delivery/ }).waitFor()
+    await page.getByRole('radio', { name: /Cash on delivery/ }).waitFor()
     await page.getByRole('button', { name: /^Place order/ }).click()
 
     await page.waitForURL(/\/orders\/\d+\?hash=/)
     await page.getByRole('heading', { level: 1, name: 'Thank you for your order' }).waitFor()
     await page.getByText(email).first().waitFor()
-    await page.getByText('Pay on delivery').first().waitFor()
+    await page.getByText('Cash on delivery').first().waitFor()
     await page.getByTestId('order-total').getByText('$45.00').waitFor()
     const id = Number(new URL(page.url()).pathname.split('/').pop())
     const [order] = await db.select().from(orders).where(eq(orders.id, id))
     expect(order).toMatchObject({
       guestUser: { name: 'Ann Buyer', email },
       shippingAddress: { line1: '1 Main St', city: 'Kathmandu', country: 'Nepal' },
-      metadata: { paymentMethod: 'pay_on_delivery' },
+      paymentMethod: 'cash_on_delivery',
     })
     expect(order!.shippingMethod).toMatchObject({ id: courier.id })
     await page.getByRole('button', { name: 'Cart', exact: true }).waitFor()
@@ -93,7 +93,7 @@ describe.skipIf(!url)('checkout', async () => {
     expect(await page.getByRole('heading', { name: 'Delivery address' }).count()).toBe(0)
     const id = Number(new URL(page.url()).pathname.split('/').pop())
     const [order] = await db.select().from(orders).where(eq(orders.id, id))
-    expect(order!.metadata).toEqual({ paymentMethod: 'pay_later' })
+    expect(order!.paymentMethod).toBe('pay_later')
     expect(order!.shippingMethod).toEqual({})
   })
 

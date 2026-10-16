@@ -28,7 +28,7 @@ describe.skipIf(!url)('orders', async () => {
       guestUser: buyer.guest,
       shippingAddress: { line1: '12 Lakeside Road', city: 'Pokhara', country: 'Nepal' },
       shippingMethodId: courier.id,
-      metadata: { paymentMethod: 'pay_on_delivery' },
+      paymentMethod: 'cash_on_delivery',
     })
     return { order, product }
   }
@@ -86,7 +86,7 @@ describe.skipIf(!url)('orders', async () => {
     await page.getByText('Ann Buyer').waitFor()
     await page.getByText('12 Lakeside Road').waitFor()
     await page.getByText(courier.name).waitFor()
-    await page.getByText('Pay on delivery').waitFor()
+    await page.getByText('Cash on delivery').waitFor()
     // 2 × $20 + $5 delivery
     await page.getByTestId('order-total').getByText('$45.00').waitFor()
   })
@@ -127,7 +127,7 @@ describe.skipIf(!url)('orders', async () => {
     await new CartService(db).addToCart(cart.id, ebook.variants[0]!.id, 1)
     const order = await new OrderService(db).createFromCart(cart.id, {
       guestUser: { name: 'Fay', email: `${unique('fay')}@example.com` },
-      metadata: { paymentMethod: 'pay_later' },
+      paymentMethod: 'pay_later',
     })
     const page = await openPage(`/orders/${order.id}`)
     const status = async () => (await db.select().from(orders).where(eq(orders.id, order.id)))[0]!.status

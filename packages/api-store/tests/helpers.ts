@@ -22,6 +22,7 @@ export const setupApi = async ({ rootDir = '..', postgresUrl = url } = {}) => {
   // The built server reads these
   process.env.NUXT_POSTGRES_URL = postgresUrl
   process.env.ORDER_HASH_SECRET = 'test-secret'
+  process.env.NUXT_PAYMENT_METHODS ??= 'cash_on_delivery,pay_later'
   process.env.BETTER_AUTH_URL = 'http://localhost:3000'
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   ses = await startFakeSes()

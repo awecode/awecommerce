@@ -51,6 +51,9 @@ export const orders = pgTable('order', {
   cartId: integer().references(() => carts.id),
   status: orderStatusEnum().notNull().default('Pending'),
   paymentStatus: paymentStatusEnum().notNull().default('Pending'),
+  // How the buyer pays: a payment provider's id, such as cash_on_delivery or
+  // stripe. An online payment's latest try is in metadata.payment.
+  paymentMethod: text(),
   shippingAddress: jsonb().default({}).$type<Record<string, any>>(),
   shippingMethod: jsonb().default({}).$type<Record<string, any>>(),
   offers: jsonb().default([]).$type<Array<Record<string, any>>>(),

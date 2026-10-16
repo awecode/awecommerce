@@ -1,5 +1,6 @@
 export default defineNuxtConfig({
-  extends: ['@awecommerce/api-store'],
+  // Card payments through Stripe: offered once stripe is in NUXT_PAYMENT_METHODS
+  extends: ['@awecommerce/api-store', '@awecommerce/payment-stripe'],
   modules: ['@nuxt/ui'],
   css: ['~/assets/css/main.css'],
   compatibilityDate: '2026-10-14',

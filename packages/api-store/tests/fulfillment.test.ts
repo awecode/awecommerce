@@ -54,12 +54,12 @@ describe.skipIf(!url)('digital goods and fulfilment hooks', async () => {
     const method = await new ShippingMethodService(db).create({ name: unique('ship'), price: '5' })
     expect((await request(`/api/store/cart?shippingMethodId=${method.id}`)).status).toBe(422)
 
-    expect((await checkout(request, { paymentMethod: 'pay_on_delivery' })).status).toBe(422)
+    expect((await checkout(request, { paymentMethod: 'cash_on_delivery' })).status).toBe(422)
     expect((await checkout(request, { shippingMethodId: method.id })).status).toBe(422)
     // An address given anyway is not kept
     const placed = await checkout(request, { shippingAddress })
     expect(placed.status).toBe(200)
-    expect(placed.body.metadata).toEqual({ paymentMethod: 'pay_later' })
+    expect(placed.body.paymentMethod).toBe('pay_later')
     expect(placed.body.shippingAddress).toEqual({})
     expect(placed.body.lines[0].requiresShipping).toBe(false)
   })
@@ -74,7 +74,7 @@ describe.skipIf(!url)('digital goods and fulfilment hooks', async () => {
     expect((await checkout(request, { shippingAddress, paymentMethod: 'pay_later' })).status).toBe(422)
     const placed = await checkout(request, { shippingAddress })
     expect(placed.status).toBe(200)
-    expect(placed.body.metadata).toEqual({ paymentMethod: 'pay_on_delivery' })
+    expect(placed.body.paymentMethod).toBe('cash_on_delivery')
     expect(placed.body.lines.map((line: any) => line.requiresShipping).sort()).toEqual([false, true])
   })
 

@@ -33,6 +33,7 @@ export const setupStorefront = async () => {
   process.env.BETTER_AUTH_URL = `http://127.0.0.1:${port}`
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   process.env.ORDER_HASH_SECRET = 'test-secret'
+  process.env.NUXT_PAYMENT_METHODS ??= 'cash_on_delivery,pay_later'
   await setup({
     rootDir: fileURLToPath(new URL('..', import.meta.url)),
     port,

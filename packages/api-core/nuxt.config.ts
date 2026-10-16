@@ -16,6 +16,14 @@ export default defineNuxtConfig({
     // Set with NUXT_POSTGRES_URL. On Cloudflare Workers, a Hyperdrive binding
     // named HYPERDRIVE is used instead when there is one.
     postgresUrl: '',
+    // The payment methods buyers can use, in the order checkout shows them:
+    // provider ids, comma separated (NUXT_PAYMENT_METHODS), such as
+    // cash_on_delivery,pay_later,stripe. None by default: until some are
+    // listed, checkout cannot place orders. See server/utils/payments.ts.
+    paymentMethods: '',
+    // Also offer pay later for digital goods when an online method is offered
+    // (NUXT_PAY_LATER_WITH_ONLINE)
+    payLaterWithOnline: false,
     public: {
       // The storefront's public address, such as https://shop.example.com
       // (NUXT_PUBLIC_SITE_URL). Order emails link to the order there, also

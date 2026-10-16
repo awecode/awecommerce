@@ -24,6 +24,7 @@ export const setupAdminApi = async ({ rootDir = '..' } = {}) => {
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   // Signs the links in order emails
   process.env.ORDER_HASH_SECRET = 'test-secret'
+  process.env.NUXT_PAYMENT_METHODS ??= 'cash_on_delivery,pay_later'
   ses = await startFakeSes()
   bucket = await startFakeS3()
   await setup({ rootDir: fileURLToPath(new URL(rootDir, import.meta.url)) })

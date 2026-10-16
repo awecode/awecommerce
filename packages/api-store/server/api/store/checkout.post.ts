@@ -5,8 +5,11 @@ import { ValidationError } from '@awecommerce/service/core/errors'
 
 // Places the order for the buyer's cart. Prices, offers and shipping are read
 // from the database; the buyer's confirmed total only has to match them. A
-// cart with nothing to ship (digital goods) takes no address, and pays later.
-// Runs the placed fulfilment hooks, then emails the buyer.
+// cart with nothing to ship (digital goods) takes no address. Runs the placed
+// fulfilment hooks, then emails the buyer. With an online payment method, it
+// then starts the payment: `payment.redirectUrl` is where to send the buyer
+// (null when the payment could not be started: the order page offers Pay now).
+// The order is placed either way.
 export default defineServiceHandler(async (event) => {
   const { shippingAddressId, guestUser, paymentMethod, ...body } = await readValidatedBody(event, checkoutSchema.parse)
   const user = await getUser(event)
@@ -21,9 +24,14 @@ export default defineServiceHandler(async (event) => {
   if (ships && body.shippingAddress === undefined && shippingAddressId === undefined) {
     throw new ValidationError('Pass shippingAddress or shippingAddressId: the cart has something to ship')
   }
-  const payment = paymentMethod ?? (ships ? 'pay_on_delivery' : 'pay_later')
-  if (payment !== (ships ? 'pay_on_delivery' : 'pay_later')) {
-    throw new ValidationError(ships ? 'Pay on delivery is the only payment for a cart that is shipped' : 'Nothing in the cart is shipped, so it cannot be paid on delivery')
+  const methods = paymentMethodsFor({ requiresShipping: ships, currency: await storeCurrency() })
+  if (!methods.length) {
+    throw new ValidationError('Payments are not set up yet')
+  }
+  // The only one there is, when none is chosen
+  const method = paymentMethod ? methods.find((m) => m.id === paymentMethod) : methods.length === 1 ? methods[0] : undefined
+  if (!method) {
+    throw new ValidationError(paymentMethod ? `${paymentMethod} cannot pay for this cart` : 'Choose a payment method')
   }
   // Nothing to ship, nowhere to ship it
   let shippingAddress: Record<string, string> | undefined = ships ? body.shippingAddress : undefined
@@ -40,16 +48,25 @@ export default defineServiceHandler(async (event) => {
         .filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
     )
   }
-  const order = await new OrderService(useDb()).createFromCart(cart.id, {
+  const orders = new OrderService(useDb())
+  const order = await orders.createFromCart(cart.id, {
     ...body,
     shippingAddress,
     // A signed-in buyer is the order's user; the guest details are not needed
     guestUser: user ? undefined : guestUser,
-    metadata: { paymentMethod: payment },
+    paymentMethod: method.id,
   })
   forgetCart(event)
   await runFulfillment(event, 'placed', order.id)
   // Logged, not thrown, when it fails: the order is placed either way
   await sendOrderEmail(event, 'placed', order, { requestOrigin: true })
-  return order
+  let redirectUrl: string | null = null
+  if (method.online) {
+    try {
+      redirectUrl = (await startPayment(event, (await orders.get(order.id))!, paymentProvider(method.id)!)).redirectUrl
+    } catch (error) {
+      console.error(`Order ${order.id}: the payment could not be started`, error)
+    }
+  }
+  return { ...order, payment: { redirectUrl } }
 })

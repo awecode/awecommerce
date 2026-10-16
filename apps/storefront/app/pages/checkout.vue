@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Checkout on one page: contact, address, delivery, points (members), payment
 // and the summary. A cart with nothing to ship (digital goods) skips the
-// address and delivery, and pays later. The order is placed for the total shown; if it changed in
-// the meantime, the new total is shown and the buyer places it again.
+// address and delivery. The order is placed for the total shown; if it changed
+// in the meantime, the new total is shown and the buyer places it again. With
+// an online payment method, the buyer then goes to the gateway to pay.
 useSeoMeta({ title: 'Checkout', robots: 'noindex' })
 
 const { user } = useAuth()
@@ -11,8 +12,10 @@ const money = useMoney()
 const requestFetch = useRequestFetch()
 
 type Address = { id: number; line1: string; line2: string | null; city: string; province: string | null; postalCode: string | null; country: string; isDefault: boolean | null }
-const [{ data: methods }, { data: addresses }, { data: loyalty }] = await Promise.all([
+const [{ data: methods }, { data: paymentMethods, refresh: refreshPaymentMethods }, { data: addresses }, { data: loyalty }] = await Promise.all([
   useFetch('/api/store/shipping-methods', { key: 'shipping-methods' }),
+  // Which ones fit depends on whether the cart has something to ship
+  useFetch('/api/store/payment-methods', { key: 'payment-methods' }),
   // Members only
   useAsyncData('addresses', async () => (user.value ? ((await requestFetch('/api/store/addresses')) as Address[]) : [])),
   useAsyncData('loyalty', async () => (user.value ? await requestFetch('/api/store/loyalty') : null)),
@@ -31,10 +34,15 @@ const state = reactive({
   // The cheapest to start with
   shippingMethodId: [...(methods.value ?? [])].sort((a, b) => Number(a.price) - Number(b.price))[0]?.id as number | undefined,
   points: 0,
+  paymentMethod: paymentMethods.value?.[0]?.id,
 })
 
 // False when nothing in the cart is shipped
 const ships = computed(() => cart.value?.requiresShipping !== false)
+watch(ships, () => refreshPaymentMethods())
+watch(paymentMethods, (list) => {
+  if (!list?.some((m) => m.id === state.paymentMethod)) state.paymentMethod = list?.[0]?.id
+})
 // A membership in the cart needs an account
 const needsSignIn = computed(() => Boolean(cart.value?.requiresAccount) && !user.value)
 
@@ -71,11 +79,8 @@ const addressItems = computed(() => [
 const methodItems = computed(() =>
   (methods.value ?? []).map((m) => ({ label: m.name, description: Number(m.price) ? money(m.price) : 'Free', value: m.id })),
 )
-// The one way to pay that fits the cart
 const paymentItems = computed(() =>
-  ships.value
-    ? [{ label: 'Pay on delivery', description: 'Pay the courier when your order arrives.', value: 'pay_on_delivery' }]
-    : [{ label: 'Pay later', description: 'We will contact you to arrange payment.', value: 'pay_later' }],
+  (paymentMethods.value ?? []).map((m) => ({ label: m.label, description: m.description ?? undefined, value: m.id })),
 )
 const newAddress = computed(() => state.addressId === 'new')
 
@@ -102,6 +107,7 @@ const problem = ref<{ message: string; cart?: boolean } | null>(null)
 type ApiError = { data?: { message?: string; data?: { code?: string; actualTotal?: string } } }
 
 
+let leaving = false
 const place = async () => {
   if (!summary.value) return
   placing.value = true
@@ -115,7 +121,7 @@ const place = async () => {
         ...(!ships.value ? {} : newAddress.value ? { shippingAddress: addressBody(state.address) } : { shippingAddressId: state.addressId as number }),
         guestUser: user.value ? undefined : { name: state.name.trim(), email: state.email.trim(), phone: state.phone.trim() || undefined },
         redeemPoints: appliedPoints.value > 0 ? appliedPoints.value : undefined,
-        paymentMethod: paymentItems.value[0]!.value as 'pay_on_delivery' | 'pay_later',
+        paymentMethod: state.paymentMethod,
       },
     })
     // Saved once the order is placed; a failure here does not undo the order
@@ -123,6 +129,13 @@ const place = async () => {
       // The first one saved becomes the default, as on the account's addresses
       const body = { ...addressBody(state.address), isDefault: !addresses.value?.length }
       await $fetch('/api/store/addresses', { method: 'POST', body }).catch(() => {})
+    }
+    // To the gateway to pay, and back to the order page after. The page stays
+    // as it is meanwhile.
+    if (order.payment.redirectUrl) {
+      leaving = true
+      await navigateTo(order.payment.redirectUrl, { external: true })
+      return
     }
     await refreshCart()
     await navigateTo(`/orders/${order.id}?hash=${encodeURIComponent(order.hash)}`)
@@ -136,7 +149,7 @@ const place = async () => {
       problem.value = { message: data?.message ?? 'Your order could not be placed. Please try again.', cart: Boolean(data?.data?.code) || blocked.value }
     }
   } finally {
-    placing.value = false
+    if (!leaving) placing.value = false
   }
 }
 </script>
@@ -207,7 +220,8 @@ const place = async () => {
 
         <section class="space-y-4" aria-labelledby="payment">
           <h2 id="payment" class="text-2xl font-medium">Payment</h2>
-          <URadioGroup :model-value="paymentItems[0]!.value" :items="paymentItems" variant="table" aria-label="Payment" />
+          <URadioGroup v-if="paymentItems.length" v-model="state.paymentMethod" :items="paymentItems" variant="table" aria-label="Payment" />
+          <p v-else class="text-muted">Payments are not set up yet, so orders cannot be placed. Please try again later.</p>
         </section>
       </div>
 
@@ -278,7 +292,7 @@ const place = async () => {
           size="xl"
           block
           :loading="placing"
-          :disabled="blocked || !summary || needsSignIn"
+          :disabled="blocked || !summary || needsSignIn || !state.paymentMethod"
           :label="summary ? `Place order · ${money(summary.total)}` : 'Place order'"
         />
       </aside>

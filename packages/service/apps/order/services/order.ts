@@ -39,6 +39,7 @@ import { Database } from '../../types'
 
 type CreateFromCartOptions = {
   guestUser?: NewOrder['guestUser']
+  paymentMethod?: string
   shippingAddress?: NewOrder['shippingAddress']
   metadata?: NewOrder['metadata']
   shippingMethodId?: number
@@ -49,6 +50,22 @@ type CreateFromCartOptions = {
   // order is not created and OrderTotalMismatchError is thrown.
   expectedTotal?: string | number
 }
+
+// An order's latest online payment try, in its metadata.payment: the
+// provider, the gateway's reference for it, open (the buyer is paying, or we
+// have not heard back) or failed (with the gateway's message), and when it
+// started
+export type PaymentTry = {
+  provider: string
+  reference: string
+  status: 'open' | 'failed'
+  message?: string
+  startedAt: string
+}
+
+// Amounts as the logs show them: "1250.5"
+const shownAmount = (value: string | number) => String(Number(value))
+const sameAmount = (a: string | number, b: string | number) => Math.abs(Number(a) - Number(b)) < 0.0001
 
 class OfferLimitReachedError extends Error {
   constructor(
@@ -597,6 +614,114 @@ class OrderService {
         paymentEvent.orderId,
         paymentEvent.type === 'Paid' ? 'Paid' : 'Refunded',
       )
+    })
+  }
+
+  // A payment a gateway confirmed. Recorded once per `reference` (the
+  // gateway's payment id), so repeated webhooks and returns do nothing more.
+  // The order is marked Paid only when it is unpaid, not cancelled, and the
+  // amount is its total; otherwise the payment is kept and the order log says
+  // why, for staff to sort out. Returns 'paid', 'duplicate' or 'not-marked'.
+  async recordPayment(
+    orderId: number,
+    payment: { amount: string; reference: string; method: string; label?: string; metadata?: Record<string, unknown> },
+  ) {
+    return await this.db.transaction(async (tx) => {
+      // Locked, so a webhook and the buyer's return cannot both record it
+      const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for('update')
+      if (!order) {
+        throw new NotFoundError(`Order not found: ${orderId}`)
+      }
+      const [seen] = await tx
+        .select({ id: paymentEvents.id })
+        .from(paymentEvents)
+        .where(and(eq(paymentEvents.orderId, orderId), eq(paymentEvents.type, 'Paid'), eq(paymentEvents.reference, payment.reference)))
+      if (seen) {
+        return 'duplicate' as const
+      }
+      await tx.insert(paymentEvents).values({
+        orderId,
+        amount: payment.amount,
+        type: 'Paid',
+        reference: payment.reference,
+        metadata: { method: payment.method, ...payment.metadata },
+      })
+      const orderService = new OrderService(tx)
+      const received = `${shownAmount(payment.amount)} through ${payment.label ?? payment.method} (${payment.reference})`
+      const problem =
+        order.status === 'Cancelled'
+          ? 'the order is cancelled'
+          : order.paymentStatus !== 'Pending'
+            ? `the order is already ${order.paymentStatus.toLowerCase()}`
+            : !sameAmount(payment.amount, order.total)
+              ? `the order total is ${shownAmount(order.total)}`
+              : null
+      if (problem) {
+        await orderService.createLog(orderId, `Payment of ${received} received, not marked paid: ${problem}`)
+        return 'not-marked' as const
+      }
+      await tx.update(orders).set({ paymentStatus: 'Paid', updatedAt: new Date().toISOString() }).where(eq(orders.id, orderId))
+      await orderService.createLog(orderId, `Paid ${received}`)
+      return 'paid' as const
+    })
+  }
+
+  // A refund a gateway made: recorded, the order marked Refunded, and logged
+  async recordRefund(
+    orderId: number,
+    refund: { amount: string; reference: string; method: string; label?: string; refundedBy?: string | null },
+  ) {
+    return await this.db.transaction(async (tx) => {
+      await tx.insert(paymentEvents).values({ orderId, amount: refund.amount, type: 'Refund', reference: refund.reference, metadata: { method: refund.method } })
+      const [order] = await tx
+        .update(orders)
+        .set({ paymentStatus: 'Refunded', updatedAt: new Date().toISOString() })
+        .where(eq(orders.id, orderId))
+        .returning()
+      if (!order) {
+        throw new NotFoundError(`Order not found: ${orderId}`)
+      }
+      await new OrderService(tx).createLog(
+        orderId,
+        `Refunded ${shownAmount(refund.amount)} through ${refund.label ?? refund.method} (${refund.reference})`,
+        refund.refundedBy,
+      )
+      return order
+    })
+  }
+
+  // Changes the payment method, and sets or clears (null) the latest online
+  // payment try (see PaymentTry). Logs `log` when given.
+  async updatePayment(
+    orderId: number,
+    changes: { paymentMethod?: string; paymentTry?: PaymentTry | null },
+    log?: string,
+    loggedBy?: string | null,
+  ) {
+    return await this.db.transaction(async (tx) => {
+      const [order] = await tx
+        .update(orders)
+        .set({
+          ...(changes.paymentMethod !== undefined ? { paymentMethod: changes.paymentMethod } : {}),
+          ...(changes.paymentTry !== undefined
+            ? {
+                metadata:
+                  changes.paymentTry === null
+                    ? sql`COALESCE(${orders.metadata}, '{}'::jsonb) - 'payment'`
+                    : sql`COALESCE(${orders.metadata}, '{}'::jsonb) || jsonb_build_object('payment', ${JSON.stringify(changes.paymentTry)}::jsonb)`,
+              }
+            : {}),
+          updatedAt: new Date().toISOString(),
+        })
+        .where(eq(orders.id, orderId))
+        .returning()
+      if (!order) {
+        throw new NotFoundError(`Order not found: ${orderId}`)
+      }
+      if (log) {
+        await new OrderService(tx).createLog(orderId, log, loggedBy)
+      }
+      return order
     })
   }
 

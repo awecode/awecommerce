@@ -37,6 +37,7 @@ export const setupBackoffice = async () => {
   process.env.BETTER_AUTH_URL = `http://127.0.0.1:${port}`
   process.env.BETTER_AUTH_SECRET = 'test-secret-that-is-long-enough-for-better-auth'
   process.env.NUXT_AUTH_ADMIN_EMAILS = STAFF_EMAIL
+  process.env.NUXT_PAYMENT_METHODS ??= 'cash_on_delivery,pay_later'
   bucket = await startFakeS3()
   await setup({
     rootDir: fileURLToPath(new URL('..', import.meta.url)),

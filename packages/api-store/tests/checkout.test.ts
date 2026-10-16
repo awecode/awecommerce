@@ -54,7 +54,7 @@ describe.skipIf(!url)('store checkout API', async () => {
     expect(placed.body.shippingAddress).toEqual(shippingAddress)
     expect(placed.body.guestUser).toEqual(guestUser)
     // The only payment method for now, recorded on the order
-    expect(placed.body.metadata).toEqual({ paymentMethod: 'pay_on_delivery' })
+    expect(placed.body.paymentMethod).toBe('cash_on_delivery')
     expect(placed.body.lines).toHaveLength(1)
     // The cookie is cleared and the cart is closed
     expect(placed.setCookie).toMatch(/^awe_cart=;/)
@@ -160,7 +160,8 @@ describe.skipIf(!url)('store checkout API', async () => {
       method: 'POST',
       body: { expectedTotal: summary.body.total, shippingAddress, guestUser, paymentMethod: 'card' },
     })
-    expect(placed.status).toBe(400)
+    expect(placed.status).toBe(422)
+    expect(placed.body.message).toBe('card cannot pay for this cart')
   })
 
   test('maps bad requests to 400, 404 and 422', async () => {

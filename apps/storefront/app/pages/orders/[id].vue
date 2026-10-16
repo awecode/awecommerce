@@ -2,7 +2,8 @@
 // An order: right after checkout (with the `hash` from checkout, so the link
 // works for whoever has it), or from the buyer's account (signed in, no hash).
 // An order with nothing to ship has no delivery; its lines show the
-// fulfilment notes (a download link, what happens next).
+// fulfilment notes (a download link, what happens next). An unpaid order with
+// an online payment method offers Pay now (see OrderPayNow).
 definePageMeta({
   // Without the link's hash, only its owner can see it: sign in first
   middleware: (to) => {
@@ -17,7 +18,7 @@ const { user } = useAuth()
 const { data: settings } = useStoreSettings()
 
 const hash = route.query.hash as string | undefined
-const { data: order, error } = await useFetch(() => `/api/store/orders/${route.params.id}`, { query: { hash } })
+const { data: order, error, refresh } = await useFetch(() => `/api/store/orders/${route.params.id}`, { query: { hash } })
 if (error.value || !order.value) {
   throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
 }
@@ -34,11 +35,7 @@ const address = computed(() => {
   const a = (order.value?.shippingAddress ?? {}) as Record<string, string>
   return [a.line1, a.line2, [a.city, a.province].filter(Boolean).join(', '), a.postalCode, a.country].filter(Boolean)
 })
-const paymentLabels: Record<string, string> = { pay_on_delivery: 'Pay on delivery', pay_later: 'Pay later' }
-const payment = computed(() => {
-  const method = (order.value?.metadata as { paymentMethod?: string } | null)?.paymentMethod
-  return method ? (paymentLabels[method] ?? method) : null
-})
+const payment = computed(() => order.value?.payment.method ?? null)
 const placedOn = computed(() =>
   order.value ? new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'long' }).format(new Date(order.value.createdAt)) : '',
 )
@@ -59,6 +56,8 @@ const placedOn = computed(() =>
       </div>
     </div>
 
+    <OrderPayNow v-if="order.payment.canPay" :key="order.updatedAt" :order-id="order.id" :hash="hash" :payment="order.payment" class="mt-10" @changed="refresh()" />
+
     <div class="mt-10 grid gap-10 sm:grid-cols-3">
       <section v-if="ships" aria-labelledby="ship-to">
         <h2 id="ship-to" class="mb-2 font-sans text-xs font-medium tracking-wider text-muted uppercase">Delivery address</h2>
@@ -73,9 +72,8 @@ const placedOn = computed(() =>
       </section>
       <section v-if="payment" aria-labelledby="payment">
         <h2 id="payment" class="mb-2 font-sans text-xs font-medium tracking-wider text-muted uppercase">Payment</h2>
-        <p>{{ payment }}</p>
-        <p v-if="payment === 'Pay on delivery'" class="text-sm text-muted">Pay the courier when your order arrives.</p>
-        <p v-else-if="payment === 'Pay later' && order.paymentStatus !== 'Paid'" class="text-sm text-muted">We will contact you to arrange payment.</p>
+        <p>{{ payment.label }}</p>
+        <p v-if="!payment.online && payment.description && order.paymentStatus === 'Pending'" class="text-sm text-muted">{{ payment.description }}</p>
       </section>
     </div>
 

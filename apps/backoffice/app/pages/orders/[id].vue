@@ -3,10 +3,12 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import CancelOrderModal from '~/components/orders/CancelOrderModal.vue'
 
 // One order: items and totals, the customer, delivery and payment, its
-// history, and the actions: the usual next status, other statuses, payment
-// status and cancelling
+// history, and the actions: the usual next status (or Awaiting payment, for an
+// unpaid online payment), other statuses, payment status, refunding through
+// the payment method, and cancelling
 const route = useRoute()
 const toast = useToast()
+const confirm = useConfirm()
 const money = useMoney()
 const queryCache = useQueryCache()
 const { data: store } = useStoreSettings()
@@ -40,6 +42,16 @@ const setStatus = (status: OrderStatus) =>
   act(() => api(`/api/admin/orders/${id.value}/status`, { method: 'POST', body: { status } }), `Order #${id.value} is ${status}`)
 const setPayment = (paymentStatus: string) =>
   act(() => api(`/api/admin/orders/${id.value}/payment-status`, { method: 'POST', body: { paymentStatus } }), `Payment is ${paymentStatus}`)
+const refund = async () => {
+  const label = paymentMethod.value?.label ?? 'the payment method'
+  const go = await confirm({
+    title: `Refund through ${label}?`,
+    description: `The whole payment goes back to the buyer through ${label}, and the order is marked refunded.`,
+    confirmLabel: 'Refund',
+    color: 'error',
+  })
+  if (go) await act(() => api(`/api/admin/orders/${id.value}/refund`, { method: 'POST' }), `Order #${id.value} refunded`)
+}
 const cancel = async () => {
   const answer = await cancelModal.open({ orderId: id.value }).result
   if (answer) await act(() => api(`/api/admin/orders/${id.value}/cancel`, { method: 'POST', body: answer }), `Order #${id.value} cancelled`)
@@ -68,10 +80,10 @@ const address = computed(() => {
 })
 const instructions = computed(() => (order.value?.shippingAddress as Record<string, string> | null)?.instructions)
 const offers = computed(() => (order.value?.offers ?? []) as { id: number; name: string; discount: number; voucherCode?: string }[])
-const paymentMethod = computed(() => {
-  const method = (order.value?.metadata as { paymentMethod?: string } | null)?.paymentMethod
-  return method ? (paymentMethods[method] ?? method) : null
-})
+const paymentMethod = computed(() => order.value?.payment.method ?? null)
+// Placed with an online method (a card, a wallet) and not paid yet: not
+// confirmed until the money is in. Offline methods are paid later by design.
+const awaitingPayment = computed(() => Boolean(paymentMethod.value?.online) && order.value?.paymentStatus === 'Pending' && status.value === 'Pending')
 const phone = computed(() => (order.value?.guestUser as { phone?: string } | null)?.phone)
 </script>
 
@@ -87,7 +99,8 @@ const phone = computed(() => (order.value?.guestUser as { phone?: string } | nul
           <UBadge data-testid="payment-status" :label="`Payment ${order.paymentStatus}`" :color="paymentColor[order.paymentStatus]" variant="outline" />
         </template>
         <template v-if="order && open" #right>
-          <UButton v-if="next" :label="next.label" :loading="busy" @click="setStatus(next.status)" />
+          <UBadge v-if="awaitingPayment" label="Awaiting payment" color="warning" variant="subtle" size="lg" icon="i-lucide-clock" />
+          <UButton v-else-if="next" :label="next.label" :loading="busy" @click="setStatus(next.status)" />
           <UDropdownMenu :items="menu" :content="{ align: 'end' }">
             <UButton icon="i-lucide-ellipsis" color="neutral" variant="outline" aria-label="More actions" :disabled="busy" />
           </UDropdownMenu>
@@ -210,8 +223,16 @@ const phone = computed(() => (order.value?.guestUser as { phone?: string } | nul
             </section>
             <section aria-labelledby="payment" class="space-y-2">
               <h2 id="payment" class="text-xs font-medium text-muted">Payment</h2>
-              <p>{{ paymentMethod ?? 'Not recorded' }}</p>
+              <p>{{ paymentMethod?.label ?? 'Not recorded' }}</p>
               <div v-if="open" class="flex flex-wrap gap-2">
+                <UButton
+                  v-if="order.payment.canRefund"
+                  :label="`Refund through ${paymentMethod?.label}`"
+                  color="error"
+                  variant="outline"
+                  :disabled="busy"
+                  @click="refund"
+                />
                 <UButton v-if="order.paymentStatus !== 'Paid'" label="Mark as paid" color="neutral" variant="outline" :disabled="busy" @click="setPayment('Paid')" />
                 <UButton v-if="order.paymentStatus === 'Paid'" label="Mark as refunded" color="neutral" variant="outline" :disabled="busy" @click="setPayment('Refunded')" />
               </div>
