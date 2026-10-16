@@ -4,8 +4,11 @@
 // Stripe sends webhooks to /api/store/payments/stripe/webhook; subscribe it to
 // checkout.session.completed, checkout.session.async_payment_succeeded,
 // checkout.session.async_payment_failed and checkout.session.expired.
+//
+// It does not extend api-core itself (registerPaymentProvider comes from it):
+// the apps already have it through api-store and api-admin, and a second path
+// to it would load the auth layer's config twice.
 export default defineNuxtConfig({
-  extends: ['@awecommerce/api-core'],
   runtimeConfig: {
     stripe: {
       // NUXT_STRIPE_SECRET_KEY: sk_test_... or sk_live_...

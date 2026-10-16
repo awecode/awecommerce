@@ -330,7 +330,7 @@ The buyer pays the order's total, in the store's currency, as one line ("Order 1
 
 A provider is a Nitro plugin calling `registerPaymentProvider` (`packages/api-core/server/utils/payments.ts`, where the type is documented): an `id`, a `label`, `online`, and for an online one `start` (create the payment at the gateway: where to send the buyer and the gateway's reference), `check` (ask the gateway about that reference: `paid` with the amount and payment id, `failed`, or `open`), `webhook` (check the signature, and say which order and reference it is about) and optionally `refund`, `available` and `configured`. The core does the rest: checkout, Pay now, the return and webhook routes, recording the payment, the order log and the hooks.
 
-Put it in a layer of its own, as `packages/payment-stripe` is (its `nuxt.config.ts` and one plugin), and add that layer to both apps' `extends`. In a copy of this repository, that keeps your code in files the base never touches, so pulling the base's changes (`git pull upstream main`) does not conflict with it:
+Put it in a layer of its own, as `packages/payment-stripe` is (its `nuxt.config.ts` and one plugin), and add that layer to both apps' `extends`. The layer should not extend `@awecommerce/api-core` itself: the apps already have it, and a second path to it loads the auth layer twice (in development, Nitro fails with "already mounted at auth:"). In a copy of this repository, that keeps your code in files the base never touches, so pulling the base's changes (`git pull upstream main`) does not conflict with it:
 
 ```ts
 // layers/payment-mygateway/server/plugins/mygateway.ts
