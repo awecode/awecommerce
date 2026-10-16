@@ -52,7 +52,9 @@ describe.skipIf(!url)('checkout', async () => {
     await fillGuest(page, email)
     await page.getByRole('radio', { name: new RegExp(courier.name) }).click()
     await total(page).getByText('$45.00').waitFor()
-    await page.getByRole('radio', { name: /Cash on delivery/ }).waitFor()
+    // The only method there is: shown, not offered as a choice
+    await page.getByTestId('payment-method').getByText('Cash on delivery').waitFor()
+    expect(await page.getByRole('radiogroup', { name: 'Payment' }).count()).toBe(0)
     await page.getByRole('button', { name: /^Place order/ }).click()
 
     await page.waitForURL(/\/orders\/\d+\?hash=/)
@@ -79,7 +81,9 @@ describe.skipIf(!url)('checkout', async () => {
     await checkoutWith(page, ebook.variants[0]!.id)
     const email = `${unique('fay')}@example.com`
 
-    await page.getByRole('radio', { name: /Pay later/ }).waitFor()
+    // The only method there is: shown, not offered as a choice
+    await page.getByTestId('payment-method').getByText('Pay later').waitFor()
+    expect(await page.getByRole('radiogroup', { name: 'Payment' }).count()).toBe(0)
     expect(await page.getByRole('heading', { name: 'Delivery address' }).count()).toBe(0)
     expect(await page.getByRole('radio', { name: new RegExp(courier.name) }).count()).toBe(0)
     await page.getByLabel('Name', { exact: true }).fill('Fay Reader')

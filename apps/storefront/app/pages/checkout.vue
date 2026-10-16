@@ -220,7 +220,12 @@ const place = async () => {
 
         <section class="space-y-4" aria-labelledby="payment">
           <h2 id="payment" class="text-2xl font-medium">Payment</h2>
-          <URadioGroup v-if="paymentItems.length" v-model="state.paymentMethod" :items="paymentItems" variant="table" aria-label="Payment" />
+          <!-- Nothing to choose with one: it is shown as it is -->
+          <URadioGroup v-if="paymentItems.length > 1" v-model="state.paymentMethod" :items="paymentItems" variant="table" aria-label="Payment" />
+          <div v-else-if="paymentItems.length" data-testid="payment-method" class="rounded-sm border border-default p-4">
+            <p class="font-medium">{{ paymentItems[0]!.label }}</p>
+            <p v-if="paymentItems[0]!.description" class="text-sm text-muted">{{ paymentItems[0]!.description }}</p>
+          </div>
           <p v-else class="text-muted">Payments are not set up yet, so orders cannot be placed. Please try again later.</p>
         </section>
       </div>
