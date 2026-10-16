@@ -70,19 +70,19 @@ describe.skipIf(!url)('storefront shell', async () => {
 
   test('signed out shows Sign in; signed in shows the account menu', async () => {
     const guest = await createPage('/')
-    expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
+    expect(await guest.getByRole('link', { name: 'Sign in', exact: true }).getAttribute('href')).toBe('/login')
     await guest.goto(`${base()}/cart`)
-    expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login?redirect=/cart')
+    expect(await guest.getByRole('link', { name: 'Sign in', exact: true }).getAttribute('href')).toBe('/login?redirect=/cart')
     // The sign-in link's token (in the hash) never ends up in the link
     await guest.goto(`${base()}/auth/confirm#token=secret-token`)
-    expect(await guest.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe('/login')
+    expect(await guest.getByRole('link', { name: 'Sign in', exact: true }).getAttribute('href')).toBe('/login')
 
     const email = `${unique('ann')}@example.com`
     const page = await signedInPage(db, email)
     await page.getByRole('button', { name: 'Account' }).click()
     await page.getByText(email).waitFor()
     await page.getByRole('menuitem', { name: 'Sign out' }).click()
-    await page.getByRole('link', { name: 'Sign in' }).waitFor()
+    await page.getByRole('link', { name: 'Sign in', exact: true }).waitFor()
   })
 
   test('small screens get the category menu in a drawer', async () => {

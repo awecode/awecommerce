@@ -363,9 +363,9 @@ class MembershipService {
   // none are left out): not among their currentPlans, and in a program they
   // hold no running or upcoming membership in, or ranked above it. Such an
   // upgrade starts now and `replaces` that plan. By program, then highest
-  // rank first.
-  async plansToJoin(userId: string) {
-    const current = await this.currentPlans(userId)
+  // rank first. Without a person (a guest), every plan on sale.
+  async plansToJoin(userId?: string) {
+    const current = userId ? await this.currentPlans(userId) : []
     const shown = new Set(current.map((c) => c.plan.id))
     const held = new Map<string, (typeof current)[number]['plan']>()
     for (const { plan, state } of current) {

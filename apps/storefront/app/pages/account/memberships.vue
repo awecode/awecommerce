@@ -10,12 +10,6 @@ const { data: settings } = useStoreSettings()
 const day = (value: string) => new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'medium' }).format(new Date(value))
 const stateLabels = { active: 'Active', upcoming: 'Upcoming', ended: 'Ended', cancelled: 'Cancelled' } as const
 const months = (n: number) => `${n} month${n === 1 ? '' : 's'}`
-// The plans to join, grouped by program (already in program order)
-const programs = computed(() => {
-  const groups = new Map<string, NonNullable<typeof data.value>['toJoin']>()
-  for (const option of data.value?.toJoin ?? []) groups.set(option.plan.program, [...(groups.get(option.plan.program) ?? []), option])
-  return [...groups]
-})
 </script>
 
 <template>
@@ -28,14 +22,9 @@ const programs = computed(() => {
           <AccountMembershipCard v-for="membership in data.current" :key="membership.plan.id" :membership="membership" class="rounded-sm bg-muted p-6" />
         </div>
       </section>
-      <section v-if="programs.length" aria-labelledby="join" class="space-y-4">
+      <section v-if="data?.toJoin.length" aria-labelledby="join" class="space-y-4">
         <h2 id="join" class="text-2xl font-medium">Join a membership</h2>
-        <div v-for="[program, options] in programs" :key="program" class="space-y-3">
-          <h3 class="font-sans text-xs font-medium tracking-wider text-muted uppercase">{{ program }}</h3>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <AccountJoinPlanCard v-for="option in options" :key="option.plan.id" :option="option" class="rounded-sm bg-muted p-6" />
-          </div>
-        </div>
+        <MembershipPlans :options="data.toJoin" />
       </section>
       <section v-if="data?.history.length" aria-labelledby="history" class="space-y-4">
         <h2 id="history" class="text-2xl font-medium">History</h2>

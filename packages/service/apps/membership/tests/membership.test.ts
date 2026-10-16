@@ -280,4 +280,9 @@ test('plans to join: other programs, and higher tiers of the one held', async ()
     [gold.id, silver.id, 1],
   ])
   expect(options.map((o) => o.plan.id)).not.toContain(noTerms.id)
+
+  // A guest: every plan on sale
+  const forGuest = (await service.plansToJoin()).filter((o) => [music, films].includes(o.plan.program))
+  expect(forGuest.map((o) => o.plan.id)).toEqual([cinema.id, gold.id, silver.id, bronze.id])
+  expect(forGuest.every((o) => o.replaces === null)).toBe(true)
 })

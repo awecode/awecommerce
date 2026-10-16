@@ -138,4 +138,24 @@ describe.skipIf(!url)('memberships', async () => {
     await goldCard.getByText(`Starts today and replaces your ${silver.name} membership.`).waitFor()
     await goldCard.getByRole('button', { name: 'Upgrade 12 months · $90.00' }).waitFor()
   })
+
+  test('the home page shows the plans: guests sign in to join, members join', async () => {
+    const slug = unique('membership')
+    const [membershipClass] = await db.insert(productClasses).values({ name: slug, slug, requiresShipping: false, trackStock: false }).returning()
+    const club = await memberships.createPlan({ name: unique('Club'), slug: unique('club'), program: unique('club'), rank: 1, description: 'Free tickets every month' })
+    await memberships.addTerm({ planId: club.id, variantId: (await product('30', membershipClass!.id)).variants[0]!.id, months: 12 })
+
+    const guest = await createPage('/')
+    const guestCard = guest.getByRole('group', { name: `Join ${club.name}` })
+    await guestCard.getByText('Free tickets every month').waitFor()
+    await guestCard.getByText('12 months · $30.00').waitFor()
+    await guestCard.getByRole('link', { name: 'Sign in to join' }).click()
+    await guest.waitForURL('**/login?redirect=/')
+
+    const page = await signedInPage(db, `${unique('home')}@example.com`)
+    await page.goto(`${process.env.BETTER_AUTH_URL}/`)
+    await page.getByRole('group', { name: `Join ${club.name}` }).getByRole('button', { name: 'Join 12 months · $30.00' }).click()
+    await page.getByRole('dialog', { name: 'Your cart (1)' }).waitFor()
+  })
 })
+

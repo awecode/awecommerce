@@ -125,4 +125,29 @@ describe.skipIf(!url)('memberships in the store', async () => {
       terms: [{ id: expect.any(Number), variantId: goldYear.variants[0]!.id, months: 12, price: '99' }],
     })
   })
+
+  test('lists the plans on sale to anyone, and only the ones to join to a member', async () => {
+    const program = unique('music')
+    const silver = await memberships.createPlan({ name: 'Silver', slug: unique('silver'), program, rank: 1 })
+    const gold = await memberships.createPlan({ name: 'Gold', slug: unique('gold'), program, rank: 2 })
+    const silverYear = await membershipProduct(silver.id)
+    await membershipProduct(gold.id)
+    const inProgram = (body: { plan: { id: number; program: string }; replaces: unknown }[]) =>
+      body.filter((option) => option.plan.program === program).map((option) => [option.plan.id, option.replaces])
+
+    const guest = buyer()
+    const { body: forGuest } = await guest('/api/store/membership-plans')
+    expect(inProgram(forGuest)).toEqual([[gold.id, null], [silver.id, null]])
+    expect(forGuest.find((option: { plan: { id: number } }) => option.plan.id === silver.id).terms).toEqual([
+      { id: expect.any(Number), variantId: silverYear.variants[0]!.id, months: 12, price: '99' },
+    ])
+
+    const { userId, token } = await createUser(db)
+    await memberships.grant({ userId, planId: silver.id, months: 1 })
+    const member = buyer()
+    member.signIn(token)
+    const { body: forMember } = await member('/api/store/membership-plans')
+    expect(inProgram(forMember)).toEqual([[gold.id, { id: silver.id, name: 'Silver' }]])
+  })
 })
+

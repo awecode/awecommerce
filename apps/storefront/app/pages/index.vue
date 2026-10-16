@@ -1,13 +1,16 @@
 <script setup lang="ts">
-// The home page: the hero, shop by category, then featured products and best
+// The home page: the hero, shop by category, the membership plans on sale
+// (for a member, the ones they can join), then featured products and best
 // sellers (the product flags set in the backoffice)
 const { store } = useAppConfig()
 useSeoMeta({ description: store.description })
 
 const menu = useCategoryMenu()
-const [{ data: featured }, { data: bestSellers }] = await Promise.all([
+const { user } = useAuth()
+const [{ data: featured }, { data: bestSellers }, { data: plans }] = await Promise.all([
   useFetch('/api/store/products', { key: 'home-featured', query: { featured: true, size: 4 } }),
   useFetch('/api/store/products', { key: 'home-best-sellers', query: { bestSeller: true, size: 4 } }),
+  useFetch('/api/store/membership-plans', { key: 'home-membership-plans', watch: [() => user.value?.id] }),
 ])
 </script>
 
@@ -25,6 +28,13 @@ const [{ data: featured }, { data: bestSellers }] = await Promise.all([
           </NuxtLink>
         </li>
       </ul>
+    </UContainer>
+  </section>
+
+  <section v-if="plans?.length" aria-labelledby="memberships" class="py-12">
+    <UContainer>
+      <h2 id="memberships" class="mb-8 text-3xl font-medium tracking-tight">Memberships</h2>
+      <MembershipPlans :options="plans" :sign-in-to="user ? undefined : '/login?redirect=/'" />
     </UContainer>
   </section>
 
