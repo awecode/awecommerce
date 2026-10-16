@@ -60,6 +60,8 @@ const { data: summary, error: summaryError, refresh: refreshSummary } = await us
   key: 'checkout-summary',
   query: summaryQuery,
 })
+// The cart changed elsewhere on the page (the cart drawer): price it again
+watch(cart, () => refreshSummary())
 const pointsError = computed(() => (summaryError.value && appliedPoints.value ? cartErrorMessage(summaryError.value) : ''))
 const blocked = computed(() => (summary.value?.lines ?? []).some((line) => lineProblem(line)))
 const offers = computed(() => [

@@ -5,7 +5,8 @@ const { cart, count, drawerOpen } = useCart()
 const money = useMoney()
 const blocked = computed(() => (cart.value?.lines ?? []).some((line) => lineProblem(line)))
 
-// Closes when the buyer follows a link out of it
+// Closes when the buyer follows a link out of it, also to the page they are
+// on (Checkout while at checkout), where the route does not change
 const route = useRoute()
 watch(() => route.fullPath, () => (drawerOpen.value = false))
 </script>
@@ -32,8 +33,8 @@ watch(() => route.fullPath, () => (drawerOpen.value = false))
           <span>−{{ money(cart.totalOfferDiscount) }}</span>
         </div>
         <p class="text-sm text-muted">{{ cart.requiresShipping ? 'Shipping is worked out at checkout.' : 'Nothing to ship.' }}</p>
-        <UButton to="/checkout" label="Checkout" size="xl" block :disabled="blocked" />
-        <UButton to="/cart" label="View cart" color="neutral" variant="outline" size="lg" block />
+        <UButton to="/checkout" label="Checkout" size="xl" block :disabled="blocked" @click="drawerOpen = false" />
+        <UButton to="/cart" label="View cart" color="neutral" variant="outline" size="lg" block @click="drawerOpen = false" />
       </div>
     </template>
   </USlideover>

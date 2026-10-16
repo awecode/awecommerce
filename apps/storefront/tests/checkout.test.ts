@@ -43,6 +43,26 @@ describe.skipIf(!url)('checkout', async () => {
 
   const total = (page: Page) => page.getByTestId('checkout-total')
 
+  test('the cart drawer on the checkout page changes the summary, and its Checkout closes it', async () => {
+    const lamp = await product('20')
+    const page = await createPage('/')
+    await checkoutWith(page, lamp.variants[0]!.id, 1)
+    // By CSS: behind the open drawer, the page is hidden from accessibility roles
+    const summary = page.locator('aside[aria-label="Order summary"]')
+    await summary.getByText('× 1', { exact: true }).waitFor()
+
+    await page.getByRole('button', { name: 'Cart, 1 item' }).click()
+    const drawer = page.getByRole('dialog', { name: /^Your cart/ })
+    await drawer.getByRole('spinbutton', { name: `Quantity of ${lamp.name}` }).fill('2')
+    await drawer.getByRole('spinbutton', { name: `Quantity of ${lamp.name}` }).press('Enter')
+    await summary.getByText('× 2', { exact: true }).waitFor()
+    await summary.getByText('$40.00').first().waitFor()
+
+    await drawer.getByRole('link', { name: 'Checkout' }).click()
+    await expect.poll(() => page.getByRole('dialog', { name: /^Your cart/ }).count()).toBe(0)
+    expect(new URL(page.url()).pathname).toBe('/checkout')
+  })
+
   test('a guest checks out with shipping and pays on delivery', async () => {
     const lamp = await product('20')
     const page = await createPage('/')
