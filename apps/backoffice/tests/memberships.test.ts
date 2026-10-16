@@ -48,6 +48,22 @@ describe.skipIf(!url)('memberships', async () => {
     expect((await memberships.getPlan(plan!.id))!.terms).toMatchObject([{ months: 6, variantId: product.variants[0]!.id }])
   })
 
+  test('Save adds a term picked but not added', async () => {
+    const productName = unique('Gold year')
+    const product = await new ProductService(db).create({ name: productName, slug: unique('gold-year'), sku: unique('GOLD'), price: '60', stockQuantity: 0 })
+    const plan = await memberships.createPlan({ name: unique('Gold'), slug: unique('gold'), program: 'music', rank: 2 })
+    const page = await openPage(`/memberships/plans?q=${plan.name}`)
+
+    await page.getByRole('row', { name: new RegExp(plan.name) }).getByText('Not sold').click()
+    await page.getByLabel('Product', { exact: true }).click()
+    await page.keyboard.type(productName)
+    await page.getByRole('option', { name: productName }).click()
+    await page.getByText('Unsaved changes').waitFor()
+    await page.getByRole('button', { name: /^Save/ }).click()
+    await page.getByText(`Saved ${plan.name}`).first().waitFor()
+    expect((await memberships.getPlan(plan.id))!.terms).toMatchObject([{ months: 12, variantId: product.variants[0]!.id }])
+  })
+
   test('grants a plan, then extends and cancels from the member history', async () => {
     const userId = randomUUID()
     const email = `${unique('dee')}@example.com`

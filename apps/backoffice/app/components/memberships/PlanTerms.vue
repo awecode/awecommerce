@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The product variants that sell a plan, each for some months. Adding and
-// removing save at once.
+// removing save at once; the plan form's Save also adds a picked variant
+// (`addPicked`), and a picked one counts as unsaved (`pending`).
 const props = defineProps<{ planId: number }>()
 
 const toast = useToast()
@@ -48,21 +49,25 @@ watch(variantItems, (items) => {
 const months = ref(12)
 
 const adding = ref(false)
+// Adds the picked variant; false when it could not
 const add = async () => {
-  if (!variantId.value) return
+  if (!variantId.value) return true
   adding.value = true
   try {
     await api(`/api/admin/membership-plans/${props.planId}/terms`, { method: 'POST', body: { variantId: variantId.value, months: months.value } })
     toast.add({ title: 'Term added', color: 'success', icon: 'i-lucide-check' })
     productId.value = undefined
     variantId.value = undefined
+    return true
   } catch (error) {
     toast.add({ title: 'Could not add it', description: apiErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
+    return false
   } finally {
     adding.value = false
     await refresh()
   }
 }
+defineExpose({ pending: computed(() => variantId.value !== undefined), addPicked: add })
 
 const remove = async (term: Term) => {
   const go = await confirm({

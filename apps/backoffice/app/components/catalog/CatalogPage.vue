@@ -20,6 +20,11 @@ const props = defineProps<{
   // Under the slug and Active fields, when the defaults do not fit
   slugHelp?: string
   activeHelp?: string
+  // Changes the extra fields keep outside the form state (such as a picked
+  // term), counted as unsaved; and saved first by Save, which stops when it
+  // returns false
+  pendingChanges?: boolean
+  beforeSave?: () => Promise<boolean>
 }>()
 
 defineSlots<{
@@ -70,7 +75,7 @@ const state = reactive<Record<string, any>>({})
 let initial = ''
 // Follows the name until the slug is edited by hand
 const slugTouched = ref(false)
-const dirty = computed(() => open.value && JSON.stringify(state) !== initial)
+const dirty = computed(() => open.value && (JSON.stringify(state) !== initial || Boolean(props.pendingChanges)))
 
 const startForm = (row: Row | null) => {
   editing.value = row
@@ -116,6 +121,11 @@ const { mutate: save, isLoading: saving } = useMutation({
   onError: (error) => toast.add({ title: 'Could not save', description: apiErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' }),
   onSettled: refresh,
 })
+
+const submit = async () => {
+  if (props.beforeSave && !(await props.beforeSave())) return
+  save()
+}
 
 const setActive = async (row: Row, isActive: boolean) => {
   try {
@@ -250,7 +260,7 @@ watch(() => route.query.new, (value) => {
     @update:open="(value: boolean) => !value && closeForm()"
   >
     <template #body>
-      <UForm ref="form" :schema="formSchema" :state="state" class="space-y-4" @submit="save()">
+      <UForm ref="form" :schema="formSchema" :state="state" class="space-y-4" @submit="submit()">
         <UFormField label="Name" name="name" required>
           <UInput v-model="state.name" autofocus class="w-full" />
         </UFormField>

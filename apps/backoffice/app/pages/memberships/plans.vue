@@ -6,6 +6,8 @@ import type { TableColumn } from '@nuxt/ui'
 type Plan = CatalogRow & { program: string; rank: number; description: string | null; termCount: number }
 
 useSeoMeta({ title: 'Membership plans' })
+// Save also adds a term picked but not yet added
+const terms = useTemplateRef<{ pending: boolean; addPicked: () => Promise<boolean> }>('terms')
 
 const columns: TableColumn<Plan>[] = [
   { accessorKey: 'program', header: 'Program' },
@@ -31,6 +33,8 @@ const columns: TableColumn<Plan>[] = [
     :update-schema="updateMembershipPlanSchema"
     slug-help="Identifies the plan"
     active-help="Inactive plans cannot be granted or bought; current members keep theirs until it ends"
+    :pending-changes="terms?.pending"
+    :before-save="async () => (terms ? await terms.addPicked() : true)"
   >
     <template #fields="form">
       <UFormField label="Program" name="program" required help="Plans with the same program, such as music, are tiers of one membership: a member has one of them at a time">
@@ -42,8 +46,8 @@ const columns: TableColumn<Plan>[] = [
       <UFormField label="Description" name="description">
         <UTextarea v-model="form.state.description" :rows="2" autoresize class="w-full" />
       </UFormField>
-      <UFormField v-if="form.editing" label="Sold as" help="Each product variant here sells the plan for its months, at the variant's price. Changes are saved at once.">
-        <MembershipsPlanTerms :plan-id="form.editing.id" />
+      <UFormField v-if="form.editing" label="Sold as" help="Each product variant here sells the plan for its months, at the variant's price. Add saves at once; so does Save, for one picked but not added.">
+        <MembershipsPlanTerms ref="terms" :plan-id="form.editing.id" />
       </UFormField>
     </template>
   </CatalogPage>
