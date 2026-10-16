@@ -157,5 +157,26 @@ describe.skipIf(!url)('memberships', async () => {
     await page.getByRole('group', { name: `Join ${club.name}` }).getByRole('button', { name: 'Join 12 months · $30.00' }).click()
     await page.getByRole('dialog', { name: 'Your cart (1)' }).waitFor()
   })
+
+  test('the account overview links to joining when the buyer has no memberships', async () => {
+    const slug = unique('membership')
+    const [membershipClass] = await db.insert(productClasses).values({ name: slug, slug, requiresShipping: false, trackStock: false }).returning()
+    const plan = await memberships.createPlan({ name: unique('Friends'), slug: unique('friends'), program: unique('friends'), rank: 1 })
+    await memberships.addTerm({ planId: plan.id, variantId: (await product('20', membershipClass!.id)).variants[0]!.id, months: 12 })
+
+    const page = await signedInPage(db, `${unique('overview')}@example.com`)
+    await page.goto(`${process.env.BETTER_AUTH_URL}/account`)
+    await page.getByText('You are not a member yet.').waitFor()
+    await page.getByRole('link', { name: 'Join a membership' }).click()
+    await page.waitForURL('**/account/memberships')
+    await page.getByRole('group', { name: `Join ${plan.name}` }).waitFor()
+
+    // A member sees their membership instead
+    const userId = await page.evaluate(async () => (await (await fetch('/api/auth/get-session')).json()).user.id)
+    await memberships.grant({ userId, planId: plan.id, months: 1 })
+    await page.goto(`${process.env.BETTER_AUTH_URL}/account`)
+    await page.getByRole('group', { name: `${plan.name} membership` }).waitFor()
+    expect(await page.getByRole('link', { name: 'Join a membership' }).count()).toBe(0)
+  })
 })
 
