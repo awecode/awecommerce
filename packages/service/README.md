@@ -242,7 +242,7 @@ A product class with `oncePerPerson` (default false) is for things a person owns
 
 - `singleVariants(variantIds)`: which variants are bought one at a time, `membership` (a membership term) or `once` (a once per person class). The cart holds one of each (see Cart).
 - `ownedVariants(userId, variantIds)`: the `once` variants the person owns, from a paid order that is not cancelled (the latest such order, by variant). It is per variant, so an ebook's PDF and EPUB are separate. A membership is never owned, since buying it again renews the plan.
-- `unpaidOrdersWith(userId, variantIds, exceptOrderId)`: the person's other orders with those variants that are still `Pending` and unpaid, for cancelling once one of them is paid (the store does this, see the root README).
+- `unpaidOrdersWith(userId, variantIds, exceptOrderId)`: the person's other orders with those variants that are unpaid and not cancelled, at any status: duplicates once one of them is paid (the store cancels or notes them, see the root README).
 - `addToCart` throws `You already own <product>` for an owned variant in a signed-in cart; `createFromCart` throws `Sign in to buy <product>` for a guest cart, and `You already own <product>`. An unpaid order does not stop another.
 
 ### Memberships

@@ -58,9 +58,9 @@ class OwnershipService {
     return new Map(rows.map((row) => [row.variantId, row.orderId]))
   }
 
-  // The person's other orders with any of these variants that are still
-  // pending and unpaid (not confirmed by staff): left behind once another
-  // order with them is paid
+  // The person's other orders with any of these variants that are unpaid and
+  // not cancelled, at any status: duplicates once another order with them is
+  // paid
   async unpaidOrdersWith(userId: string, variantIds: number[], exceptOrderId: number): Promise<number[]> {
     if (!variantIds.length) return []
     const rows = await this.db
@@ -70,7 +70,7 @@ class OwnershipService {
       .where(
         and(
           eq(orders.userId, userId),
-          eq(orders.status, 'Pending'),
+          ne(orders.status, 'Cancelled'),
           eq(orders.paymentStatus, 'Pending'),
           ne(orders.id, exceptOrderId),
           inArray(orderLines.variantId, variantIds),

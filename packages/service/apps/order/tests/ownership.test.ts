@@ -88,7 +88,7 @@ test('not bought again while a paid order has it; another variant, or after canc
   expect((await orders.createFromCart(second.id)).lines).toHaveLength(1)
 })
 
-test('the other unpaid, unconfirmed orders with it', async () => {
+test('the other unpaid orders with it, at any status but cancelled', async () => {
   const { pdf } = await createEbook()
   const mug = await plainProduct()
   const user = unique('user')
@@ -102,7 +102,7 @@ test('the other unpaid, unconfirmed orders with it', async () => {
   await orders.changeStatus(confirmed, 'Confirmed')
   await orders.changePaymentStatus(paid, 'Paid')
   await orders.cancel(other, 'staff', 'Test')
-  expect(await ownership.unpaidOrdersWith(user, [pdf], paid)).toEqual([abandoned])
+  expect((await ownership.unpaidOrdersWith(user, [pdf], paid)).sort()).toEqual([abandoned, confirmed].sort())
 })
 
 test('a membership is one in the cart but never owned, so it can be renewed', async () => {
