@@ -43,6 +43,9 @@ watch(offer, (value) => {
 watch(isNew, (value) => {
   if (value) load(emptyOfferForm())
 }, { immediate: true })
+// A saved offer's form shows (and saves) once it has loaded, so nothing typed
+// before then is lost or saved over it
+const ready = computed(() => isNew.value || offer.value !== undefined)
 
 useSeoMeta({ title: () => state.name || (isNew.value ? 'New offer' : 'Offer') })
 
@@ -162,7 +165,7 @@ const preview = computed(() => {
 const form = useTemplateRef('form')
 const saving = ref(false)
 const save = async () => {
-  if (saving.value) return false
+  if (saving.value || !ready.value) return false
   try {
     await form.value!.validate({})
   } catch {
@@ -241,10 +244,10 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/offers" aria-label="Back to offers" />
         </template>
-        <template v-if="!error && !isNew" #trailing>
+        <template v-if="!error && !isNew && ready" #trailing>
           <UBadge :color="savedForm.isActive ? 'success' : 'neutral'" variant="subtle" :label="savedForm.isActive ? 'Active' : 'Inactive'" />
         </template>
-        <template v-if="!error" #right>
+        <template v-if="!error && ready" #right>
           <span v-if="dirty" class="text-xs text-muted">Unsaved changes</span>
           <UButton v-if="dirty && !isNew" color="neutral" variant="ghost" label="Discard" @click="discard" />
           <UButton :loading="saving" :label="isNew ? 'Create' : 'Save'" @click="save">
@@ -268,6 +271,9 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
         :actions="[{ label: 'Back to offers', to: '/offers', color: 'neutral', variant: 'outline' }]"
         class="m-auto"
       />
+      <div v-else-if="!ready" role="status" class="m-auto flex items-center gap-2 text-sm text-muted">
+        <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" /> Loading…
+      </div>
       <UForm
         v-else
         ref="form"

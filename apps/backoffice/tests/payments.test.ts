@@ -49,7 +49,7 @@ describe.skipIf(!url)('online payments in the backoffice', async () => {
 
   test('a paid card order is confirmed as usual, and refunded through Stripe', async () => {
     const order = await cardOrder()
-    await orders.recordPayment(order.id, { amount: '40', reference: 'pi_backoffice', method: 'stripe', label: 'Card' })
+    await orders.recordPayment(order.id, { amount: order.total, reference: 'pi_backoffice', method: 'stripe', label: 'Card' })
     const page = await openOrder(order.id)
     await page.getByRole('button', { name: 'Confirm order' }).waitFor()
 

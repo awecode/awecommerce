@@ -36,6 +36,9 @@ const load = async (form: ProductForm) => {
   await nextTick()
   savedForm.value = clone(state)
 }
+// A saved product's form shows (and saves) once it has loaded, so nothing
+// typed before then is lost or saved over it
+const ready = computed(() => isNew.value || product.value !== undefined)
 watch(product, (value) => {
   if (value && !dirty.value) load(productFormFrom(value))
 }, { immediate: true })
@@ -142,7 +145,7 @@ const uploadPendingImages = async () => {
 
 // True when everything was saved
 const save = async () => {
-  if (saving.value) return false
+  if (saving.value || !ready.value) return false
   try {
     await form.value!.validate({})
   } catch {
@@ -249,11 +252,11 @@ const linkPlaceholder = 'https://…'
         <template #leading>
           <UButton icon="i-lucide-arrow-left" color="neutral" variant="ghost" to="/products" aria-label="Back to products" class="2xl:hidden" />
         </template>
-        <template v-if="!error" #trailing>
+        <template v-if="!error && ready" #trailing>
           <UBadge v-if="!isNew" :color="savedForm.status === 'Published' ? 'success' : 'neutral'" variant="subtle">{{ savedForm.status }}</UBadge>
           <UBadge v-if="!isNew && !savedForm.isActive" color="warning" variant="subtle">Inactive</UBadge>
         </template>
-        <template v-if="!error" #right>
+        <template v-if="!error && ready" #right>
           <span v-if="dirty" class="text-xs text-muted">Unsaved changes</span>
           <UButton v-if="dirty && !isNew" color="neutral" variant="ghost" label="Discard" @click="discard" />
           <UButton :loading="saving" :label="isNew ? 'Create' : 'Save'" @click="save">
@@ -274,6 +277,9 @@ const linkPlaceholder = 'https://…'
         :actions="[{ label: 'Back to products', to: '/products', color: 'neutral', variant: 'outline' }]"
         class="m-auto"
       />
+      <div v-else-if="!ready" role="status" class="m-auto flex items-center gap-2 text-sm text-muted">
+        <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" /> Loading…
+      </div>
       <UForm
         v-else
         ref="form"
