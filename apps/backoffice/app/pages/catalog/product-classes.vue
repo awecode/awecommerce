@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 
-type ProductClass = CatalogRow & { taxRate: string | null; trackStock: boolean | null; requiresShipping: boolean; description: string | null }
+type ProductClass = CatalogRow & { taxRate: string | null; trackStock: boolean | null; requiresShipping: boolean; oncePerPerson: boolean; description: string | null }
 
 useSeoMeta({ title: 'Product classes' })
 
@@ -26,6 +26,12 @@ const columns: TableColumn<ProductClass>[] = [
     cell: ({ row }) => (row.original.requiresShipping ? 'Shipped' : 'Not shipped'),
     meta: { class: { td: 'text-muted' } },
   },
+  {
+    id: 'oncePerPerson',
+    header: 'Per person',
+    cell: ({ row }) => (row.original.oncePerPerson ? 'Once' : 'Any number'),
+    meta: { class: { td: 'text-muted' } },
+  },
 ]
 </script>
 
@@ -36,7 +42,7 @@ const columns: TableColumn<ProductClass>[] = [
     singular="product class"
     icon="i-lucide-shapes"
     :columns="columns"
-    :defaults="{ taxRate: '', trackStock: true, requiresShipping: true, description: '' }"
+    :defaults="{ taxRate: '', trackStock: true, requiresShipping: true, oncePerPerson: false, description: '' }"
     :create-schema="createProductClassSchema"
     :update-schema="updateProductClassSchema"
   >
@@ -56,6 +62,13 @@ const columns: TableColumn<ProductClass>[] = [
           v-model="form.state.requiresShipping"
           label="Ships to the buyer"
           description="Off for digital goods: an order of only these takes no address or shipping"
+        />
+      </UFormField>
+      <UFormField name="oncePerPerson">
+        <USwitch
+          v-model="form.state.oncePerPerson"
+          label="Once per person"
+          description="For things a person owns once, such as an ebook: one in the cart, a sign-in to buy, and not again while they own it"
         />
       </UFormField>
       <UFormField label="Description" name="description">

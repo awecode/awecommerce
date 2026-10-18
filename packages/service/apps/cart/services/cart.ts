@@ -22,6 +22,7 @@ import { priceCart } from './pricing'
 import { LoyaltyService } from '../../loyalty/services/loyalty'
 import { MembershipService } from '../../membership/services/membership'
 import { membershipPlans, membershipTerms } from '../../membership/schemas'
+import { OwnershipService } from '../../order/services/ownership'
 
 const SUM_PRODUCT_QUANTITY_ON_CART_MERGE = true
 
@@ -121,9 +122,11 @@ class CartService {
 
   // Adds a variant with the buyer's answers to the product's custom fields. The
   // same variant with the same answers adds to that line's quantity; different
-  // answers make a separate line. A membership term replaces the cart's lines
-  // of its program instead (any of its plans and terms, this one too): a
-  // person holds one plan of a program at a time.
+  // answers make a separate line. Something a person buys one of (see
+  // OwnershipService) is added once, with quantity 1, replacing its line: a
+  // membership term replaces the cart's lines of its program (any of its plans
+  // and terms), as a person holds one plan of a program at a time. A once per
+  // person variant the cart's user already owns is refused.
   async addToCart(
     cartId: number,
     variantId: number,
@@ -154,13 +157,24 @@ class CartService {
       throw new ValidationError('Product price not found')
     }
     const customizations = validateCustomizations(row.product.customFields, answers)
-    const term = (await new MembershipService(this.db).termsForVariants([variantId])).get(variantId)
-    if (term) {
+    const ownership = new OwnershipService(this.db)
+    const single = (await ownership.singleVariants([variantId])).get(variantId)
+    if (single) {
+      if (quantity !== 1) {
+        throw new ValidationError(`Only one ${row.product.name} can be bought`)
+      }
+      const [cart] = await this.db.select({ userId: carts.userId }).from(carts).where(eq(carts.id, cartId))
+      if ((await ownership.ownedVariants(cart?.userId, [variantId])).has(variantId)) {
+        throw new ValidationError(`You already own ${row.product.name}`)
+      }
+      const term = single === 'membership' ? (await new MembershipService(this.db).termsForVariants([variantId])).get(variantId) : undefined
       return await this.db.transaction(async (tx) => {
         await tx.delete(cartLines).where(
           and(
             eq(cartLines.cartId, cartId),
-            inArray(cartLines.variantId, this.programVariants(tx, term.plan.program)),
+            term
+              ? inArray(cartLines.variantId, this.programVariants(tx, term.plan.program))
+              : eq(cartLines.variantId, variantId),
           ),
         )
         await new ProductVariantService(tx).checkStock(new Map([[variantId, quantity]]))
@@ -264,6 +278,9 @@ class CartService {
     if (!line) {
       throw new NotFoundError(`Cart line not found: ${cartLineId}`)
     }
+    if (quantity > 1 && (await new OwnershipService(this.db).singleVariants([line.variantId])).has(line.variantId)) {
+      throw new ValidationError('Only one of this can be bought')
+    }
     await new ProductVariantService(this.db).checkStock(
       new Map([[line.variantId, (await this.quantityInCart(cartId, line.variantId)) - line.quantity + quantity]]),
     )
@@ -360,6 +377,9 @@ class CartService {
     const terms = await new MembershipService(this.db).termsForVariants(
       content.lines.map((line) => line.variantId),
     )
+    const ownership = new OwnershipService(this.db)
+    const singles = await ownership.singleVariants(content.lines.map((line) => line.variantId))
+    const owned = await ownership.ownedVariants(content.userId, content.lines.map((line) => line.variantId))
     const stockLeft = (variantId: number) => stock.get(variantId)?.stock ?? null
     const inCart = new Map<number, number>()
     for (const line of content.lines) {
@@ -390,12 +410,19 @@ class CartService {
           line.variant.product.customFields,
           line.customizations,
         ),
+        // Bought one at a time (a membership, or a once per person product):
+        // its quantity stays 1
+        oncePerPerson: singles.has(line.variantId),
+        // The paid order the signed-in buyer owns it from, or null. Checkout
+        // fails while this is set; the buyer needs to remove the line.
+        ownedInOrder: owned.get(line.variantId) ?? null,
       })),
       // False when nothing in the cart is shipped (digital goods only): checkout
       // then takes no address and no shipping method
       requiresShipping: pricing.requiresShipping,
-      // True when the cart has a membership: only a signed-in buyer can order it
-      requiresAccount: terms.size > 0,
+      // True when the cart has a membership or a once per person product: only
+      // a signed-in buyer can order it
+      requiresAccount: singles.size > 0,
       subtotal: pricing.subtotal,
       loyaltyDiscount: pricing.loyaltyDiscount,
       shippingCharge: pricing.shippingCharge,
@@ -514,7 +541,14 @@ class CartService {
       )
       const program = (line: CartLine) => terms.get(line.variantId)?.plan.program
       const sessionPrograms = new Set(sessionCart.lines.map(program).filter(Boolean))
-      const userLines = userCart.lines.filter((line) => !sessionPrograms.has(program(line)))
+      // and a variant bought one at a time keeps the guest cart's line
+      const singles = await new OwnershipService(tx).singleVariants(
+        [...userCart.lines, ...sessionCart.lines].map((line) => line.variantId),
+      )
+      const sessionVariants = new Set(sessionCart.lines.map((line) => line.variantId))
+      const userLines = userCart.lines.filter(
+        (line) => !sessionPrograms.has(program(line)) && !(singles.has(line.variantId) && sessionVariants.has(line.variantId)),
+      )
 
       const lines: NewCartLine[] = []
       for (const userLine of userLines) {

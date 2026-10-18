@@ -35,6 +35,7 @@ import {
 } from '../schemas'
 import { products, productVariants } from '../../product/schemas'
 import { MembershipService } from '../../membership/services/membership'
+import { OwnershipService } from './ownership'
 import { Database } from '../../types'
 
 type CreateFromCartOptions = {
@@ -258,6 +259,23 @@ class OrderService {
       const retired = content.lines.find((line) => terms.get(line.variantId)?.plan.isActive === false)
       if (retired) {
         throw new ValidationError(`Product variant is not available: ${retired.variant.sku}`)
+      }
+      // A once per person product belongs to an account too, one at a time,
+      // and not again while the buyer owns it
+      const ownership = new OwnershipService(tx)
+      const singles = await ownership.singleVariants(content.lines.map((line) => line.variantId))
+      const once = content.lines.find((line) => singles.get(line.variantId) === 'once')
+      if (!cart.userId && once) {
+        throw new ValidationError(`Sign in to buy ${once.variant.product.name}`)
+      }
+      const several = content.lines.find((line) => singles.has(line.variantId) && line.quantity > 1)
+      if (several) {
+        throw new ValidationError(`Only one ${several.variant.product.name} can be bought`)
+      }
+      const owned = await ownership.ownedVariants(cart.userId, content.lines.map((line) => line.variantId))
+      const ownedLine = content.lines.find((line) => owned.has(line.variantId))
+      if (ownedLine) {
+        throw new ValidationError(`You already own ${ownedLine.variant.product.name}`)
       }
       // The product's custom fields may have changed since the buyer answered
       // them. Fail instead of placing an order with answers it no longer asks for.

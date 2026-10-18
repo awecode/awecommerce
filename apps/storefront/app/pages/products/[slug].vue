@@ -2,7 +2,9 @@
 // A product: its images, the variant picked by option (kept in the URL as
 // `variant`, so a link opens the same one), stock, the buyer's answers to its
 // fields, and adding it to the cart (which opens the cart drawer). Also its SEO tags and Product JSON-LD,
-// and the member price when members of a plan pay less.
+// and the member price when members of a plan pay less. Something bought one
+// at a time (a membership, an ebook) has no quantity, and one the buyer owns
+// links to its order instead of Add to cart.
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -10,8 +12,9 @@ const { store } = useAppConfig()
 const { data: settings } = useStoreSettings()
 const { add: addToCart, drawerOpen } = useCart()
 const money = useMoney()
+const { user } = useAuth()
 
-const { data: product, error } = await useFetch(() => `/api/store/products/${route.params.slug}`)
+const { data: product, error } = await useFetch(() => `/api/store/products/${route.params.slug}`, { watch: [() => user.value?.id] })
 if (error.value || !product.value) {
   throw createError({ statusCode: error.value?.statusCode ?? 404, statusMessage: 'Page not found', fatal: true })
 }
@@ -84,7 +87,7 @@ const add = async () => {
   adding.value = true
   try {
     const customizations = Object.fromEntries(Object.entries(answers).filter(([, value]) => value.trim()))
-    await addToCart(variant.value.id, quantity.value, customizations)
+    await addToCart(variant.value.id, variant.value.oncePerPerson ? 1 : quantity.value, customizations)
     drawerOpen.value = true
   } catch (error) {
     toast.add({ title: 'Could not add to your cart', description: cartErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
@@ -210,13 +213,21 @@ useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
               <UInput v-model="answers[field.label]" :maxlength="field.maxLength" size="lg" class="w-full" />
             </UFormField>
 
-            <p class="flex items-center gap-2 text-sm" :class="variant?.inStock ? 'text-muted' : 'text-error'">
+            <div v-if="variant?.ownedInOrder" data-testid="owned" class="flex flex-wrap items-center justify-between gap-3 rounded-sm bg-muted p-5">
+              <p class="flex items-center gap-2 font-medium">
+                <UIcon name="i-lucide-circle-check" class="size-5 text-success" /> You own this
+              </p>
+              <UButton :to="`/orders/${variant.ownedInOrder}`" label="View your order" color="neutral" variant="outline" />
+            </div>
+
+            <p v-if="!variant?.ownedInOrder" class="flex items-center gap-2 text-sm" :class="variant?.inStock ? 'text-muted' : 'text-error'">
               <span class="size-2 rounded-full" :class="variant?.inStock ? 'bg-success' : 'bg-error'" />
               {{ stockNote }}
             </p>
 
-            <div class="flex gap-3">
+            <div v-if="!variant?.ownedInOrder" class="flex gap-3">
               <UInputNumber
+                v-if="!variant?.oncePerPerson"
                 v-model="quantity"
                 :min="1"
                 :max="tracked && variant?.inStock ? variant.stockQuantity ?? undefined : undefined"

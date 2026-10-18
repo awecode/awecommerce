@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// A cart line: image, name, options and answers, price, quantity and Remove,
-// with what stops it from being checked out. `compact` is for the drawer.
+// A cart line: image, name, options and answers, price, quantity (not for
+// something bought one at a time) and Remove, with what stops it from being
+// checked out. `compact` is for the drawer.
 const props = defineProps<{ line: CartLine; compact?: boolean }>()
 
 const money = useMoney()
@@ -48,6 +49,7 @@ const run = async (action: () => Promise<unknown>) => {
       </p>
       <div class="mt-auto flex items-center gap-3">
         <UInputNumber
+          v-if="!line.oncePerPerson"
           :model-value="line.quantity"
           :min="1"
           :disabled="busy"

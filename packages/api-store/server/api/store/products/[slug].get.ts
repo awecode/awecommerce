@@ -1,5 +1,6 @@
 import { inArray } from 'drizzle-orm'
 import { MembershipService } from '@awecommerce/service/apps/membership/services/membership'
+import { OwnershipService } from '@awecommerce/service/apps/order/services/ownership'
 import { OfferService } from '@awecommerce/service/apps/offer/services/offer'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
 import { products } from '@awecommerce/service/apps/product/schemas'
@@ -11,7 +12,9 @@ import { products } from '@awecommerce/service/apps/product/schemas'
 // members of a plan pay less for one: the buyer's own (`isYours`) when they
 // hold such a plan, otherwise the lowest, or null. A variant that sells a
 // membership has `membership`: the plan's id, name and description (rich
-// text) and the months; null otherwise.
+// text) and the months; null otherwise. `oncePerPerson`: it is bought one at
+// a time (a membership, or a once per person product), and `ownedInOrder` the
+// paid order the signed-in buyer owns it from, or null.
 const membershipOf = (term?: { planId: number; months: number; plan: { name: string; description: string | null } }) =>
   term ? { planId: term.planId, planName: term.plan.name, description: term.plan.description, months: term.months } : null
 
@@ -34,6 +37,9 @@ export default defineServiceHandler(async (event) => {
   const yours = await offerService.memberPrices(variants, planIds)
   const lowest = await offerService.memberPrices(variants)
   const terms = await new MembershipService(useDb()).termsForVariants(variants.map((variant) => variant.id))
+  const ownership = new OwnershipService(useDb())
+  const singles = await ownership.singleVariants(variants.map((variant) => variant.id))
+  const owned = await ownership.ownedVariants(user?.id, variants.map((variant) => variant.id))
   return {
     ...product,
     variants: variants.map((variant) => {
@@ -44,6 +50,8 @@ export default defineServiceHandler(async (event) => {
         inStock: product.productClass?.trackStock === false || (variant.stockQuantity ?? 0) > 0,
         memberPrice,
         membership: membershipOf(terms.get(variant.id)),
+        oncePerPerson: singles.has(variant.id),
+        ownedInOrder: owned.get(variant.id) ?? null,
       }
     }),
     relatedProducts,

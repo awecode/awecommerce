@@ -1,0 +1,1 @@
+ALTER TABLE "product_class" ADD COLUMN "oncePerPerson" boolean DEFAULT false NOT NULL;

@@ -41,6 +41,7 @@ export const cartErrorMessage = (error: unknown) =>
 // What stops a line from being checked out, if anything
 export const lineProblem = (line: CartLine) => {
   if (!line.isAvailable) return 'No longer for sale. Remove it to check out.'
+  if (line.ownedInOrder) return 'You already own this. Remove it to check out.'
   if (!line.isInStock) {
     return line.stockLeft ? `Only ${line.stockLeft} left. Lower the quantity to check out.` : 'Sold out. Remove it to check out.'
   }

@@ -51,6 +51,9 @@ export const productClasses = pgTable('product_class', {
   // Whether products of this class are shipped to the buyer. A cart with only
   // products that are not (digital goods) needs no address or shipping.
   requiresShipping: boolean().notNull().default(true),
+  // Whether a person buys a product of this class once (an ebook): one in the
+  // cart, and none while they own it from a paid order
+  oncePerPerson: boolean().notNull().default(false),
   // Tax percentage for products of this class; empty uses the store default
   taxRate: numeric({ precision: 100, scale: 20 }),
   isActive: boolean().default(true),

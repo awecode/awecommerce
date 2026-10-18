@@ -12,23 +12,23 @@ describe.skipIf(!url)('memberships bought as products', async () => {
   const admin = client((await createSignedInUser(db, 'admin')).token)
   const memberships = new MembershipService(db)
 
-  // An order by a signed-in buyer for `quantity` of a 6-month Platinum term
-  const orderMembership = async (quantity = 1) => {
+  // An order by a signed-in buyer for a 6-month Platinum term
+  const orderMembership = async () => {
     const platinum = await memberships.createPlan({ name: 'Platinum', slug: unique('platinum'), program: unique('music'), rank: 1 })
     const slug = unique('platinum-6')
     const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '40', stockQuantity: 10, status: 'Published' })
     await memberships.addTerm({ planId: platinum.id, variantId: product.variants[0]!.id, months: 6 })
     const { userId } = await createSignedInUser(db, null)
     const cart = await new CartService(db).create(userId)
-    await new CartService(db).addToCart(cart.id, product.variants[0]!.id, quantity)
+    await new CartService(db).addToCart(cart.id, product.variants[0]!.id, 1)
     const order = await new OrderService(db).createFromCart(cart.id)
     return { order, userId, platinum }
   }
   const setPayment = (id: number, paymentStatus: string) =>
     admin(`/api/admin/orders/${id}/payment-status`, { method: 'POST', body: { paymentStatus } })
 
-  test('paying grants the membership once, for its months times the quantity; refunding ends it', async () => {
-    const { order, userId, platinum } = await orderMembership(2)
+  test('paying grants the membership once, for its months; refunding ends it', async () => {
+    const { order, userId, platinum } = await orderMembership()
     expect(await memberships.activeMemberships(userId)).toEqual([])
 
     expect((await setPayment(order.id, 'Paid')).status).toBe(200)
@@ -36,8 +36,8 @@ describe.skipIf(!url)('memberships bought as products', async () => {
     await setPayment(order.id, 'Paid')
     const granted = await memberships.forOrder(order.id)
     expect(granted).toHaveLength(1)
-    expect(granted[0]).toMatchObject({ userId, planId: platinum.id, months: 12, status: 'active' })
-    expect(Number(granted[0]!.pricePaid)).toBe(80)
+    expect(granted[0]).toMatchObject({ userId, planId: platinum.id, months: 6, status: 'active' })
+    expect(Number(granted[0]!.pricePaid)).toBe(40)
     expect((await memberships.activeMemberships(userId)).map((m) => m.planId)).toEqual([platinum.id])
 
     await setPayment(order.id, 'Refunded')
