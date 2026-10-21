@@ -22,15 +22,17 @@ const { data: offer, error } = useQuery({
   query: () => api<Parameters<typeof offerFormFrom>[0] & { usageCount: number | null }>(`/api/admin/offers/${offerId.value}/with-parts`),
   enabled: () => !isNew.value,
 })
-const { data: plans } = useQuery({
-  key: ['membership-plans', 'all'],
-  query: () => apiGet('/api/admin/membership-plans', { query: { size: 100 } }),
-})
-const planItems = computed(() => (plans.value?.results ?? []).map((plan) => ({ label: `${plan.name} (${plan.program})`, value: plan.id })))
 
 // ---- the form, and what was last saved, to tell when it has changes
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const state = reactive<OfferForm>(emptyOfferForm())
+// The chosen plans' names, for the summary (the same request as the plan picker's)
+const { data: chosenPlans } = useQuery({
+  key: () => ['membership-plans', 'picker-chosen', state.planIds],
+  query: () => apiGet('/api/admin/membership-plans', { query: { ids: state.planIds.join(','), size: 100 } }),
+  enabled: () => state.planIds.length > 0,
+})
+const planItems = computed(() => (chosenPlans.value?.results ?? []).map((plan) => ({ label: `${plan.name} (${plan.program})`, value: plan.id })))
 const savedForm = ref<OfferForm>(clone(state))
 const dirty = computed(() => JSON.stringify(state) !== JSON.stringify(savedForm.value))
 const load = (form: OfferForm) => {
@@ -315,7 +317,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
                   <OffersCustomerPicker v-model="state.users" />
                 </UFormField>
                 <UFormField label="Members of plans" help="Customers with an active membership of these plans">
-                  <USelectMenu v-model="state.planIds" :items="planItems" value-key="value" multiple placeholder="Choose plans" aria-label="Members of plans" class="w-80" />
+                  <MembershipsPlanPicker v-model="state.planIds" multiple placeholder="Choose plans" aria-label="Members of plans" class="w-80" />
                 </UFormField>
               </template>
             </section>

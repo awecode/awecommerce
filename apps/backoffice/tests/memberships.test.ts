@@ -90,10 +90,17 @@ describe.skipIf(!url)('memberships', async () => {
     await page.getByLabel('Customer', { exact: true }).click()
     await page.keyboard.type(email)
     await page.getByRole('option', { name: new RegExp(email) }).click()
+    // Plans are searched as you type, however many there are
     await page.getByRole('dialog').getByLabel('Plan', { exact: true }).click()
+    await page.keyboard.type(plan.name)
     await page.getByRole('option', { name: new RegExp(plan.name) }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Grant', exact: true }).click()
     await page.getByText('Membership granted').first().waitFor()
+
+    // A plan filter from the address is named, though no search shows it
+    await page.goto(`${process.env.BETTER_AUTH_URL}/memberships?plan=${plan.id}`)
+    await page.getByLabel('Plan', { exact: true }).getByText(plan.name).waitFor()
+    await page.getByRole('row', { name: /Dee Member/ }).waitFor()
 
     await page.getByPlaceholder('Search members…').fill(email)
     await page.waitForURL((u) => u.searchParams.get('q') === email)

@@ -75,13 +75,6 @@ const menu = computed(() => [
 ])
 
 // ---- memberships
-const { data: plans } = useQuery({
-  key: ['membership-plans', 'all'],
-  query: () => apiGet('/api/admin/membership-plans', { query: { size: 100 } }),
-})
-const planItems = computed(() =>
-  (plans.value?.results ?? []).filter((plan) => plan.isActive).map((plan) => ({ label: `${plan.name} (${plan.program})`, value: plan.id })),
-)
 const grant = reactive({ planId: undefined as number | undefined, months: 12 })
 const grantPlan = (planId: number, months: number, done: string) =>
   act(() => api('/api/admin/memberships', { method: 'POST', body: { userId: id.value, planId, months } }), done)
@@ -170,7 +163,7 @@ const address = (a: SavedAddress) =>
               </ul>
               <p v-else class="text-sm text-muted">No memberships.</p>
               <div class="flex flex-wrap items-center gap-2">
-                <USelect v-model="grant.planId" :items="planItems" placeholder="Plan" aria-label="Plan to grant" class="w-48" />
+                <MembershipsPlanPicker v-model="grant.planId" active-only placeholder="Plan" aria-label="Plan to grant" class="w-48" />
                 <UInputNumber v-model="grant.months" :min="1" :max="120" aria-label="Months to grant" class="w-28" />
                 <UButton
                   label="Grant"

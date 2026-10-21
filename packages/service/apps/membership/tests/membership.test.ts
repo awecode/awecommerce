@@ -150,6 +150,9 @@ test('plans list by program and rank, with search, pages and their terms', async
   expect(found.pagination.total).toBe(2)
   await service.updatePlan(basic.id, { isActive: false })
   expect((await service.listPlans({ q: program, isActive: true })).map((p) => p.id)).toEqual([premium.id])
+  // By id, for naming plans already chosen
+  expect((await service.listPlans({ ids: [basic.id, premium.id] })).map((p) => p.id)).toEqual([premium.id, basic.id])
+  expect(await service.listPlans({ ids: [] })).toEqual([])
 
   const shown = await service.getPlan(premium.id)
   expect(shown!.terms[0]).toMatchObject({ months: 12, variant: { sku: slug, product: { name: slug } } })

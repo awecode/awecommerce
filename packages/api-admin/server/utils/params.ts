@@ -22,6 +22,9 @@ export const listQuery = z.object({
   ...pageFields,
 })
 
+// Membership plans: `ids` picks plans by id, to name the ones already chosen
+export const planListQuery = listQuery.extend({ ids })
+
 export const productListQuery = z.object({
   q: z.string().trim().min(1).optional(),
   status: z.enum(['Draft', 'Published']).optional(),

@@ -67,8 +67,9 @@ describe.skipIf(!url)('customers and staff', async () => {
     // Memberships
     const memberships = page.getByRole('region', { name: 'Memberships' })
     await memberships.getByLabel('Plan to grant').click()
+    await page.keyboard.type(gold.name)
     await page.getByRole('option', { name: new RegExp(gold.name) }).click()
-    await memberships.getByRole('button', { name: 'Grant' }).click()
+    await memberships.getByRole('button', { name: 'Grant', exact: true }).click()
     await page.getByText('Membership granted').first().waitFor()
     await memberships.getByRole('button', { name: 'Extend' }).click()
     await page.getByLabel('Months to add').fill('6')

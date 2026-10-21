@@ -17,6 +17,8 @@ interface PlanFilter {
   // Part of the name, slug or program
   q?: string
   isActive?: boolean
+  // Only these plans
+  ids?: number[]
   pagination?: PaginationArgs
 }
 
@@ -129,6 +131,9 @@ class MembershipService {
     }
     if (filter?.isActive !== undefined) {
       where.push(eq(membershipPlans.isActive, filter.isActive))
+    }
+    if (filter?.ids) {
+      where.push(filter.ids.length ? inArray(membershipPlans.id, filter.ids) : sql`false`)
     }
     const query = this.db
       .select({

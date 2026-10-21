@@ -36,14 +36,8 @@ const { data, isLoading } = useQuery({
 type Membership = NonNullable<typeof data.value>['results'][number]
 const refresh = () => queryCache.invalidateQueries({ key: ['memberships'] })
 
-const { data: plans } = useQuery({
-  key: ['membership-plans', 'all'],
-  query: () => apiGet('/api/admin/membership-plans', { query: { size: 100 } }),
-})
-const planItems = computed(() => [
-  { label: 'Any plan', value: 'any' },
-  ...(plans.value?.results ?? []).map((plan) => ({ label: `${plan.name} (${plan.program})`, value: String(plan.id) })),
-])
+// The plan filter, as a number for the picker
+const planFilter = computed(() => (param('plan') ? Number(param('plan')) : undefined))
 const stateItems = [
   { label: 'Any state', value: 'any' },
   { label: 'Active', value: 'active' },
@@ -81,9 +75,6 @@ const { data: users } = useQuery({
   enabled: () => grantOpen.value,
 })
 const userItems = computed(() => (users.value?.results ?? []).map((user) => ({ label: user.email, description: user.name, value: user.id })))
-const activePlanItems = computed(() =>
-  (plans.value?.results ?? []).filter((plan) => plan.isActive).map((plan) => ({ label: `${plan.name} (${plan.program})`, value: plan.id })),
-)
 const startGrant = () => {
   Object.assign(grant, { userId: undefined, planId: undefined, months: 12 })
   grantOpen.value = true
@@ -161,12 +152,13 @@ const months = (n: number) => `${n} month${n === 1 ? '' : 's'}`
       </UDashboardNavbar>
       <UDashboardToolbar>
         <template #right>
-          <USelect
-            :model-value="param('plan') ?? 'any'"
-            :items="planItems"
+          <MembershipsPlanPicker
+            :model-value="planFilter"
+            clear
+            placeholder="Any plan"
             aria-label="Plan"
             class="w-48"
-            @update:model-value="(value) => setQuery({ plan: value === 'any' ? undefined : String(value) })"
+            @update:model-value="(value) => setQuery({ plan: typeof value === 'number' ? String(value) : undefined })"
           />
           <USelect
             :model-value="param('state') ?? 'any'"
@@ -236,7 +228,7 @@ const months = (n: number) => `${n} month${n === 1 ? '' : 's'}`
           />
         </UFormField>
         <UFormField label="Plan" name="planId" required help="The same plan again starts when the current one ends; a higher tier replaces a lower one">
-          <USelect v-model="grant.planId" :items="activePlanItems" placeholder="Choose a plan" aria-label="Plan" class="w-full" />
+          <MembershipsPlanPicker v-model="grant.planId" active-only placeholder="Choose a plan" aria-label="Plan" class="w-full" />
         </UFormField>
         <UFormField label="Months" name="months" required>
           <UInputNumber v-model="grant.months" :min="1" :max="120" class="w-32" />
