@@ -124,7 +124,10 @@ describe.skipIf(!url)('memberships', async () => {
     await page.getByText('You have no memberships yet.').waitFor()
     const cinemaCard = page.getByRole('group', { name: `Join ${cinema.name}` })
     await cinemaCard.getByRole('button', { name: 'Join 12 months · $40.00' }).click()
-    await page.getByRole('dialog', { name: 'Your cart (1)' }).waitFor()
+    // Straight to checkout, without the cart drawer
+    await page.waitForURL('**/checkout')
+    await page.getByRole('heading', { level: 1, name: 'Checkout' }).waitFor()
+    await page.goto(`${process.env.BETTER_AUTH_URL}/account/memberships`)
 
     const userId = await page.evaluate(async () => (await (await fetch('/api/auth/get-session')).json()).user.id)
     await memberships.grant({ userId, planId: silver.id, months: 1 })
@@ -155,7 +158,7 @@ describe.skipIf(!url)('memberships', async () => {
     const page = await signedInPage(db, `${unique('home')}@example.com`)
     await page.goto(`${process.env.BETTER_AUTH_URL}/`)
     await page.getByRole('group', { name: `Join ${club.name}` }).getByRole('button', { name: 'Join 12 months · $30.00' }).click()
-    await page.getByRole('dialog', { name: 'Your cart (1)' }).waitFor()
+    await page.waitForURL('**/checkout')
   })
 
   test('the account overview links to joining when the buyer has no memberships', async () => {

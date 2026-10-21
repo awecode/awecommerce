@@ -16,7 +16,7 @@ Each app extends one API layer, so it serves only that API and `useFetch` knows 
 
 ## Run the apps
 
-Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`) and `BETTER_AUTH_SECRET`. The storefront also needs `NUXT_PAYMENT_METHODS` (such as `cash_on_delivery,pay_later`): no payment method is on by default, and without one no order can be placed (see Payments). Set the store's name, currency and locale with `NUXT_PUBLIC_STORE_NAME`, `NUXT_PUBLIC_STORE_CURRENCY` (ISO 4217, `USD` when unset) and `NUXT_PUBLIC_STORE_LOCALE` (BCP 47, `en-US` when unset), the same in both apps; changing them needs a redeploy. Migrate the database first, for the library's tables and the auth tables:
+Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`; the storefront uses `NUXT_PUBLIC_SITE_URL` when it is unset) and `BETTER_AUTH_SECRET`. The storefront also needs `NUXT_PAYMENT_METHODS` (such as `cash_on_delivery,pay_later`): no payment method is on by default, and without one no order can be placed (see Payments). Set the store's name, currency and locale with `NUXT_PUBLIC_STORE_NAME`, `NUXT_PUBLIC_STORE_CURRENCY` (ISO 4217, `USD` when unset) and `NUXT_PUBLIC_STORE_LOCALE` (BCP 47, `en-US` when unset), the same in both apps; changing them needs a redeploy. Migrate the database first, for the library's tables and the auth tables:
 
 ```sh
 pnpm migrate        # library tables (see packages/service/README.md)
@@ -51,6 +51,51 @@ id = "<the Hyperdrive id>"
 
 The store API tests check the Workers path on Node: every request is made to look like a Workers request with a Hyperdrive binding (`packages/api-store/tests/workers-app`), and `NUXT_POSTGRES_URL` points nowhere.
 
+## Deploy to Cloudflare
+
+`pnpm deploy:cf` (`packages/cf-deploy`) sets up both apps as Cloudflare Workers, built from GitHub by Workers Builds. It asks its questions in the terminal, confirms each new Cloudflare resource before creating it, and can be run again at any time. It drives the [`cf`](https://www.npmjs.com/package/cf) CLI, pinned to `1.0.0-beta.18`; `cf` is a beta, so its commands and output may change between versions.
+
+**Before you start:**
+
+- A Cloudflare account, and `pnpm --filter @awecommerce/cf-deploy exec cf login` (or `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` set).
+- A Postgres database that Hyperdrive can reach from the internet, migrated (`pnpm migrate` and `pnpm migrate:auth`).
+- This repository (or your copy of it) on GitHub as `origin`, the `gh` CLI signed in, the Cloudflare GitHub App installed for the repository, and a Workers Builds API token on the account (dashboard: a Worker's Settings > Builds).
+- An Amazon SES sender (region, from address, access key id and secret key), and the keys of each online payment method you turn on.
+
+**Phase 1, the database.** It asks for the connection string (or takes `--connection-string`, or `DEPLOY_POSTGRES_URL`), checks it with a test query, and creates a Hyperdrive named `awecommerce` (`--name` for another) with caching off. The id goes into both `apps/*/wrangler.jsonc`. The password is not saved anywhere else.
+
+**Phase 2, the Workers.** The backoffice first, then the storefront. For each:
+
+1. A Worker: you pick the name (such as `awecommerce-backoffice`), it is written to the app's `wrangler.jsonc`, and a placeholder Worker is created so Workers Builds has something to attach to. Preview URLs are turned off.
+2. The GitHub connection (once) and a production build trigger on the default branch. Build: `pnpm install --frozen-lockfile && pnpm --filter <app> run build:cf`. Deploy: `pnpm --filter <app> exec wrangler deploy --config .output/server/wrangler.json`, the config Nitro writes on Workers Builds (the app's `wrangler.jsonc` plus the built Worker and its assets).
+3. Settings shared by both apps, asked on the backoffice's turn and saved: both public URLs, the staff admin emails, the payment methods, `ORDER_HASH_SECRET` (random unless you give one), the store's name, currency and locale, the storefront's Google Analytics id and home page row size, whether to resize images, the R2 bucket (picked or created) with its public address (a custom domain or r2.dev) and CORS for both sites, then the SES keys and the keys of each payment method turned on.
+4. Vars written into the app's `wrangler.jsonc`, with the R2 binding `R2` and, when the URL is not on `workers.dev`, the URL's host as the Worker's custom domain. Secrets are set on the Worker right away.
+5. The build variable `IMAGE_PROVIDER=cloudflare` on the trigger when image resizing is on (removed when off). It is read when the app is built, so it is not a Worker var. Turn on image transformations for the sites' zone and allow the R2 public host as a source.
+6. A first build, if you confirm.
+
+What each Worker gets:
+
+| | Backoffice | Storefront |
+|---|---|---|
+| Vars | `BETTER_AUTH_URL` (its own URL), `NUXT_PUBLIC_SITE_URL` (the storefront's URL), `NUXT_AUTH_ADMIN_EMAILS` | `NUXT_PUBLIC_SITE_URL` (its own URL; sign-in uses it, as `BETTER_AUTH_URL` is not set), `NUXT_PAYMENT_METHODS`, `NUXT_HOME_CATEGORY_ROW_SIZE`, `NUXT_PUBLIC_GOOGLE_ANALYTICS_ID` when given |
+| Vars, both | `NUXT_PUBLIC_STORE_NAME`, `NUXT_PUBLIC_STORE_CURRENCY`, `NUXT_PUBLIC_STORE_LOCALE`, `NUXT_S3_PUBLIC_URL`, `NUXT_SES_REGION`, `NUXT_SES_FROM_EMAIL`, `NUXT_SES_ACCESS_KEY_ID` | the same |
+| Secrets | `BETTER_AUTH_SECRET` (its own), `ORDER_HASH_SECRET`, `NUXT_SES_SECRET_KEY`, `NUXT_STRIPE_SECRET_KEY` with Stripe | `BETTER_AUTH_SECRET` (its own), `ORDER_HASH_SECRET`, `NUXT_SES_SECRET_KEY`; with Stripe `NUXT_STRIPE_SECRET_KEY` and `NUXT_STRIPE_WEBHOOK_SECRET`; with Thuprai Pay `NUXT_THUPRAI_PAY_API_KEY` and `NUXT_THUPRAI_PAY_WEBHOOK_SECRET` |
+
+Optional payment vars (`NUXT_STRIPE_LABEL`, `NUXT_THUPRAI_PAY_API_BASE`, `NUXT_THUPRAI_PAY_LABEL`, `NUXT_THUPRAI_PAY_DESCRIPTION`) are written when given. Which settings each payment method needs, and in which app, is one list, `PAYMENT_PROVIDERS` in `packages/cf-deploy/cli.mjs`: add your provider's id and settings there. An id that is not in the list is still put in `NUXT_PAYMENT_METHODS`, with a warning, and its keys are yours to set. The Stripe and Thuprai Pay webhooks still have to be set up at the gateways (see Payments).
+
+**Commit and push afterwards.** Vars, Worker names, the Hyperdrive id, the R2 bucket and custom domains are in `apps/*/wrangler.jsonc`, and Workers Builds deploys what is on GitHub. Secrets are already live. The `wrangler.jsonc` files keep `keep_vars: true`, so vars edited in the dashboard survive a deploy; a var removed from the file stays on the Worker until it is deleted in the dashboard too.
+
+**Running it again.** Answers and ids are saved in `.cf-deploy/state.json` at the repository root (gitignored: it holds secrets, so keep it local). A second run reuses the Hyperdrive, Workers, connection, token and triggers, shows the saved settings, and asks before changing them (default no). Changing a shared setting marks both Workers for a new push of vars and secrets, and a finished app is run again for it. Stopping half way is fine: the next run picks up where it stopped. `--reset` creates a new Hyperdrive; `--yes` takes the default answer to every yes or no question. Deleting the state file starts over, but the Cloudflare resources stay.
+
+**Deploying by hand, without the CLI.** Create a Hyperdrive with caching off, an R2 bucket, and fill in `apps/<app>/wrangler.jsonc` (name, Hyperdrive id, bucket, vars, and `routes` for a custom domain). Set the secrets with `pnpm --filter <app> exec wrangler secret put <NAME>`. Then build and deploy from your machine:
+
+```sh
+pnpm --filter @awecommerce/backoffice cf:deploy
+IMAGE_PROVIDER=cloudflare pnpm --filter @awecommerce/storefront cf:deploy   # with image resizing
+```
+
+`cf:deploy` runs `build:cf` (`NITRO_PRESET=cloudflare-module nuxt build`), which writes `.output/server/wrangler.json` (the app's `wrangler.jsonc` with the built entry and assets), then `wrangler deploy` with that file. On Workers, a missing `/_nuxt/` file answers 404 with `Cache-Control: no-store` (`packages/api-core/server/cloudflare-entry.ts`), so a chunk asked for during a deploy is not cached as missing for a year.
+
 ## Backoffice
 
 `apps/backoffice` is the staff app: Nuxt UI 4 on Tailwind 4, an SPA (`ssr: false`), with data loaded through Pinia Colada.
@@ -80,7 +125,7 @@ The store API tests check the Workers path on Node: every request is made to loo
 - **Content without an admin screen yet** is in `app/app.config.ts` under `store`: `logo` (an image URL; the store name is shown without one), `tagline`, the default `description`, the home page `hero` (title, text, image, button) and the footer's `links`. The store's name, currency and locale come from `NUXT_PUBLIC_STORE_*` (see Run the apps).
 - **Layout** (`app/layouts/default.vue`): the header has the name or logo, the category menu (top-level categories with a panel of their subcategories; a drawer on small screens), search (a dialog that goes to `/search?q=`), the account menu or Sign in, and the cart with its item count. The footer lists the top-level categories and the configured links.
 - **Pages:**
-  - `/`: the hero, featured offers, featured products, membership plans, shop by category (top-level categories, with their logo when set), best sellers, new arrivals, a row of 4 products for each featured category (featured products first, then newest), and shop by brand. Loaded in one request (`/api/store/home`).
+  - `/`: the hero, featured offers, featured products, membership plans, shop by category (top-level categories, with their logo when set), best sellers, new arrivals, a row of products for each featured category (featured products first, then newest; 4, or `NUXT_HOME_CATEGORY_ROW_SIZE`), and shop by brand. Loaded in one request (`/api/store/home`).
   - `/categories/:slug` (its subcategories' products too, with links to them), `/brands/:slug` and `/search?q=`: a product grid with brand and price filters, sorting (newest, price up or down) and pages, all in the URL (`brands`, `minPrice`, `maxPrice`, `sort`, `page`). Filters sit beside the grid on wide screens and in a drawer on small ones. Search results are `noindex`.
   - `/products/:slug`: images, the price (sale price struck through), option pickers (sold-out values crossed out; the picked variant is kept in the URL as `?variant=`), stock (`In stock`, `Only 3 left`, `Sold out`), the buyer's answers to the product's fields, quantity and Add to cart, the description and specification, and related products. Its tags include the product image and `og:type` product, and Product JSON-LD (an `Offer`, or an `AggregateOffer` for several prices).
   - Unknown categories, brands and products give a real 404, shown by `app/error.vue`.
@@ -89,7 +134,7 @@ The store API tests check the Workers path on Node: every request is made to loo
   - `/checkout`: one page with contact (guests give name and email; members see who they are signed in as), the delivery address (members pick a saved one or add a new one, saved after the order is placed; the first one saved becomes the default), the delivery method (the cheapest first), loyalty points (members, previewed in the total) and payment (Pay on delivery), beside the summary. A cart with nothing to ship has no address or delivery method, and pays later ("We will contact you to arrange payment"). The order is placed for the total shown: if it changed, the new total is shown to confirm; stock, voucher and availability problems link back to the cart.
   - `/orders/:id?hash=`: the confirmation after checkout (the link works for whoever has it), with the address, delivery, payment, items and totals, and each line's fulfilment note (see Digital goods). An order with nothing to ship has no address or delivery. Without the hash, it is the signed-in owner's order page (guests are sent to sign in first).
   - Sign-in: `/login` (email, then the emailed link or the pasted token), `/auth/confirm` (where the link lands) and `/auth/error`, in the shop's look; they replace the auth layer's pages. The header's and checkout's Sign in links bring the buyer back to the same page (`?redirect=`).
-  - `/account` (sign-in needed): the overview with memberships (when there are any), loyalty points, recent orders and the default address; `/account/orders` (every order, a page at a time); `/account/memberships` (current plans with Renew, then the history); `/account/addresses` (add, edit, make default, delete). The address fields are shared with checkout (`AddressFields`).
+  - `/account` (sign-in needed): the overview with memberships (when there are any), loyalty points, recent orders and the default address; `/account/orders` (every order, a page at a time); `/account/memberships` (current plans with Renew, then the history); `/account/addresses` (add, edit, make default, delete); `/account/profile` (their name, and a photo uploaded to object storage). Join on a membership plan adds it to the cart and goes straight to checkout. The address fields are shared with checkout (`AddressFields`).
 - **Composables:** `useStoreSettings()`, `useMoney()` (prices in the store's currency and locale), `useCategories()`, `useBrands()`, `useCategoryMenu()` and `useCart()` (the cart summary, its item count, the drawer's state, and `add`, `setQuantity`, `remove`, `applyVoucher` and `removeVoucher`, which store the summary the API answers with). Shared data is fetched once per page under one key (`dedupe: 'defer'`).
 - **Scrolling** (`app/router.options.ts`): a new page, or another page of results, starts at the top; changing filters or sorting keeps the place; a hash scrolls to its element only when it is an element id (the sign-in link carries its token in the hash).
 - **SEO defaults** (`app/app.vue`): titles as `Page · Store`, the default description, Open Graph and Twitter tags, `<html lang>` from the store's locale, and a canonical link without the query, built from `NUXT_PUBLIC_SITE_URL` (the request's address when unset).
@@ -122,7 +167,7 @@ Buyers see, and can buy, only listed products: active and `Published`, with an a
 |---|---|
 | `GET /api/store/products` | One page of products, each with `inStock`. Query: `q`, `categories` (ids, `1,2` or repeated; each includes its subcategories), `brands` (ids), `minPrice`, `maxPrice`, `sortBy` (`priceAsc`, `priceDesc` or `featuredNewest`; newest first by default), `featured`, `bestSeller`, `page`, `size` (at most 100) |
 | `GET /api/store/products/:slug` | A product with its active variants (each with `inStock` and `memberPrice`, see Memberships, and `oncePerPerson` and `ownedInOrder`, see Digital goods), options, images and listed related products (as product list rows, with prices and stock, for product cards) |
-| `GET /api/store/home` | What the home page shows, in one request: featured `offers` (as `/api/store/offers`), `featured` products, `membershipPlans` (as `/api/store/membership-plans`), `bestSellers`, `newArrivals` (4 of each), `categories` (each featured category with up to 4 of its products and its subcategories', featured first, then newest) and `brands` |
+| `GET /api/store/home` | What the home page shows, in one request: featured `offers` (as `/api/store/offers`), `featured` products, `membershipPlans` (as `/api/store/membership-plans`), `bestSellers`, `newArrivals` (4 of each), `categories` (each featured category with up to `NUXT_HOME_CATEGORY_ROW_SIZE` of its products and its subcategories', 4 by default, featured first, then newest) and `brands` |
 | `GET /api/store/categories` | Active categories with a listed product in them or below them, each with its `parent`. Categories under an inactive category are left out. |
 | `GET /api/store/brands` | Active brands with a listed product |
 
@@ -168,6 +213,7 @@ Adding more than is in stock, or raising a quantity past it, gives 409 with `dat
 
 | Route | Body | Does |
 |---|---|---|
+| `POST /api/store/profile/photo` | multipart `file` | Stores a profile photo and makes it the account's image; see Product images. The name is changed through Better Auth (`updateUser`). |
 | `GET /api/store/addresses` | | Saved addresses, newest first |
 | `POST /api/store/addresses` | address fields, `isDefault?` | Saves one; a default replaces the previous default |
 | `PATCH /api/store/addresses/:id` | any address fields, `isDefault?` | Changes one (404 if it is not the buyer's) |
@@ -276,14 +322,15 @@ The user routes go through Better Auth's admin plugin; its errors keep their sta
 
 ## Product images
 
-Product, offer, brand and category images live in object storage and are shown from their public URL, each under its folder (`products/`, `offers/`, `brands/`, `categories/`). The backoffice uploads them; the storefront only shows the stored URLs in an `img` tag and never sees the storage settings.
+Product, offer, brand and category images live in object storage and are shown from their public URL, each under its folder (`products/`, `offers/`, `brands/`, `categories/`). The backoffice uploads them; the storefront shows the stored URLs. Buyers' profile photos are stored there too, under `profiles/`, uploaded from the storefront.
 
 - **On the product page**, images are chosen as files (links cannot be pasted). A chosen file stays on the form as a local preview, marked Not uploaded yet, and is uploaded when the product is saved. The first image is the thumbnail until another is chosen. Discard drops the files not uploaded yet.
 - **Saving** checks the form, then uploads each new file in order, then saves the product as before, with the images' public URLs (the product API stays JSON). The slug must be lowercase letters, numbers and hyphens for images to upload; otherwise it is highlighted and nothing uploads. If an upload fails, the product is not saved; the files already uploaded keep their URLs on the form, so trying again does not upload them twice.
 - **`POST /api/admin/product-images`** (staff only, like every `/api/admin` route) takes a multipart `file`, `slug` and optional `folder` (`products` by default, or `offers`, `brands`, `categories`). It accepts JPEG, PNG and WebP, judged by the file's bytes, not its name or declared type, up to 8 MiB (415 and 413 otherwise; 422 for a slug or folder it cannot use). The key is `<folder>/<slug>.<ext>`; when that key is taken, `<folder>/<slug>-1.<ext>`, `<folder>/<slug>-2.<ext>` and so on, so nothing is overwritten. A different type is a different key. Objects are stored with their content type, `Content-Disposition: inline` and a year-long immutable `Cache-Control`; no ACL is set, as the bucket's public URL is what makes them readable. A bucket failure gives 502 and an unconfigured storage 503, each with the reason.
 - **Brand and category logos** are uploaded as a file, or a public URL is pasted, on their forms; a chosen file is uploaded when the form is saved.
 - **Removing an image** takes it off the product (or offer, brand or category) only; the object stays in the bucket. Changing a slug does not rename stored objects; later uploads use the slug at the time.
-- **Where they go** (`packages/api-admin/server/utils/objectStorage.ts`): a real R2 binding named `R2` when present (`globalThis.R2`, `globalThis.__env__.R2`, or `event.context.cloudflare.env.R2` on a Nitro Cloudflare deploy; only a value with `put` and `get` counts, never `process.env.R2`); otherwise an S3-compatible bucket through aws4fetch, set with `NUXT_S3_ACCESS_KEY`, `NUXT_S3_SECRET_KEY`, `NUXT_S3_BUCKET_NAME`, `NUXT_S3_ENDPOINT_URL` and `NUXT_S3_REGION` (for R2 from Node, the endpoint is `https://<account>.r2.cloudflarestorage.com`); otherwise uploads fail with "Object storage is not configured". `NUXT_S3_PUBLIC_URL` (the bucket's public address) is needed either way. These settings are the backoffice's only (`apps/backoffice/.env.example`).
+- **Where they go** (`packages/api-core/server/utils/objectStorage.ts`, shared by both apps): a real R2 binding named `R2` when present (`globalThis.R2`, `globalThis.__env__.R2`, or `event.context.cloudflare.env.R2` on a Nitro Cloudflare deploy; only a value with `put` and `get` counts, never `process.env.R2`); otherwise an S3-compatible bucket through aws4fetch, set with `NUXT_S3_ACCESS_KEY`, `NUXT_S3_SECRET_KEY`, `NUXT_S3_BUCKET_NAME`, `NUXT_S3_ENDPOINT_URL` and `NUXT_S3_REGION` (for R2 from Node, the endpoint is `https://<account>.r2.cloudflarestorage.com`); otherwise uploads fail with "Object storage is not configured". `NUXT_S3_PUBLIC_URL` (the bucket's public address) is needed either way. The backoffice needs these settings; the storefront needs them for profile photos (`apps/*/.env.example`).
+- **`POST /api/store/profile/photo`** (signed in) takes a multipart `file`, with the same types and size limit, stores it as `profiles/<userId>.<ext>` (numbered when taken) and makes it the account's image, so a profile photo is always one stored here. It answers `{ url }`. A replaced photo stays in the bucket.
 - Image URLs saved before this keep showing. The rich text editors and variants have no image upload.
 - **Resizing:** both apps show images through `AppImage` (`@nuxt/image`), at about twice the size they are shown, as WebP. It is off unless `IMAGE_PROVIDER=cloudflare` is set when the app is built; then Cloudflare's image transformations resize them on the zone the app is served from (turn transformations on for the zone, and allow the bucket's host as a source). Off, every image is shown as stored.
 

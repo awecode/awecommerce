@@ -3,8 +3,8 @@ import { normalizePath, publicUrlFor } from '../storage/keys'
 import { isR2Binding, r2Backend } from '../storage/r2'
 import { isS3Configured, s3Backend } from '../storage/s3'
 
-// Product images in object storage, which the storefront shows from their
-// public URL. Return types are written out: this file is auto-imported, and
+// Images in object storage (the backoffice's uploads and buyers' profile
+// photos), shown from their public URL. Return types are written out: this file is auto-imported, and
 // inferred backend types would weigh on the apps' typed $fetch routes.
 
 type Backend = {

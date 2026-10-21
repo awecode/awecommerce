@@ -8,10 +8,17 @@ export function resolveAuthBaseURL(configured: Array<string | undefined>) {
 
 export function getAuthBaseURL() {
   let runtimeBaseURL: string | undefined
+  // An app served at its site URL (the storefront) can leave BETTER_AUTH_URL
+  // unset: `auth.baseURLFromSiteURL` lets the site URL stand in. Not on the
+  // backoffice, whose site URL is the storefront's.
+  let siteURL: string | undefined
   try {
-    const value = (useRuntimeConfig().public as { baseURL?: unknown }).baseURL
-    if (typeof value === 'string')
-      runtimeBaseURL = value
+    const config = useRuntimeConfig()
+    const publicConfig = config.public as { baseURL?: unknown; siteUrl?: unknown }
+    if (typeof publicConfig.baseURL === 'string')
+      runtimeBaseURL = publicConfig.baseURL
+    if ((config.auth as { baseURLFromSiteURL?: unknown } | undefined)?.baseURLFromSiteURL === true && typeof publicConfig.siteUrl === 'string')
+      siteURL = publicConfig.siteUrl
   }
   catch {
     // Nuxt runtime is unavailable, for example during the auth schema CLI.
@@ -21,5 +28,6 @@ export function getAuthBaseURL() {
     process.env.BETTER_AUTH_URL,
     process.env.NUXT_PUBLIC_BASE_URL,
     runtimeBaseURL,
+    siteURL,
   ])
 }

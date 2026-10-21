@@ -5,8 +5,9 @@ import { BrandService, CategoryService, ProductService } from '@awecommerce/serv
 // Everything the home page shows, in one request: featured offers, featured
 // products, the plans a visitor can join (as /api/store/membership-plans),
 // best sellers, new arrivals, a row of products for each featured category
-// (featured products first, then newest), and brands. Categories, settings
-// and the cart stay on their own routes.
+// (featured products first, then newest; NUXT_HOME_CATEGORY_ROW_SIZE of
+// them, 4 by default), and brands. Categories and the cart stay on their own
+// routes.
 export default defineServiceHandler(async (event) => {
   const db = useDb()
   const products = new ProductService(db)
@@ -28,7 +29,10 @@ export default defineServiceHandler(async (event) => {
     new BrandService(db).list({ isActive: true, hasListedProducts: true }),
     featuredCategoriesPromise,
     featuredCategoriesPromise.then((categories) =>
-      products.productsForCategories(categories.map((category) => category.id), 4),
+      products.productsForCategories(
+        categories.map((category) => category.id),
+        Number(useRuntimeConfig(event).homeCategoryRowSize) || 4,
+      ),
     ),
   ])
   const categories = featuredCategories.map((category) => ({

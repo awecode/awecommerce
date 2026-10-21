@@ -1,0 +1,42 @@
+// Cloudflare Workers config for the backoffice. `pnpm deploy:cf` fills in the
+// name, Hyperdrive id, R2 bucket, vars and custom domain (see the README).
+// Nitro merges this into .output/server/wrangler.json with the built entry and
+// assets, and that file is what gets deployed.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "awecommerce-backoffice",
+  // The Workers runtime behaves as of this date. Raise it after testing a newer one.
+  "compatibility_date": "2025-05-15",
+  // nodejs_compat: pg and node:crypto need Node.js APIs.
+  // nodejs_compat_populate_process_env: vars and secrets are also on
+  // process.env, where the auth layer and the library read some of them.
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  // Logs in the dashboard
+  "observability": {
+    "enabled": true
+  },
+  // No extra URL for each uploaded version: the app is served at its own address only
+  "preview_urls": false,
+  // Variables edited in the dashboard survive the next deploy. A var removed
+  // from this file stays on the Worker until it is deleted there too.
+  "keep_vars": true,
+  // Plain settings. Secrets are set on the Worker, never here.
+  "vars": {},
+  // Postgres through Hyperdrive, with caching off (see the README)
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": ""
+    }
+  ],
+  // Object storage for images, used instead of S3 keys (NUXT_S3_PUBLIC_URL is still needed)
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "awecommerce-media"
+    }
+  ]
+}

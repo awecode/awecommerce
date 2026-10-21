@@ -7,6 +7,7 @@ const links = [
   { label: 'Orders', to: '/account/orders' },
   { label: 'Memberships', to: '/account/memberships' },
   { label: 'Addresses', to: '/account/addresses' },
+  { label: 'Profile', to: '/account/profile' },
 ]
 </script>
 

@@ -5,3 +5,6 @@ coverage
 .nuxt
 .output
 .data
+.cf-deploy
+.cloudflare
+.wrangler

@@ -35,6 +35,18 @@ describe.skipIf(!url)('account', async () => {
       await fetch('/api/store/addresses', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) })
     }, body)
 
+  test('the profile page changes the name, and offers a photo', async () => {
+    const { page } = await member()
+    await page.goto(`${base()}/account/profile`)
+    await page.getByRole('button', { name: 'Add photo' }).waitFor()
+    const field = page.getByLabel('Your name')
+    await field.fill('Sita Sharma')
+    await page.getByRole('button', { name: 'Save name' }).click()
+    await page.getByText('Name saved').waitFor()
+    const name = await page.evaluate(async () => (await (await fetch('/api/auth/get-session')).json()).user.name)
+    expect(name).toBe('Sita Sharma')
+  })
+
   test('account pages ask guests to sign in and come back after; signed in, /login moves on', async () => {
     const guest = await createPage('/account')
     await guest.waitForURL('**/login?redirect=/account')
