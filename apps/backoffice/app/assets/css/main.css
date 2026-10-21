@@ -5,6 +5,19 @@
 /* Classes used by the auth layer's components */
 @source "../../../../../packages/auth/app";
 
+/* Feedback on anything clickable. Tailwind v4 gives buttons the default
+   cursor, so it is set back to the pointer. Keyboard focus gets one outline in
+   the primary colour; Nuxt UI's parts draw their own over it. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  :where(a, button, [role="button"], [role="radio"], summary):focus-visible {
+    outline: 2px solid var(--ui-primary);
+  }
+}
+
 @theme {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 }
@@ -20,4 +33,16 @@ body {
   /* Tabular figures keep prices and stock aligned in columns */
   font-feature-settings: "cv11", "tnum";
   @apply antialiased;
+}
+
+/* Tables written in the product description and specification editor */
+.tiptap table {
+  @apply w-full border-collapse text-sm;
+}
+.tiptap th,
+.tiptap td {
+  @apply border border-default px-2 py-1.5 text-left align-top;
+}
+.tiptap th {
+  @apply font-semibold;
 }

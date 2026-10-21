@@ -74,6 +74,11 @@ test('not bought again while a paid order has it; another variant, or after canc
   await carts.addToCart(second.id, pdf, 1)
   await orders.changePaymentStatus(order.id, 'Paid')
   expect(await ownership.ownedVariants(user, [pdf, epub])).toEqual(new Map([[pdf, order.id]]))
+  // With the singles already known: the same, and only for the variants asked
+  const singles = await ownership.singleVariants([pdf, epub])
+  expect(await ownership.ownedVariants(user, [pdf, epub], singles)).toEqual(new Map([[pdf, order.id]]))
+  expect(await ownership.ownedVariants(user, [epub], singles)).toEqual(new Map())
+  expect(await ownership.ownedVariants(null, [pdf], singles)).toEqual(new Map())
 
   // Paid: refused when adding, flagged in the cart, and refused at checkout
   const third = await carts.create(user)

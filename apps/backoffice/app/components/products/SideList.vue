@@ -38,7 +38,7 @@ const { data, isLoading } = useQuery({
           v-for="product in data?.results ?? []"
           :key="product.id"
           :to="`/products/${product.id}`"
-          class="flex items-center gap-2.5 px-3 py-2 hover:bg-elevated/60"
+          class="flex items-center gap-2.5 px-3 py-2 transition-colors hover:bg-elevated/60 active:bg-elevated"
           :class="{ 'bg-elevated': product.id === currentId }"
           :aria-current="product.id === currentId ? 'page' : undefined"
         >

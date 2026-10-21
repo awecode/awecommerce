@@ -1,6 +1,7 @@
 import { relations } from 'drizzle-orm'
 import {
   boolean,
+  index,
   integer,
   numeric,
   pgEnum,
@@ -108,7 +109,7 @@ export const productImages = pgTable('product_image', {
   imageUrl: text().notNull(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
-})
+}, (t) => [index('product_image_productId_idx').on(t.productId)])
 
 // What is bought: a product has one variant per combination of its options,
 // or a single variant without options
@@ -131,7 +132,7 @@ export const productVariants = pgTable('product_variant', {
   isActive: boolean().notNull().default(true),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
-})
+}, (t) => [index('product_variant_productId_idx').on(t.productId)])
 
 // An option of one product, such as Size
 export const productOptions = pgTable('product_option', {

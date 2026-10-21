@@ -51,7 +51,7 @@ const schema = z.object({
         </UFormField>
         <USwitch v-model="state.taxShipping" label="Tax shipping" description="Shipping is taxed at the default rate." />
         <p class="text-sm text-muted">
-          Product classes can have their own rate: see <NuxtLink to="/catalog/product-classes" class="underline">Product classes</NuxtLink>.
+          Product classes can have their own rate: see <NuxtLink to="/catalog/product-classes" class="underline hover:no-underline">Product classes</NuxtLink>.
         </p>
       </UForm>
     </template>

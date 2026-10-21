@@ -22,6 +22,7 @@ type Order = {
   gateway: string | null
   gatewayReference: string | null
   customer: { name?: string; email?: string } | null
+  message: string | null
   data: Record<string, unknown>
   successRedirectUrl: string
   failureRedirectUrl: string
@@ -88,6 +89,7 @@ export const startFakeThupraiPay = async () => {
         gateway: null,
         gatewayReference: null,
         customer: body.customer ?? null,
+        message: body.message ?? null,
         data: body.data ?? {},
         successRedirectUrl: body.successRedirectUrl,
         failureRedirectUrl: body.failureRedirectUrl,

@@ -39,13 +39,28 @@ test('list sorts by name and date', async () => {
   const b = await createProduct(`${prefix}-b`)
   const a = await createProduct(`${prefix}-a`)
   const c = await createProduct(`${prefix}-c`)
-  const ids = async (sortBy: 'nameAsc' | 'nameDesc' | 'newest' | 'oldest') =>
+  const ids = async (sortBy: 'nameAsc' | 'nameDesc' | 'newest' | 'oldest' | 'featuredNewest') =>
     (await productService.list({ q: prefix, sortBy })).map((row) => row.id)
 
   expect(await ids('nameAsc')).toEqual([a.id, b.id, c.id])
   expect(await ids('nameDesc')).toEqual([c.id, b.id, a.id])
   expect(await ids('newest')).toEqual([c.id, a.id, b.id])
   expect(await ids('oldest')).toEqual([b.id, a.id, c.id])
+})
+
+test('list sorts featured products first, then newest', async () => {
+  const prefix = unique('featured-sort')
+  const older = await createProduct(`${prefix}-older`)
+  const featuredOlder = await createProduct(`${prefix}-featured-older`, { isFeatured: true })
+  const newer = await createProduct(`${prefix}-newer`)
+  const featuredNewer = await createProduct(`${prefix}-featured-newer`, { isFeatured: true })
+
+  expect((await productService.list({ q: prefix, sortBy: 'featuredNewest' })).map((row) => row.id)).toEqual([
+    featuredNewer.id,
+    featuredOlder.id,
+    newer.id,
+    older.id,
+  ])
 })
 
 test('updateMany changes several products at once, or none', async () => {

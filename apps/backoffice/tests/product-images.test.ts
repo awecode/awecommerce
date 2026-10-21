@@ -40,13 +40,17 @@ describe.skipIf(!url)('product images', async () => {
     await page.getByLabel('Name', { exact: true }).fill(name)
     await page.getByLabel('SKU', { exact: true }).fill(slug)
     // Nothing is uploaded until save
-    expect(fakeBucket().objects.has(`${slug}.png`)).toBe(false)
+    expect(fakeBucket().objects.has(`products/${slug}.png`)).toBe(false)
     await page.keyboard.press('ControlOrMeta+s')
 
     await page.waitForURL(/\/products\/\d+$/)
     const saved = await service.get(Number(page.url().split('/').pop()))
-    expect(saved).toMatchObject({ slug, images: [cdn(`${slug}.png`)], thumbnail: cdn(`${slug}.png`) })
-    expect(new Uint8Array(fakeBucket().objects.get(`${slug}.png`)!.body)).toEqual(new Uint8Array(png))
+    expect(saved).toMatchObject({
+      slug,
+      images: [cdn(`products/${slug}.png`)],
+      thumbnail: cdn(`products/${slug}.png`),
+    })
+    expect(new Uint8Array(fakeBucket().objects.get(`products/${slug}.png`)!.body)).toEqual(new Uint8Array(png))
   })
 
   test('a failed upload saves nothing, and the retry keeps what already uploaded', async () => {
@@ -56,14 +60,14 @@ describe.skipIf(!url)('product images', async () => {
     await page.getByLabel('Name', { exact: true }).fill(name)
     await page.getByLabel('SKU', { exact: true }).fill(slug)
     await choose(page, pngFile(), jpegFile())
-    fakeBucket().failWhen((key) => key === `${slug}.jpg`)
+    fakeBucket().failWhen((key) => key === `products/${slug}.jpg`)
 
     await page.getByRole('button', { name: /^Create/ }).click()
     await page.getByText('Could not upload photo.jpg').first().waitFor()
     expect(page.url()).toMatch(/\/products\/new$/)
     expect(await bySlug(slug)).toBeUndefined()
     // The PNG went up; the JPEG is still waiting on the form
-    expect(fakeBucket().objects.has(`${slug}.png`)).toBe(true)
+    expect(fakeBucket().objects.has(`products/${slug}.png`)).toBe(true)
     await expect.poll(() => page.getByText('Not uploaded yet').count()).toBe(1)
 
     fakeBucket().failWhen(() => false)
@@ -71,16 +75,16 @@ describe.skipIf(!url)('product images', async () => {
     await page.waitForURL(/\/products\/\d+$/)
     expect(await service.get(Number(page.url().split('/').pop()))).toMatchObject({
       slug,
-      images: [cdn(`${slug}.png`), cdn(`${slug}.jpg`)],
-      thumbnail: cdn(`${slug}.png`),
+      images: [cdn(`products/${slug}.png`), cdn(`products/${slug}.jpg`)],
+      thumbnail: cdn(`products/${slug}.png`),
     })
     // Not uploaded twice
-    expect(fakeBucket().objects.has(`${slug}-1.png`)).toBe(false)
+    expect(fakeBucket().objects.has(`products/${slug}-1.png`)).toBe(false)
   })
 
   test('an existing product: a new file as thumbnail, a removed image stays in the bucket, and a clash is numbered', async () => {
     const slug = unique('mug')
-    fakeBucket().objects.set(`${slug}.png`, { body: png, headers: {} })
+    fakeBucket().objects.set(`products/${slug}.png`, { body: png, headers: {} })
     const old = 'https://example.com/old-mug.jpg'
     const mug = await service.create({ name: slug, slug, sku: slug, price: '20', stockQuantity: 5, images: [old], thumbnail: old })
     const page = await open(`/products/${mug.id}`)
@@ -93,9 +97,12 @@ describe.skipIf(!url)('product images', async () => {
     await page.keyboard.press('ControlOrMeta+s')
     await page.getByText(`Saved ${slug}`).first().waitFor()
 
-    // slug.png was taken, so the upload is slug-1.png; the thumbnail is its public URL
-    expect(await service.get(mug.id)).toMatchObject({ images: [cdn(`${slug}-1.png`)], thumbnail: cdn(`${slug}-1.png`) })
-    expect(fakeBucket().objects.has(`${slug}.png`)).toBe(true)
+    // products/slug.png was taken, so the upload is products/slug-1.png
+    expect(await service.get(mug.id)).toMatchObject({
+      images: [cdn(`products/${slug}-1.png`)],
+      thumbnail: cdn(`products/${slug}-1.png`),
+    })
+    expect(fakeBucket().objects.has(`products/${slug}.png`)).toBe(true)
   })
 
   test('a slug that cannot name a file is highlighted and nothing uploads', async () => {

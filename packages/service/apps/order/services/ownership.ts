@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { productClasses, products, productVariants } from '../../product/schemas'
 import { membershipTerms } from '../../membership/schemas'
 import { orderLines, orders } from '../schemas'
@@ -38,20 +38,34 @@ class OwnershipService {
   }
 
   // The once variants of these that the person owns: the latest paid order
-  // with each, by variant id
-  async ownedVariants(userId: string | null | undefined, variantIds: number[]): Promise<Map<number, number>> {
-    const once = [...(await this.singleVariants(variantIds))].filter(([, kind]) => kind === 'once').map(([id]) => id)
-    if (!userId || !once.length) return new Map()
+  // with each, by variant id. One join (a membership term is never owned).
+  // `singles` skips the read when the caller already knows none are once.
+  async ownedVariants(
+    userId: string | null | undefined,
+    variantIds: number[],
+    singles?: Map<number, 'membership' | 'once'>,
+  ): Promise<Map<number, number>> {
+    if (!userId || !variantIds.length) return new Map()
+    const once = singles
+      ? [...singles].filter(([id, kind]) => kind === 'once' && variantIds.includes(id)).map(([id]) => id)
+      : [...new Set(variantIds)]
+    if (!once.length) return new Map()
     const rows = await this.db
       .select({ variantId: orderLines.variantId, orderId: sql<number>`MAX(${orders.id})::int` })
       .from(orderLines)
       .innerJoin(orders, eq(orders.id, orderLines.orderId))
+      .innerJoin(productVariants, eq(productVariants.id, orderLines.variantId))
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .leftJoin(productClasses, eq(productClasses.id, products.productClassId))
+      .leftJoin(membershipTerms, eq(membershipTerms.variantId, productVariants.id))
       .where(
         and(
           eq(orders.userId, userId),
           eq(orders.paymentStatus, 'Paid'),
           ne(orders.status, 'Cancelled'),
           inArray(orderLines.variantId, once),
+          eq(productClasses.oncePerPerson, true),
+          isNull(membershipTerms.id),
         ),
       )
       .groupBy(orderLines.variantId)

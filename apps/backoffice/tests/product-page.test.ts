@@ -47,8 +47,8 @@ describe.skipIf(!url)('product page', async () => {
     const category = await new CategoryService(db).create({ name: unique('Bags'), slug: unique('bags') })
     const saved = await product(unique('tote'))
     const page = await open(`/products/${saved.id}`)
-    // Uploaded on save under the product's slug (see product-images.test.ts)
-    const image = `http://cdn.test/${saved.slug}.png`
+    // Uploaded on save under products/<slug> (see product-images.test.ts)
+    const image = `http://cdn.test/products/${saved.slug}.png`
 
     await page.getByLabel('Name', { exact: true }).fill(`${saved.name} large`)
     await page.locator('[contenteditable="true"]').first().click()

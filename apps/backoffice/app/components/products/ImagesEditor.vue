@@ -68,7 +68,7 @@ const move = (index: number, step: number) => {
       </div>
       <button
         type="button"
-        class="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-dashed border-default text-xs text-muted hover:border-(--ui-primary) hover:text-default"
+        class="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border border-dashed border-default text-xs text-muted transition hover:border-(--ui-primary) hover:text-default active:scale-[0.98]"
         @click="input?.click()"
       >
         <UIcon name="i-lucide-image-plus" class="size-5" />

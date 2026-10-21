@@ -19,27 +19,26 @@ const membershipOf = (term?: { planId: number; months: number; plan: { name: str
   term ? { planId: term.planId, planName: term.plan.name, description: term.plan.description, months: term.months } : null
 
 export default defineServiceHandler(async (event) => {
-  const productService = new ProductService(useDb())
-  const found = await productService.getBySlug(getRouterParam(event, 'slug')!)
-  const isListed = found && (await productService.listedProductIds([found.id])).length > 0
-  const product = isListed ? await productService.get(found.id) : null
+  const db = useDb()
+  const productService = new ProductService(db)
+  const [product, user] = await Promise.all([productService.getListedBySlug(getRouterParam(event, 'slug')!), getUser(event)])
   if (!product) {
     throw createError({ statusCode: 404, statusMessage: 'Not Found', message: 'Product not found' })
   }
   const relatedIds = product.relatedProducts.map((related) => related.id)
-  const relatedProducts = relatedIds.length
-    ? await productService.list({ listedOnly: true, extraFilters: [inArray(products.id, relatedIds)] })
-    : []
   const variants = product.variants.filter((variant) => variant.isActive)
-  const offerService = new OfferService(useDb())
-  const user = await getUser(event)
-  const planIds = user ? (await new MembershipService(useDb()).activeMemberships(user.id)).map((m) => m.planId) : []
-  const yours = await offerService.memberPrices(variants, planIds)
-  const lowest = await offerService.memberPrices(variants)
-  const terms = await new MembershipService(useDb()).termsForVariants(variants.map((variant) => variant.id))
-  const ownership = new OwnershipService(useDb())
-  const singles = await ownership.singleVariants(variants.map((variant) => variant.id))
-  const owned = await ownership.ownedVariants(user?.id, variants.map((variant) => variant.id))
+  const variantIds = variants.map((variant) => variant.id)
+  const memberships = new MembershipService(db)
+  const ownership = new OwnershipService(db)
+  // Each of these needs only the product, so they run at once. Member prices
+  // load the buyer's plans themselves; ownership does not wait for singles.
+  const [relatedProducts, { yours, lowest }, terms, singles, owned] = await Promise.all([
+    relatedIds.length ? productService.list({ listedOnly: true, extraFilters: [inArray(products.id, relatedIds)] }) : [],
+    new OfferService(db).memberPricesFor(variants, user ? memberships.activePlanIds(user.id) : []),
+    memberships.termsForVariants(variantIds),
+    ownership.singleVariants(variantIds),
+    ownership.ownedVariants(user?.id, variantIds),
+  ])
   return {
     ...product,
     variants: variants.map((variant) => {

@@ -80,6 +80,9 @@ export const sendEmail = async (params: SendEmailParams, { dev = import.meta.dev
   console.warn('No SES configuration found, using console.log for dev mode.')
   console.log(`\x1b[33mTo:\x1b[0m      ${params.toEmails.join(', ')}`)
   console.log(`\x1b[33mSubject:\x1b[0m ${params.subject}`)
+  if (params.attachments?.length) {
+    console.log(`\x1b[33mAttachments:\x1b[0m ${params.attachments.map((file) => `${file.filename} (${file.content.length} bytes)`).join(', ')}`)
+  }
   console.log('\n\x1b[36m================================================================\x1b[0m')
   console.log(params.message)
   console.log('\n\x1b[36m================================================================\x1b[0m')

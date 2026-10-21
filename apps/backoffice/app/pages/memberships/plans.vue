@@ -34,7 +34,7 @@ const columns: TableColumn<Plan>[] = [
     slug-help="Identifies the plan"
     active-help="Inactive plans cannot be granted or bought; current members keep theirs until it ends"
     :pending-changes="terms?.pending"
-    :before-save="async () => (terms ? await terms.addPicked() : true)"
+    :before-save="async (_state) => (terms ? await terms.addPicked() : true)"
   >
     <template #fields="form">
       <UFormField label="Program" name="program" required help="Plans with the same program, such as music, are tiers of one membership: a member has one of them at a time">

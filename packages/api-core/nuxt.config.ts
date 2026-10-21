@@ -1,6 +1,12 @@
 export default defineNuxtConfig({
   // Sign-in for customers and staff, available to every API layer and app
   extends: ['@awecommerce/auth'],
+  experimental: {
+    // Old tabs request chunks that a new deploy removed. Reload on any chunk
+    // error, not only on route navigation, so lazy components do not end on
+    // a 500 page.
+    emitRouteChunkError: 'automatic-immediate',
+  },
   nitro: {
     // useDb() finds the current request this way, for its own connection on
     // Cloudflare Workers. Works on Node too.

@@ -58,6 +58,7 @@ describe.skipIf(!url)('browsing', async () => {
     const first = await categories.create({ name: unique('Lamps'), slug: unique('lamps'), isFeatured: true, order: 0 })
     const second = await categories.create({ name: unique('Rugs'), slug: unique('rugs'), isFeatured: true, order: 2 })
     const lamp = await product(unique('Desk Lamp'), { categoryId: first.id, isFeatured: true })
+    const plainLamp = await product(unique('Plain Lamp'), { categoryId: first.id })
     await product(unique('Wool Rug'), { categoryId: second.id })
     const brand = await new BrandService(db).create({ name: unique('Acme'), slug: unique('acme') })
     await product(unique('Acme Kettle'), { brandId: brand.id })
@@ -83,6 +84,9 @@ describe.skipIf(!url)('browsing', async () => {
     await offer.getByRole('button', { name: `Copy code ${code}` }).waitFor()
     const lamps = page.getByRole('region', { name: first.name })
     await lamps.getByText(lamp.name).waitFor()
+    // Featured products first in the category row, though the plain one is newer
+    const lampNames = await lamps.locator('[data-product-card] h3').allTextContents()
+    expect(lampNames.indexOf(lamp.name)).toBeLessThan(lampNames.indexOf(plainLamp.name))
     await page.getByRole('region', { name: 'New arrivals' }).getByText(newest.name).waitFor()
     await page.getByRole('region', { name: 'Shop by brand' }).getByRole('link', { name: brand.name }).waitFor()
 

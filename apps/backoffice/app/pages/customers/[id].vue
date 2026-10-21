@@ -138,7 +138,7 @@ const address = (a: SavedAddress) =>
               </div>
               <ul v-if="person.orders.results.length" class="divide-y divide-default rounded-md border border-default text-sm">
                 <li v-for="order in person.orders.results" :key="order.id">
-                  <NuxtLink :to="`/orders/${order.id}`" class="flex items-center gap-3 px-3 py-2 hover:bg-elevated/50">
+                  <NuxtLink :to="`/orders/${order.id}`" class="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-elevated/50 active:bg-elevated">
                     <span class="w-16 font-medium text-highlighted tabular-nums">#{{ order.id }}</span>
                     <span class="flex-1 text-muted">{{ day(order.createdAt!) }} · {{ order.items }} item{{ order.items === 1 ? '' : 's' }}</span>
                     <span class="tabular-nums">{{ money(order.total) }}</span>

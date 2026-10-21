@@ -352,34 +352,31 @@ class CartService {
     options: { shippingMethodId?: number; redeemPoints?: number } = {},
   ) {
     const content = await this.getCartContentForSession(sessionId, true)
-    // Previews the points' value; they are only redeemed at checkout
-    const loyaltyDiscount =
-      options.redeemPoints !== undefined
-        ? await new LoyaltyService(this.db).redemptionValue(
-            content.userId,
-            options.redeemPoints,
-          )
-        : 0
-    const pricing = await priceCart(
-      this.db,
-      content,
-      options.shippingMethodId,
-      loyaltyDiscount,
-    )
-    const listedIds = new Set(
-      await new ProductService(this.db).listedProductIds(
-        content.lines.map((line) => line.variant.productId),
-      ),
-    )
-    const stock = await new ProductVariantService(this.db).stockLevels(
-      content.lines.map((line) => line.variantId),
-    )
-    const terms = await new MembershipService(this.db).termsForVariants(
-      content.lines.map((line) => line.variantId),
-    )
+    const variantIds = content.lines.map((line) => line.variantId)
     const ownership = new OwnershipService(this.db)
-    const singles = await ownership.singleVariants(content.lines.map((line) => line.variantId))
-    const owned = await ownership.ownedVariants(content.userId, content.lines.map((line) => line.variantId))
+    // Each of these needs only the content, so they run at once
+    const [pricing, listedIds, stock, terms, [singles, owned]] = await Promise.all([
+      (async () => {
+        // Previews the points' value; they are only redeemed at checkout
+        const loyaltyDiscount =
+          options.redeemPoints !== undefined
+            ? await new LoyaltyService(this.db).redemptionValue(
+                content.userId,
+                options.redeemPoints,
+              )
+            : 0
+        return await priceCart(this.db, content, options.shippingMethodId, loyaltyDiscount)
+      })(),
+      new ProductService(this.db)
+        .listedProductIds(content.lines.map((line) => line.variant.productId))
+        .then((ids) => new Set(ids)),
+      new ProductVariantService(this.db).stockLevels(variantIds),
+      new MembershipService(this.db).termsForVariants(variantIds),
+      (async () => {
+        const singles = await ownership.singleVariants(variantIds)
+        return [singles, await ownership.ownedVariants(content.userId, variantIds, singles)] as const
+      })(),
+    ])
     const stockLeft = (variantId: number) => stock.get(variantId)?.stock ?? null
     const inCart = new Map<number, number>()
     for (const line of content.lines) {
@@ -678,8 +675,10 @@ class CartService {
   // (theirs, everyone's, and their plans'), that apply now
   private async automaticOffers(userId: string | null) {
     const offerService = new OfferService(this.db)
-    const site = await offerService.getActiveUserOffers(userId, { type: 'site' })
-    const user = userId ? await offerService.getActiveUserOffers(userId) : []
+    const [site, user] = await Promise.all([
+      offerService.getActiveUserOffers(userId, { type: 'site' }),
+      userId ? offerService.getActiveUserOffers(userId) : [],
+    ])
     return [
       ...site.map((offer) => ({ offer, kind: 'site' as const })),
       ...user.map((offer) => ({ offer, kind: 'user' as const })),
@@ -716,18 +715,35 @@ class CartService {
   // and are not used up.
   private async withOffers(base: CartContent): Promise<CartContent> {
     const offerService = new OfferService(this.db)
-    const automatic = await this.automaticOffers(base.userId)
+    const [automatic, [voucherRow]] = await Promise.all([
+      this.automaticOffers(base.userId),
+      this.db
+        .select({ cartId: cartAppliedVoucherOffers.cartId })
+        .from(cartAppliedVoucherOffers)
+        .where(eq(cartAppliedVoucherOffers.cartId, base.id))
+        .limit(1),
+    ])
+    // Which products each offer covers depends only on the offer, so these
+    // are read at once. The offers are then applied in order.
+    const productIds = base.lines.map((line) => line.variant.productId)
+    const byRange = await offerService.productsInOfferRanges(
+      automatic.map(({ offer }) => offer.condition!.rangeId),
+      productIds,
+    )
+    const ranges = automatic.map(({ offer }) => byRange.get(offer.condition!.rangeId) ?? [])
     let combined = withoutOffers(base)
     const alone: CartContent[] = []
-    for (const { offer, kind } of automatic) {
+    automatic.forEach(({ offer, kind }, index) => {
       if (offer.combinesWithOtherOffers) {
-        combined = await offerService.applyUserOffer(offer, combined, kind)
+        combined = offerService.applyUserOfferInRange(offer, combined, kind, ranges[index])
       } else {
-        alone.push(await offerService.applyUserOffer(offer, withoutOffers(base), kind))
+        alone.push(offerService.applyUserOfferInRange(offer, withoutOffers(base), kind, ranges[index]))
       }
-    }
+    })
     const appliedVouchers: { id: number; name: string; voucherCode: string }[] = []
-    combined = await this.db.transaction(async (tx) => {
+    // Most carts have no vouchers: then there is nothing to re-apply, and no
+    // need to lock the cart
+    if (voucherRow) combined = await this.db.transaction(async (tx) => {
       let content = combined
       // Locked, and the vouchers read after it, so reads of the same cart
       // re-apply its vouchers one at a time. Otherwise a read could clear

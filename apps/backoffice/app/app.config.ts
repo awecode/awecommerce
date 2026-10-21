@@ -8,7 +8,8 @@ export default defineAppConfig({
       primary: 'blue',
       neutral: 'zinc',
     },
-    button: compact,
+    // Shrinks a little while pressed
+    button: { ...compact, slots: { base: 'transition active:scale-[0.98]' } },
     input: compact,
     inputNumber: compact,
     inputMenu: compact,

@@ -15,8 +15,8 @@ export const productListQuery = z.object({
   brands: ids,
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
-  // Newest first when not given
-  sortBy: z.enum(['priceAsc', 'priceDesc']).optional(),
+  // Newest first when not given; featuredNewest for home category rows
+  sortBy: z.enum(['priceAsc', 'priceDesc', 'featuredNewest']).optional(),
   featured: z.stringbool().optional(),
   bestSeller: z.stringbool().optional(),
   page: z.coerce.number().int().min(1).default(1),

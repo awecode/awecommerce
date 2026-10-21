@@ -272,7 +272,7 @@ class OrderService {
       if (several) {
         throw new ValidationError(`Only one ${several.variant.product.name} can be bought`)
       }
-      const owned = await ownership.ownedVariants(cart.userId, content.lines.map((line) => line.variantId))
+      const owned = await ownership.ownedVariants(cart.userId, content.lines.map((line) => line.variantId), singles)
       const ownedLine = content.lines.find((line) => owned.has(line.variantId))
       if (ownedLine) {
         throw new ValidationError(`You already own ${ownedLine.variant.product.name}`)

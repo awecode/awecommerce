@@ -15,9 +15,11 @@ describe.skipIf(!url)('product image upload', async () => {
     file: { bytes: Uint8Array<ArrayBuffer>; type?: string; name?: string },
     slug: string,
     token: string | undefined = staffToken,
+    folder?: string,
   ) => {
     const form = new FormData()
     form.append('slug', slug)
+    if (folder) form.append('folder', folder)
     form.append('file', new Blob([file.bytes], { type: file.type ?? 'image/png' }), file.name ?? 'photo.png')
     const response = await fetch('/api/admin/product-images', {
       method: 'POST',
@@ -34,22 +36,25 @@ describe.skipIf(!url)('product image upload', async () => {
     expect((await upload({ bytes: png() }, unique('mug'), customer)).status).toBe(403)
   })
 
-  test('stores the image under the slug, and numbers a clash instead of overwriting', async () => {
+  test('stores the image under products/<slug>, and numbers a clash instead of overwriting', async () => {
     const slug = unique('mug')
     const first = await upload({ bytes: png(), name: 'IMG_0042.PNG' }, slug)
-    expect(first).toEqual({ status: 200, body: { key: `${slug}.png`, url: `http://cdn.test/${slug}.png` } })
-    const stored = fakeBucket().objects.get(`${slug}.png`)!
+    expect(first).toEqual({
+      status: 200,
+      body: { key: `products/${slug}.png`, url: `http://cdn.test/products/${slug}.png` },
+    })
+    const stored = fakeBucket().objects.get(`products/${slug}.png`)!
     expect(new Uint8Array(stored.body)).toEqual(png())
     expect(stored.headers['content-type']).toBe('image/png')
     expect(stored.headers['cache-control']).toBe('public, max-age=31536000, immutable')
     expect(stored.headers['x-amz-acl']).toBeUndefined()
 
-    expect((await upload({ bytes: png() }, slug)).body.key).toBe(`${slug}-1.png`)
-    expect((await upload({ bytes: png() }, slug)).body.key).toBe(`${slug}-2.png`)
+    expect((await upload({ bytes: png() }, slug)).body.key).toBe(`products/${slug}-1.png`)
+    expect((await upload({ bytes: png() }, slug)).body.key).toBe(`products/${slug}-2.png`)
     // Another type is another key
-    expect((await upload({ bytes: jpeg(), type: 'image/jpeg' }, slug)).body.key).toBe(`${slug}.jpg`)
-    expect((await upload({ bytes: webp(), type: 'image/webp' }, slug)).body.key).toBe(`${slug}.webp`)
-    expect(new Uint8Array(fakeBucket().objects.get(`${slug}.png`)!.body)).toEqual(png())
+    expect((await upload({ bytes: jpeg(), type: 'image/jpeg' }, slug)).body.key).toBe(`products/${slug}.jpg`)
+    expect((await upload({ bytes: webp(), type: 'image/webp' }, slug)).body.key).toBe(`products/${slug}.webp`)
+    expect(new Uint8Array(fakeBucket().objects.get(`products/${slug}.png`)!.body)).toEqual(png())
   })
 
   test('refuses other types, whatever they claim to be, and files over 8 MB', async () => {
@@ -78,14 +83,28 @@ describe.skipIf(!url)('product image upload', async () => {
     }
   })
 
+  test('stores under the given folder (offers, brands, categories), and refuses unknown folders', async () => {
+    for (const folder of ['offers', 'brands', 'categories'] as const) {
+      const slug = unique(folder)
+      const response = await upload({ bytes: png() }, slug, staffToken, folder)
+      expect(response).toEqual({
+        status: 200,
+        body: { key: `${folder}/${slug}.png`, url: `http://cdn.test/${folder}/${slug}.png` },
+      })
+    }
+    const bad = await upload({ bytes: png() }, unique('x'), staffToken, 'root')
+    expect(bad.status).toBe(422)
+    expect(bad.body.message).toBe('Folder must be one of: products, offers, brands, categories.')
+  })
+
   test('says so when the bucket fails, and stores nothing', async () => {
     const slug = unique('broken')
-    fakeBucket().failWhen((key) => key.startsWith(slug))
+    fakeBucket().failWhen((key) => key.startsWith(`products/${slug}`))
     const response = await upload({ bytes: png() }, slug)
     fakeBucket().failWhen(() => false)
 
     expect(response.status).toBe(502)
     expect(response.body.message).toMatch(/^The image could not be stored\./)
-    expect(fakeBucket().objects.has(`${slug}.png`)).toBe(false)
+    expect(fakeBucket().objects.has(`products/${slug}.png`)).toBe(false)
   })
 })

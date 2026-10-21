@@ -63,6 +63,33 @@ test('listedProductIds keeps only products the store shows', async () => {
   expect(await productService.listedProductIds([])).toEqual([])
 })
 
+test('getListedBySlug loads a listed product like get, and nothing for hidden ones', async () => {
+  const { listed, hidden } = await createProducts(unique('listed-slug'))
+
+  expect(await productService.getListedBySlug(listed.slug)).toEqual(await productService.get(listed.id))
+  for (const product of hidden) {
+    expect(await productService.getListedBySlug(product.slug)).toBeNull()
+  }
+  expect(await productService.getListedBySlug('no-such-product')).toBeNull()
+})
+
+test('a page of the list carries the total, also past the end and with a price filter', async () => {
+  const prefix = unique('listed-pages')
+  for (const price of ['10', '20', '30']) await createProduct(prefix, { price })
+  const page = (page: number, extra = {}) =>
+    productService.list({ q: prefix, listedOnly: true, pagination: { page, size: 2 }, ...extra })
+
+  const first = await page(1)
+  expect(first.results).toHaveLength(2)
+  expect(first.pagination).toEqual({ page: 1, size: 2, total: 3, pages: 2 })
+  expect((await page(2)).results).toHaveLength(1)
+  expect(await page(3)).toEqual({ results: [], pagination: { page: 3, size: 2, total: 3, pages: 2 } })
+  const cheap = await page(1, { maxPrice: 20 })
+  expect(cheap.results.map((p) => p.minPrice).map(Number).sort()).toEqual([10, 20])
+  expect(cheap.pagination.total).toBe(2)
+  expect((await page(1, { q: unique('nothing') })).pagination.total).toBe(0)
+})
+
 test('list with listedOnly applies the same rule', async () => {
   const prefix = unique('listed-only')
   const { listed } = await createProducts(prefix)

@@ -15,7 +15,7 @@ const items = computed(() => props.order.lines.reduce((total, line) => total + l
 </script>
 
 <template>
-  <NuxtLink :to="`/orders/${order.id}`" class="flex items-center gap-4 py-5 hover:bg-muted/60 sm:px-3" :aria-label="`Order ${order.id}`">
+  <NuxtLink :to="`/orders/${order.id}`" class="flex items-center gap-4 py-5 transition-colors hover:bg-muted/60 active:bg-muted sm:px-3" :aria-label="`Order ${order.id}`">
     <div class="flex -space-x-3">
       <div v-for="line in order.lines.slice(0, 3)" :key="line.id" class="size-12 overflow-hidden rounded-sm bg-elevated ring-2 ring-(--ui-bg)">
         <img v-if="line.imageUrl" :src="line.imageUrl" alt="" class="size-full object-cover">

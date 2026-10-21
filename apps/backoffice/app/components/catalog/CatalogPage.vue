@@ -22,9 +22,11 @@ const props = defineProps<{
   activeHelp?: string
   // Changes the extra fields keep outside the form state (such as a picked
   // term), counted as unsaved; and saved first by Save, which stops when it
-  // returns false
+  // returns false. beforeSave receives the form state (logo uploads, etc.).
   pendingChanges?: boolean
-  beforeSave?: () => Promise<boolean>
+  beforeSave?: (state: Record<string, any>) => Promise<boolean>
+  // When the slideover opens or resets (new/edit/discard)
+  onFormReset?: () => void
 }>()
 
 defineSlots<{
@@ -88,6 +90,7 @@ const startForm = (row: Row | null) => {
   )
   initial = JSON.stringify(state)
   slugTouched.value = Boolean(row)
+  props.onFormReset?.()
   open.value = true
 }
 watch(() => state.name, (name) => {
@@ -123,7 +126,7 @@ const { mutate: save, isLoading: saving } = useMutation({
 })
 
 const submit = async () => {
-  if (props.beforeSave && !(await props.beforeSave())) return
+  if (props.beforeSave && !(await props.beforeSave(state))) return
   save()
 }
 

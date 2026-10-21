@@ -248,6 +248,21 @@ interface OfferRangeListFilter {
   isActive?: boolean
 }
 
+type MemberPriceVariant = { id: number; productId: number; price: string | null; discountedPrice: string | null }
+type MemberPrice = { planId: number; planName: string; price: string }
+
+// The lowest of each variant's plan prices. On a tie, the first plan wins.
+const lowestMemberPrices = (byPlan: Map<number, MemberPrice[]>) => {
+  const prices = new Map<number, MemberPrice>()
+  for (const [variantId, options] of byPlan) {
+    for (const option of options) {
+      const current = prices.get(variantId)
+      if (!current || new Decimal(option.price).lt(current.price)) prices.set(variantId, option)
+    }
+  }
+  return prices
+}
+
 class OfferRangeService {
   private db: Database
 
@@ -1438,31 +1453,38 @@ class OfferService {
   }
 
   async getProductIdsInOfferRange(rangeId: number, productIds: number[]) {
-    const productsInOfferRange = await this.db
+    return (await this.productsInOfferRanges([rangeId], productIds)).get(rangeId) ?? []
+  }
+
+  // Which of these products each range covers, from one join. Empty ranges
+  // are omitted. Used on the product page for every member offer at once.
+  async productsInOfferRanges(rangeIds: number[], productIds: number[]) {
+    const inRange = new Map<number, number[]>()
+    const ranges = [...new Set(rangeIds)]
+    const ids = [...new Set(productIds)]
+    if (!ranges.length || !ids.length) return inRange
+    const rows = await this.db
       .select({
-        id: products.id,
+        rangeId: offerRanges.id,
+        productId: products.id,
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
-      .where(
+      .innerJoin(
+        offerRanges,
         and(
-          inArray(products.id, productIds),
-          sql`
-          EXISTS (
-              SELECT 1 FROM ${offerRanges}
-              WHERE 
-              ${offerRanges.id} = ${rangeId}
-              AND
-              ${offerRanges.isActive} = true
-              AND ${productInRange}
-          )
-          `,
+          inArray(offerRanges.id, ranges),
+          eq(offerRanges.isActive, true),
+          sql`${productInRange}`,
         ),
       )
-
-    return productsInOfferRange.map((p) => p.id)
+      .where(inArray(products.id, ids))
+    for (const row of rows) {
+      inRange.set(row.rangeId, [...(inRange.get(row.rangeId) ?? []), row.productId])
+    }
+    return inRange
   }
 
   async applyVoucherCode(
@@ -1591,6 +1613,20 @@ class OfferService {
       offer.condition.rangeId,
       productIds,
     )
+    return this.applyUserOfferInRange(offer, cartContent, kind, productIdsInOfferRange)
+  }
+
+  // applyUserOffer, given the cart's products in the offer's range
+  // (getProductIdsInOfferRange)
+  applyUserOfferInRange(
+    offer: any,
+    cartContent: CartContent,
+    kind: 'site' | 'user',
+    productIdsInOfferRange: number[],
+  ): CartContent {
+    if (!offer.benefit.isActive) {
+      return cartContent
+    }
 
     if (
       offer.benefit.type === 'free_shipping'
@@ -1611,38 +1647,62 @@ class OfferService {
   // shipping and per-user limits are left out. Only variants a member pays
   // less for are in the map.
   async memberPrices(
-    variants: { id: number; productId: number; price: string | null; discountedPrice: string | null }[],
+    variants: MemberPriceVariant[],
     planIds?: number[],
   ) {
-    const prices = new Map<number, { planId: number; planName: string; price: string }>()
+    return lowestMemberPrices(await this.pricesByPlan(variants, planIds))
+  }
+
+  // memberPrices for the buyer's plans (`yours`) and over every plan
+  // (`lowest`). The buyer's plan ids (or a promise of them) run with the
+  // plans and offers, so the product page does not wait for memberships first.
+  async memberPricesFor(variants: MemberPriceVariant[], planIds: number[] | Promise<number[]>) {
+    const [byPlan, ids] = await Promise.all([this.pricesByPlan(variants), planIds])
+    const held = new Set(ids)
+    const yours = new Map<number, MemberPrice[]>()
+    for (const [variantId, prices] of byPlan) {
+      const own = prices.filter((price) => held.has(price.planId))
+      if (own.length) yours.set(variantId, own)
+    }
+    return { yours: lowestMemberPrices(yours), lowest: lowestMemberPrices(byPlan) }
+  }
+
+  // Each variant's price for each plan (or just these plans) whose members
+  // pay less for it, by variant id
+  private async pricesByPlan(variants: MemberPriceVariant[], planIds?: number[]) {
+    const byPlan = new Map<number, MemberPrice[]>()
     const now = new Date().toISOString()
-    const plans = await this.db.query.membershipPlans.findMany({
-      where: and(
-        eq(membershipPlans.isActive, true),
-        planIds ? inArray(membershipPlans.id, planIds.length ? planIds : [-1]) : undefined,
-      ),
-    })
+    const [plans, offerRows] = await Promise.all([
+      this.db.query.membershipPlans.findMany({
+        where: and(
+          eq(membershipPlans.isActive, true),
+          planIds ? inArray(membershipPlans.id, planIds.length ? planIds : [-1]) : undefined,
+        ),
+      }),
+      this.db.query.offers.findMany({
+        where: and(
+          eq(offers.type, 'user'),
+          eq(offers.isActive, true),
+          sql`jsonb_array_length(${offers.includedMembershipPlanIds}) > 0`,
+          or(isNull(offers.startDate), lte(offers.startDate, now)),
+          or(isNull(offers.endDate), gte(offers.endDate, now)),
+          or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
+        ),
+        with: { condition: true, benefit: true },
+        orderBy: [desc(offers.priority), desc(offers.createdAt)],
+      }),
+    ])
     const memberOffers = plans.length
-      ? (
-          await this.db.query.offers.findMany({
-            where: and(
-              eq(offers.type, 'user'),
-              eq(offers.isActive, true),
-              sql`jsonb_array_length(${offers.includedMembershipPlanIds}) > 0`,
-              or(isNull(offers.startDate), lte(offers.startDate, now)),
-              or(isNull(offers.endDate), gte(offers.endDate, now)),
-              or(isNull(offers.overallLimit), lt(offers.usageCount, offers.overallLimit)),
-            ),
-            with: { condition: true, benefit: true },
-            orderBy: [desc(offers.priority), desc(offers.createdAt)],
-          })
-        ).filter((offer) => offer.benefit.isActive && offer.benefit.type !== 'free_shipping')
+      ? offerRows.filter((offer) => offer.benefit.isActive && offer.benefit.type !== 'free_shipping')
       : []
     const productIds = [...new Set(variants.map((variant) => variant.productId))]
-    const inRange = new Map<number, number[]>()
-    for (const offer of memberOffers) {
-      inRange.set(offer.id, await this.getProductIdsInOfferRange(offer.condition.rangeId, productIds))
-    }
+    const byRange = await this.productsInOfferRanges(
+      memberOffers.map((offer) => offer.condition.rangeId),
+      productIds,
+    )
+    const inRange = new Map(
+      memberOffers.map((offer) => [offer.id, byRange.get(offer.condition.rangeId) ?? []] as const),
+    )
 
     for (const variant of variants) {
       if ((variant.discountedPrice ?? variant.price) === null) continue
@@ -1675,13 +1735,10 @@ class OfferService {
         const discount = Math.max(...candidates.map((candidate) => candidate.totalOfferDiscount))
         if (discount <= 0) continue
         const price = new Decimal(variant.discountedPrice ?? variant.price!).sub(discount).toString()
-        const current = prices.get(variant.id)
-        if (!current || new Decimal(price).lt(current.price)) {
-          prices.set(variant.id, { planId: plan.id, planName: plan.name, price })
-        }
+        byPlan.set(variant.id, [...(byPlan.get(variant.id) ?? []), { planId: plan.id, planName: plan.name, price }])
       }
     }
-    return prices
+    return byPlan
   }
 
   async increaseUsage(offerId: number, userId: string) {

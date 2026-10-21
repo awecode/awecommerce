@@ -3,8 +3,14 @@
 // stores the summary the API answers with; failures throw, with the API's
 // message in `cartErrorMessage(error)`.
 export const useCart = () => {
-  // One request per page, however many components ask (see useStoreSettings)
-  const request = useFetch('/api/store/cart', { key: 'cart', dedupe: 'defer' })
+  // One request per page, however many components ask (see useStoreSettings).
+  // Empty cart is 204 with no body; ofetch yields undefined, which Nuxt warns
+  // about (NUXT_E3006). Treat that as null.
+  const request = useFetch('/api/store/cart', {
+    key: 'cart',
+    dedupe: 'defer',
+    transform: (value) => value ?? null,
+  })
   const { data, refresh } = request
   const drawerOpen = useState('cart-drawer-open', () => false)
   const count = computed(() => (data.value?.lines ?? []).reduce((total, line) => total + line.quantity, 0))

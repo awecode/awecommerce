@@ -16,7 +16,7 @@ const range = computed(() => props.product.minPrice !== props.product.maxPrice)
 </script>
 
 <template>
-  <NuxtLink :to="`/products/${product.slug}`" class="group block" data-product-card>
+  <NuxtLink :to="`/products/${product.slug}`" class="group block transition-opacity active:opacity-75" data-product-card>
     <div class="relative aspect-4/5 overflow-hidden rounded-sm bg-elevated">
       <img
         v-if="product.thumbnail"

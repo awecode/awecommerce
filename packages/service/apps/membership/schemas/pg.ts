@@ -1,6 +1,7 @@
 import { relations } from 'drizzle-orm'
 import {
   boolean,
+  index,
   integer,
   numeric,
   pgEnum,
@@ -40,7 +41,7 @@ export const membershipTerms = pgTable('membership_term', {
     .references(() => productVariants.id, { onDelete: 'cascade' }),
   months: integer().notNull(),
   createdAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
-})
+}, (table) => [index('membership_term_planId_idx').on(table.planId)])
 
 export const membershipStatus = pgEnum('membership_status', ['active', 'cancelled'])
 
@@ -63,7 +64,7 @@ export const memberships = pgTable('membership', {
   cancelledAt: timestamp({ withTimezone: true, mode: 'string' }),
   cancellationReason: text(),
   createdAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
-})
+}, (table) => [index('membership_userId_idx').on(table.userId)])
 
 export const membershipPlanRelations = relations(membershipPlans, ({ many }) => ({
   terms: many(membershipTerms),

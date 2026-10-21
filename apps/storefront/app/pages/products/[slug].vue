@@ -164,7 +164,7 @@ useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
 
         <div class="space-y-8 lg:sticky lg:top-24 lg:self-start">
           <div class="space-y-3">
-            <NuxtLink v-if="product.brand" :to="`/brands/${product.brand.slug}`" class="text-xs tracking-wider text-muted uppercase hover:underline">
+            <NuxtLink v-if="product.brand" :to="`/brands/${product.brand.slug}`" class="text-xs tracking-wider text-muted uppercase hover:underline active:opacity-75">
               {{ product.brand.name }}
             </NuxtLink>
             <h1 class="text-3xl leading-tight font-medium tracking-tight sm:text-4xl">{{ product.name }}</h1>
@@ -189,7 +189,7 @@ useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
                 role="radio"
                 :aria-checked="selected[option.name] === value"
                 :aria-label="soldOut(option.name, value) ? `${value}, sold out` : value"
-                class="min-w-12 rounded-full border px-4 py-2 text-sm transition"
+                class="min-w-12 rounded-full border px-4 py-2 text-sm transition active:scale-95"
                 :class="[
                   selected[option.name] === value ? 'border-(--ui-primary) bg-(--ui-primary) text-inverted' : 'border-default hover:border-(--ui-primary)',
                   soldOut(option.name, value) && selected[option.name] !== value ? 'text-dimmed line-through' : '',
@@ -259,7 +259,8 @@ useHead({ script: [{ type: 'application/ld+json', innerHTML: jsonLd }] })
 
           <UAccordion
             v-if="product.specification"
-            :items="[{ label: 'Details', slot: 'details' as const }]"
+            :items="[{ label: 'Details', value: 'details', slot: 'details' as const }]"
+            default-value="details"
             :ui="{ trigger: 'font-medium' }"
           >
             <template #details>

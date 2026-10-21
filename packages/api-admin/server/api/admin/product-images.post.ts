@@ -1,7 +1,7 @@
-// Uploads a product image (multipart form: `file` and the product's `slug`)
-// and answers with its public URL, which the product's images then use. The
-// key is <slug>.<ext> (<slug>-1.<ext> and so on when taken), the extension
-// from what the file really is: JPEG, PNG or WebP, up to 8 MiB.
+// Uploads an admin image (multipart: `file`, `slug`, optional `folder`) and
+// answers with its public URL. Folders: products (default), offers, brands,
+// categories. Key is <folder>/<slug>.<ext> (<folder>/<slug>-1.<ext> when
+// taken). Extension from the file bytes: JPEG, PNG or WebP, up to 8 MiB.
 const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024
 
 // The file's real type, from its first bytes; the declared type is not trusted
@@ -14,6 +14,8 @@ const imageType = (bytes: Uint8Array): { extension: string; contentType: string 
   return null
 }
 
+const FOLDERS = new Set(['products', 'offers', 'brands', 'categories'])
+
 const fail = (statusCode: number, statusMessage: string, message: string) => createError({ statusCode, statusMessage, message })
 
 export default defineEventHandler(async (event) => {
@@ -25,8 +27,12 @@ export default defineEventHandler(async (event) => {
   const parts = (await readMultipartFormData(event)) ?? []
   const file = parts.find((part) => part.name === 'file' && part.filename !== undefined)
   const slug = parts.find((part) => part.name === 'slug')?.data.toString('utf8').trim() ?? ''
+  const folderRaw = parts.find((part) => part.name === 'folder')?.data.toString('utf8').trim() || 'products'
   if (!file) {
     throw fail(400, 'Bad Request', 'Send the image as the file field.')
+  }
+  if (!FOLDERS.has(folderRaw)) {
+    throw fail(422, 'Unprocessable Entity', `Folder must be one of: ${[...FOLDERS].join(', ')}.`)
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
     throw fail(422, 'Unprocessable Entity', 'The slug can only have lowercase letters, numbers and hyphens.')
@@ -40,7 +46,7 @@ export default defineEventHandler(async (event) => {
   }
   try {
     return await uploadToObjectStorage(event, new Uint8Array(file.data), {
-      filename: `${slug}.${type.extension}`,
+      filename: `${folderRaw}/${slug}.${type.extension}`,
       contentType: type.contentType,
     })
   } catch (error) {

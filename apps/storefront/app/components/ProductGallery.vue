@@ -17,7 +17,7 @@ watch(() => props.images, () => (current.value = 0))
       <li v-for="(image, index) in images" :key="image">
         <button
           type="button"
-          class="block aspect-square w-full overflow-hidden rounded-sm bg-elevated ring-offset-2 ring-offset-(--ui-bg)"
+          class="block aspect-square w-full overflow-hidden rounded-sm bg-elevated ring-offset-2 ring-offset-(--ui-bg) transition active:scale-95"
           :class="index === current ? 'ring-2 ring-(--ui-primary)' : 'opacity-70 hover:opacity-100'"
           :aria-label="`Show image ${index + 1} of ${images.length}`"
           :aria-current="index === current"

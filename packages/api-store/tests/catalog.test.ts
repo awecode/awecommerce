@@ -60,6 +60,8 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect(await list('featured=true')).toEqual([mid.name])
     expect(await list('bestSeller=true')).toEqual([dear.name])
     expect(await list('sortBy=priceDesc')).toEqual([dear.name, mid.name, cheap.name])
+    // Featured first, then newest (mid is featured; dear is newer than cheap)
+    expect(await list('sortBy=featuredNewest')).toEqual([mid.name, dear.name, cheap.name])
     // Several ids, comma-separated or repeated
     const other = await new CategoryService(db).create({ name: unique('c'), slug: unique('c') })
     const inOther = await createProduct(prefix, { price: '1', categoryId: other.id })
@@ -185,6 +187,21 @@ describe.skipIf(!url)('store catalog API', async () => {
     expect(brandIds).toContain(stocked.id)
     expect(brandIds).not.toContain(empty.id)
     expect(brandIds).not.toContain(draftOnly.id)
+  })
+
+  test('the home page returns best sellers, brands and a featured category shelf', async () => {
+    const category = await new CategoryService(db).create({ name: unique('home-cat'), slug: unique('home-cat'), isFeatured: true })
+    const brand = await new BrandService(db).create({ name: unique('home-brand'), slug: unique('home-brand') })
+    const best = await createProduct(unique('home-best'), { isBestSeller: true, categoryId: category.id, brandId: brand.id })
+    const { status, body } = await request('/api/store/home')
+    expect(status).toBe(200)
+    expect(body.bestSellers.map((product: { id: number }) => product.id)).toContain(best.id)
+    expect(body.brands.map((row: { id: number }) => row.id)).toContain(brand.id)
+    const shelf = body.categories.find((row: { category: { id: number } }) => row.category.id === category.id)
+    expect(shelf?.category).toEqual({ id: category.id, name: category.name, slug: category.slug })
+    expect(shelf?.products.map((product: { id: number }) => product.id)).toContain(best.id)
+    expect(body.offers).toEqual(expect.any(Array))
+    expect(body.membershipPlans).toEqual(expect.any(Array))
   })
 
   test('lists the featured offers anyone can use, without their targeting', async () => {

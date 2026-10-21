@@ -59,6 +59,7 @@ const summaryQuery = computed(() => ({
 const { data: summary, error: summaryError, refresh: refreshSummary } = await useFetch('/api/store/cart', {
   key: 'checkout-summary',
   query: summaryQuery,
+  transform: (value) => value ?? null,
 })
 // The cart changed elsewhere on the page (the cart drawer): price it again
 watch(cart, () => refreshSummary())
@@ -192,7 +193,7 @@ const place = async () => {
               <UInput v-model="state.phone" type="tel" autocomplete="tel" size="lg" class="w-full sm:w-1/2" />
             </UFormField>
             <p class="text-sm text-muted">
-              Have an account? <NuxtLink to="/login?redirect=/checkout" class="underline">Sign in</NuxtLink> to use your saved addresses and points.
+              Have an account? <NuxtLink to="/login?redirect=/checkout" class="underline hover:no-underline">Sign in</NuxtLink> to use your saved addresses and points.
             </p>
           </template>
         </section>

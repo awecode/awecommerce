@@ -97,10 +97,11 @@ const removeImage = () => {
 const imageInput = useTemplateRef('imageInput')
 const uploadImage = async () => {
   if (!pendingImage.value) return
-  const body = new FormData()
-  body.append('slug', `offer-${slugify(state.name) || 'image'}`)
-  body.append('file', pendingImage.value)
-  const { url } = await api<{ url: string }>('/api/admin/product-images', { method: 'POST', body })
+  const slug = slugify(state.name)
+  if (!isStorageSlug(slug)) {
+    throw new Error('Set a name that becomes a slug (lowercase letters, numbers, hyphens) before uploading the image.')
+  }
+  const { url } = await uploadAdminImage(pendingImage.value, { folder: 'offers', slug })
   state.image = url
   pendingImage.value = null
 }

@@ -1,11 +1,13 @@
-import { and, asc, desc, eq, gt, ilike, inArray, lte, or, SQL, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, gt, ilike, inArray, lte, or, SQL, sql } from 'drizzle-orm'
 import { NotFoundError, ValidationError } from '../../../core/errors'
 import { Exact, paginate, PaginationArgs } from '../../../core/pagination'
 import { Database } from '../../types'
-import { ProductService } from '../../product/services/product'
+import { products, productVariants } from '../../product/schemas'
+import { listedProduct } from '../../product/services/product'
 import {
   membershipPlans,
   memberships,
+  MembershipPlan,
   membershipTerms,
   NewMembershipPlan,
   NewMembershipTerm,
@@ -36,6 +38,18 @@ const membershipState = sql<MembershipState>`CASE
   WHEN ${memberships.startsAt} > now() THEN 'upcoming'
   WHEN ${memberships.endsAt} <= now() THEN 'ended'
   ELSE 'active' END`
+
+// The same state as the SQL above, for a membership already read
+const stateAt = (m: { status: 'active' | 'cancelled'; startsAt: string; endsAt: string }, now: number): MembershipState =>
+  m.status === 'cancelled'
+    ? 'cancelled'
+    : new Date(m.startsAt).getTime() > now
+      ? 'upcoming'
+      : new Date(m.endsAt).getTime() <= now
+        ? 'ended'
+        : 'active'
+
+type Memberships = Awaited<ReturnType<MembershipService['history']>>
 
 type GrantOptions = {
   userId: string
@@ -173,13 +187,19 @@ class MembershipService {
     await this.db.delete(membershipTerms).where(eq(membershipTerms.id, id))
   }
 
-  // The terms these variants sell, with their plans, by variant id
+  // The terms these variants sell, with their plans, by variant id. One join.
   async termsForVariants(variantIds: number[]) {
+    // An empty list rather than an early `new Map()`, which would type every
+    // lookup as any
     const terms = variantIds.length
-      ? await this.db.query.membershipTerms.findMany({
-          where: inArray(membershipTerms.variantId, variantIds),
-          with: { plan: true },
-        })
+      ? await this.db
+          .select({
+            ...getTableColumns(membershipTerms),
+            plan: getTableColumns(membershipPlans),
+          })
+          .from(membershipTerms)
+          .innerJoin(membershipPlans, eq(membershipPlans.id, membershipTerms.planId))
+          .where(inArray(membershipTerms.variantId, variantIds))
       : []
     return new Map(terms.map((term) => [term.variantId, term]))
   }
@@ -198,6 +218,23 @@ class MembershipService {
       with: { plan: true },
       orderBy: desc(memberships.endsAt),
     })
+  }
+
+  // The plan ids of the person's active memberships, without loading the plans
+  async activePlanIds(userId: string) {
+    const now = new Date().toISOString()
+    const rows = await this.db
+      .select({ planId: memberships.planId })
+      .from(memberships)
+      .where(
+        and(
+          eq(memberships.userId, userId),
+          eq(memberships.status, 'active'),
+          lte(memberships.startsAt, now),
+          gt(memberships.endsAt, now),
+        ),
+      )
+    return rows.map((row) => row.planId)
   }
 
   async grant(options: GrantOptions) {
@@ -311,10 +348,14 @@ class MembershipService {
   // cancelled: `state` (active, upcoming or ended), when the running or next
   // one starts, and when the last one ends. Latest end first.
   async currentPlans(userId: string, { endedWithinDays = 90 } = {}) {
+    return this.currentFrom(await this.history(userId), endedWithinDays)
+  }
+
+  private currentFrom(rows: Memberships, endedWithinDays = 90) {
     const now = Date.now()
     const since = now - endedWithinDays * 86_400_000
-    const byPlan = new Map<number, Awaited<ReturnType<MembershipService['history']>>>()
-    for (const membership of await this.history(userId)) {
+    const byPlan = new Map<number, Memberships>()
+    for (const membership of rows) {
       if (membership.status === 'cancelled') continue
       byPlan.set(membership.planId, [...(byPlan.get(membership.planId) ?? []), membership])
     }
@@ -338,25 +379,34 @@ class MembershipService {
 
   // The terms on sale for these plans: the plan is active, and the variant is
   // active and its product listed. Shortest first, each with its selling
-  // price and product slug.
-  async termsOnSale(planIds: number[]) {
-    if (!planIds.length) return []
-    const terms = await this.db.query.membershipTerms.findMany({
-      where: inArray(membershipTerms.planId, planIds),
-      with: { plan: true, variant: { with: { product: { columns: { id: true, slug: true } } } } },
-      orderBy: asc(membershipTerms.months),
-    })
-    const listed = new Set(await new ProductService(this.db).listedProductIds(terms.map((term) => term.variant.productId)))
-    return terms
-      .filter((term) => term.plan.isActive && term.variant.isActive && listed.has(term.variant.productId))
-      .map((term) => ({
-        id: term.id,
-        planId: term.planId,
-        months: term.months,
-        variantId: term.variantId,
-        price: term.variant.discountedPrice ?? term.variant.price,
-        productSlug: term.variant.product.slug,
-      }))
+  // price and product slug. One join, including whether the product is listed.
+  // With no plan ids, every plan on sale (the memberships page loads them
+  // with the person's history, rather than a second round trip).
+  async termsOnSale(planIds?: number[]) {
+    if (planIds && !planIds.length) return []
+    const where: SQL[] = [
+      eq(membershipPlans.isActive, true),
+      eq(productVariants.isActive, true),
+      listedProduct,
+    ]
+    if (planIds) where.push(inArray(membershipTerms.planId, planIds))
+    return await this.db
+      .select({
+        id: membershipTerms.id,
+        planId: membershipTerms.planId,
+        months: membershipTerms.months,
+        variantId: membershipTerms.variantId,
+        // Without the column's 20 trailing zeros (99, not 99.000…), as the
+        // relational query this replaced returned it
+        price: sql<string | null>`trim_scale(coalesce(${productVariants.discountedPrice}, ${productVariants.price}))`,
+        productSlug: products.slug,
+      })
+      .from(membershipTerms)
+      .innerJoin(membershipPlans, eq(membershipPlans.id, membershipTerms.planId))
+      .innerJoin(productVariants, eq(productVariants.id, membershipTerms.variantId))
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(and(...where))
+      .orderBy(asc(membershipTerms.months))
   }
 
   // The plans the person can join, each with its terms on sale (plans with
@@ -365,39 +415,82 @@ class MembershipService {
   // upgrade starts now and `replaces` that plan. By program, then highest
   // rank first. Without a person (a guest), every plan on sale.
   async plansToJoin(userId?: string) {
-    const current = userId ? await this.currentPlans(userId) : []
+    const [rows, plans, terms] = await Promise.all([
+      userId ? this.history(userId) : [],
+      this.activePlans(),
+      this.termsOnSale(),
+    ])
+    const current = this.currentFrom(rows)
+    return this.withTerms(this.joinable(plans, current), terms)
+  }
+
+  // What the memberships page shows, from the person's history and the terms
+  // on sale in parallel: `current` (their currentPlans, each with the terms
+  // on sale to renew), `toJoin` (their plansToJoin), and `history` (every
+  // membership, latest start first, with its `state`).
+  async overview(userId: string) {
+    const [rows, plans, terms] = await Promise.all([
+      this.history(userId),
+      this.activePlans(),
+      this.termsOnSale(),
+    ])
+    const current = this.currentFrom(rows)
+    const joinable = this.joinable(plans, current)
+    const now = Date.now()
+    return {
+      current: current.map((entry) => ({ ...entry, terms: terms.filter((term) => term.planId === entry.plan.id) })),
+      toJoin: this.withTerms(joinable, terms),
+      history: rows.map(({ plan, ...membership }) => ({
+        ...membership,
+        plan: { id: plan.id, name: plan.name, program: plan.program, rank: plan.rank },
+        state: stateAt(membership, now),
+      })),
+    }
+  }
+
+  private async activePlans() {
+    return await this.db.query.membershipPlans.findMany({
+      where: eq(membershipPlans.isActive, true),
+      orderBy: [asc(membershipPlans.program), desc(membershipPlans.rank), asc(membershipPlans.name)],
+    })
+  }
+
+  // The plans (as activePlans lists them) the person can join, given their
+  // current plans, with the plan each one replaces
+  private joinable(plans: MembershipPlan[], current: ReturnType<MembershipService['currentFrom']>) {
     const shown = new Set(current.map((c) => c.plan.id))
-    const held = new Map<string, (typeof current)[number]['plan']>()
+    const held = new Map<string, MembershipPlan>()
     for (const { plan, state } of current) {
       const top = held.get(plan.program)
       if (state !== 'ended' && (!top || plan.rank > top.rank)) held.set(plan.program, plan)
     }
-    const plans = (
-      await this.db.query.membershipPlans.findMany({
-        where: eq(membershipPlans.isActive, true),
-        orderBy: [asc(membershipPlans.program), desc(membershipPlans.rank), asc(membershipPlans.name)],
-      })
-    ).filter((plan) => !shown.has(plan.id) && plan.rank > (held.get(plan.program)?.rank ?? -Infinity))
-    const terms = await this.termsOnSale(plans.map((plan) => plan.id))
     return plans
+      .filter((plan) => !shown.has(plan.id) && plan.rank > (held.get(plan.program)?.rank ?? -Infinity))
       .map((plan) => {
         const replaces = held.get(plan.program)
-        return {
-          plan,
-          replaces: replaces ? { id: replaces.id, name: replaces.name } : null,
-          terms: terms.filter((term) => term.planId === plan.id),
-        }
+        return { plan, replaces: replaces ? { id: replaces.id, name: replaces.name } : null }
       })
-      .filter((option) => option.terms.length)
   }
 
-  // Every membership the person had, newest first
+  private withTerms<T extends { plan: MembershipPlan }>(entries: T[], terms: Awaited<ReturnType<MembershipService['termsOnSale']>>) {
+    return entries
+      .map((entry) => ({ ...entry, terms: terms.filter((term) => term.planId === entry.plan.id) }))
+      .filter((entry) => entry.terms.length)
+  }
+
+  // Every membership the person had, newest first. One join with the plan,
+  // so the account page does not follow up with a second query.
   async history(userId: string) {
-    return await this.db.query.memberships.findMany({
-      where: eq(memberships.userId, userId),
-      with: { plan: true },
-      orderBy: [desc(memberships.startsAt), desc(memberships.id)],
-    })
+    const rows = await this.db
+      .select({
+        ...getTableColumns(memberships),
+        plan: getTableColumns(membershipPlans),
+      })
+      .from(memberships)
+      .innerJoin(membershipPlans, eq(membershipPlans.id, memberships.planId))
+      .where(eq(memberships.userId, userId))
+      .orderBy(desc(memberships.startsAt), desc(memberships.id))
+    return rows
   }
 }
 

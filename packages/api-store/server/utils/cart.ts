@@ -29,8 +29,10 @@ const cookieSessionId = (event: H3Event) => {
 export const findCart = async (event: H3Event) => {
   const cartService = new CartService(useDb())
   const sessionId = cookieSessionId(event)
-  const cookieCart = sessionId ? await cartService.getCartForSession(sessionId) : undefined
-  const user = await getUser(event)
+  const [cookieCart, user] = await Promise.all([
+    sessionId ? cartService.getCartForSession(sessionId) : undefined,
+    getUser(event),
+  ])
   if (!user) {
     return cookieCart && !cookieCart.userId ? cookieCart : undefined
   }

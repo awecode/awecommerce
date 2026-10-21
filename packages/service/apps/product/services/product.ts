@@ -1,4 +1,4 @@
-import { Exact, paginate, PaginationArgs } from '../../../core/pagination'
+import { Exact, ListResult, paginate, PaginationArgs } from '../../../core/pagination'
 import { NotFoundError, ValidationError } from '../../../core/errors'
 import {
   and,
@@ -138,8 +138,10 @@ interface ProductFilter {
   qFilter?: SQL
   minPrice?: number
   maxPrice?: number
-  // Newest first when not given
-  sortBy?: 'priceAsc' | 'priceDesc' | 'nameAsc' | 'nameDesc' | 'newest' | 'oldest'
+  // Newest first when not given; featuredNewest puts featured products first
+  sortBy?: 'priceAsc' | 'priceDesc' | 'nameAsc' | 'nameDesc' | 'newest' | 'oldest' | 'featuredNewest'
+  // The first rows only, without counting the rest. For a page that does not page.
+  limit?: number
   getFilters?: () => SQL[]
 }
 
@@ -312,6 +314,16 @@ class ProductService {
   }
 
   async get(productId: number) {
+    return await this.findOne(eq(products.id, productId))
+  }
+
+  // The product with this slug, as get returns it, when the store shows it
+  // (see listedProduct); null otherwise. One query, for the product page.
+  async getListedBySlug(slug: string) {
+    return await this.findOne(and(eq(products.slug, slug), listedProduct)!)
+  }
+
+  private async findOne(where: SQL) {
     const result = await this.db.query.products.findFirst({
       with: {
         variants: {
@@ -361,7 +373,7 @@ class ProductService {
         },
         images: true,
       },
-      where: eq(products.id, productId),
+      where,
     })
     return result
       ? {
@@ -553,47 +565,127 @@ class ProductService {
       nameDesc: [desc(products.name), desc(products.id)],
       newest: [desc(products.createdAt), desc(products.id)],
       oldest: [asc(products.createdAt), asc(products.id)],
-    }[filter.sortBy ?? 'newest']
+      featuredNewest: [desc(products.isFeatured), desc(products.createdAt), desc(products.id)],
+    }[filter.sortBy ?? 'newest'] ?? [desc(products.createdAt), desc(products.id)]
 
-    let query = this.db
-      .select({
-        ...getTableColumns(products),
-        minPrice: minVariantPrice,
-        maxPrice: maxVariantPrice,
-        variantCount,
-        totalStock,
-        singleVariant,
-        inStock,
-        brand: getTableColumns(brands),
-        category: getTableColumns(categories),
-        productClass: getTableColumns(productClasses),
-      })
+    const columns = {
+      ...getTableColumns(products),
+      minPrice: minVariantPrice,
+      maxPrice: maxVariantPrice,
+      variantCount,
+      totalStock,
+      singleVariant,
+      inStock,
+      brand: getTableColumns(brands),
+      category: getTableColumns(categories),
+      productClass: getTableColumns(productClasses),
+    }
+    const query = this.db
+      .select(columns)
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
-      .orderBy(...orderBy)
       .where(and(...where))
+      .orderBy(...orderBy)
+    type Row = (typeof query)['_']['result'][number]
 
-    return await paginate(
-      filter as F | undefined,
-      (page) => (page ? query.limit(page.limit).offset(page.offset) : query),
-      async () =>
-        Number(
-          (
-            await this.db
-              .select({ count: sql<number>`count(*)` })
-              .from(products)
-              .leftJoin(brands, eq(products.brandId, brands.id))
-              .leftJoin(categories, eq(products.categoryId, categories.id))
-              .leftJoin(
-                productClasses,
-                eq(products.productClassId, productClasses.id),
-              )
-              .where(and(...where))
-          )[0]!.count,
-        ),
-    )
+    if (filter.limit && !filter.pagination) {
+      return (await query.limit(filter.limit)) as ListResult<F, Row>
+    }
+    if (!filter.pagination) {
+      return (await query) as ListResult<F, Row>
+    }
+
+    const countQuery = this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(products)
+      .leftJoin(brands, eq(products.brandId, brands.id))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+      .where(and(...where))
+    const count = async () => Number((await countQuery)[0]!.count)
+    const { page, size } = filter.pagination
+    const offset = (page - 1) * size
+    let results: Row[]
+    let total: number
+    if (filter.minPrice || filter.maxPrice) {
+      // Counted on its own: with the price worked out per product twice,
+      // one query that does both is costly enough for Postgres to compile it
+      // (JIT), which takes far longer than a second round trip
+      results = await query.limit(size).offset(offset)
+      total = await count()
+    } else {
+      // The total counted in the same query (once, not per row). A page past
+      // the end has no row to carry it, so it is counted on its own.
+      const counted = await this.db
+        .select({ ...columns, listTotal: sql<number>`(${countQuery})`.mapWith(Number) })
+        .from(products)
+        .leftJoin(brands, eq(products.brandId, brands.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .leftJoin(productClasses, eq(products.productClassId, productClasses.id))
+        .where(and(...where))
+        .orderBy(...orderBy)
+        .limit(size)
+        .offset(offset)
+      results = counted.map(({ listTotal, ...row }) => row) as Row[]
+      total = counted.length ? counted[0].listTotal : await count()
+    }
+    return {
+      results,
+      pagination: { page, size, total, pages: Math.ceil(total / size) },
+    } as ListResult<F, Row>
+  }
+
+  // Up to `limit` listed products for each category, including products in
+  // categories under it. Featured products come first, then the newest. One
+  // query picks the rows and one loads them: the home page does not need a
+  // count, and does not query each category on its own.
+  async productsForCategories(categoryIds: number[], limit: number) {
+    type Row = Extract<Awaited<ReturnType<ProductService['list']>>, unknown[]>[number]
+    const grouped = new Map<number, Row[]>()
+    if (!categoryIds.length || limit < 1) return grouped
+
+    const ids = sql.join(categoryIds.map((id) => sql`${id}`), sql`, `)
+    const ranked = await this.db.execute<{ id: number; shelf_id: number }>(sql`
+      WITH RECURSIVE tree AS (
+        SELECT c.id AS category_id, c.id AS shelf_id
+        FROM ${categories} c
+        WHERE c.id IN (${ids})
+        UNION
+        SELECT child.id, tree.shelf_id
+        FROM ${categories} child
+        JOIN tree ON child."parentId" = tree.category_id
+      ),
+      ranked AS (
+        SELECT ${products.id} AS id, tree.shelf_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY tree.shelf_id
+            ORDER BY ${products.isFeatured} DESC, ${products.createdAt} DESC, ${products.id} DESC
+          ) AS rn
+        FROM ${products}
+        INNER JOIN tree ON tree.category_id = ${products.categoryId}
+        WHERE ${listedProduct}
+      )
+      SELECT id, shelf_id FROM ranked WHERE rn <= ${limit} ORDER BY shelf_id, rn
+    `)
+    const pairs = (Array.isArray(ranked) ? ranked : (ranked as { rows?: { id: number; shelf_id: number }[] }).rows ?? []) as { id: number; shelf_id: number }[]
+    const productIds = [...new Set(pairs.map((row) => row.id))]
+    if (!productIds.length) return grouped
+
+    const loaded = await this.list({
+      listedOnly: true,
+      extraFilters: [inArray(products.id, productIds)],
+    })
+    const byId = new Map(loaded.map((product) => [product.id, product]))
+    for (const row of pairs) {
+      const product = byId.get(row.id)
+      if (!product) continue
+      const shelf = grouped.get(row.shelf_id) ?? []
+      shelf.push(product)
+      grouped.set(row.shelf_id, shelf)
+    }
+    return grouped
   }
 
   async markAsFeatured(productId: number) {

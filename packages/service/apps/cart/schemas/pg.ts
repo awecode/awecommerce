@@ -2,6 +2,7 @@ import { offers } from '../../offer/schemas/pg'
 import { productVariants } from '../../product/schemas/pg'
 import { relations, sql } from 'drizzle-orm'
 import {
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -23,7 +24,7 @@ export const carts = pgTable('cart', {
   status: cartStatus().notNull().default('Open'),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).defaultNow(),
-})
+}, (t) => [index('cart_userId_idx').on(t.userId)])
 
 export const cartAppliedVoucherOffers = pgTable('cart_applied_offer', {
   cartId: integer().notNull().references(() => carts.id, {

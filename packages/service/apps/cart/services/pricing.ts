@@ -17,18 +17,6 @@ const priceCart = async (
   // Value of redeemed loyalty points. Reduces the products only, not shipping.
   loyaltyDiscount: Decimal.Value = 0,
 ) => {
-  let shippingMethod: typeof shippingMethods.$inferSelect | undefined
-  if (shippingMethodId !== undefined) {
-    ;[shippingMethod] = await db
-      .select()
-      .from(shippingMethods)
-      .where(eq(shippingMethods.id, shippingMethodId))
-    if (!shippingMethod) {
-      throw new NotFoundError(`Shipping method not found: ${shippingMethodId}`)
-    }
-  }
-
-  const taxSettings = await new TaxService(db).getSettings()
   const classIds = [
     ...new Set(
       content.lines
@@ -36,20 +24,26 @@ const priceCart = async (
         .filter((id): id is number => id !== null),
     ),
   ]
-  const classes = new Map(
+  const [[shippingMethod], taxSettings, classRows] = await Promise.all([
+    shippingMethodId !== undefined
+      ? db.select().from(shippingMethods).where(eq(shippingMethods.id, shippingMethodId))
+      : [undefined],
+    new TaxService(db).getSettings(),
     classIds.length
-      ? (
-          await db
-            .select({
-              id: productClasses.id,
-              taxRate: productClasses.taxRate,
-              requiresShipping: productClasses.requiresShipping,
-            })
-            .from(productClasses)
-            .where(inArray(productClasses.id, classIds))
-        ).map((productClass) => [productClass.id, productClass])
+      ? db
+          .select({
+            id: productClasses.id,
+            taxRate: productClasses.taxRate,
+            requiresShipping: productClasses.requiresShipping,
+          })
+          .from(productClasses)
+          .where(inArray(productClasses.id, classIds))
       : [],
-  )
+  ])
+  if (shippingMethodId !== undefined && !shippingMethod) {
+    throw new NotFoundError(`Shipping method not found: ${shippingMethodId}`)
+  }
+  const classes = new Map(classRows.map((productClass) => [productClass.id, productClass]))
   // A product without a class is shipped
   const shipsLine = content.lines.map(
     (line) =>

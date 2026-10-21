@@ -80,3 +80,29 @@ test('a category covers its subcategories, at any depth, chosen or excepted', as
   })
   expect((await offerService.getProductIdsInOfferRange(everything.id, ids)).sort()).toEqual([jacket.id, boot.id].sort())
 })
+
+test('several ranges are read in one go, the same as each on its own', async () => {
+  const shirts = await new CategoryService(db).create({ name: unique('Shirts'), slug: unique('shirts') })
+  const shirt = await product({ categoryId: shirts.id })
+  const other = await product()
+  const chosen = await new OfferRangeService(db).create({
+    name: unique('range'),
+    inclusiveFilter: false,
+    includedCategories: [shirts.id],
+  })
+  const everything = await new OfferRangeService(db).create({
+    name: unique('range'),
+    inclusiveFilter: true,
+    includeAllProducts: true,
+    includeAllBrands: true,
+    includeAllCategories: true,
+    includeAllProductClasses: true,
+  })
+  const ids = [shirt.id, other.id]
+  const byRange = await offerService.productsInOfferRanges([chosen.id, everything.id, chosen.id], ids)
+  expect([...byRange.get(chosen.id)!].sort()).toEqual([shirt.id].sort())
+  expect([...byRange.get(everything.id)!].sort()).toEqual(ids.sort())
+  expect(byRange.has(chosen.id)).toBe(true)
+  expect(await offerService.productsInOfferRanges([], ids)).toEqual(new Map())
+  expect(await offerService.productsInOfferRanges([chosen.id], [])).toEqual(new Map())
+})

@@ -1,58 +1,36 @@
 <script setup lang="ts">
-import type { CardProduct } from '~/components/ProductCard.vue'
-
 // The home page, in order: the hero, featured offers, featured products,
 // the membership plans on sale (for a member, the ones they can join), shop
-// by category, best sellers, new arrivals, a row of the newest products for
-// each featured category, then shop by brand. Flags and order are set in the
-// backoffice; empty sections are left out.
+// by category, best sellers, new arrivals, a row for each featured category
+// (featured products first, then newest), then shop by brand. Loaded in one
+// request. Flags and order are set in the backoffice; empty sections are
+// left out.
 const { store } = useAppConfig()
 useSeoMeta({ description: store.description })
 
 const menu = useCategoryMenu()
 const { user } = useAuth()
-const requestFetch = useRequestFetch()
-const [{ data: categories }, { data: brands }, { data: offers }, { data: featured }, { data: plans }, { data: newest }, { data: bestSellers }] =
-  await Promise.all([
-    useCategories(),
-    useBrands(),
-    useFetch('/api/store/offers', { key: 'home-offers' }),
-    useFetch('/api/store/products', { key: 'home-featured', query: { featured: true, size: 4 } }),
-    useFetch('/api/store/membership-plans', { key: 'home-membership-plans', watch: [() => user.value?.id] }),
-    useFetch('/api/store/products', { key: 'home-new-arrivals', query: { size: 4 } }),
-    useFetch('/api/store/products', { key: 'home-best-sellers', query: { bestSeller: true, size: 4 } }),
-  ])
+const { data: home } = await useFetch('/api/store/home', {
+  key: 'home',
+  watch: [() => user.value?.id],
+})
 
 // Shop by category: images only when some category has a logo; then the
 // others get the default image
 const categoryImages = computed(() => menu.value.some((category) => category.logo))
-
-// Each featured category with its 4 newest products (and its subcategories')
-const featuredCategories = computed(() => (categories.value ?? []).filter((category) => category.isFeatured))
-const { data: categoryRows } = await useAsyncData(
-  'home-category-rows',
-  () =>
-    Promise.all(
-      featuredCategories.value.map(async (category) => ({
-        category,
-        products: ((await requestFetch('/api/store/products', { query: { categories: category.id, size: 4 } })) as { results: CardProduct[] }).results,
-      })),
-    ),
-  { watch: [featuredCategories] },
-)
 </script>
 
 <template>
   <HomeHero />
 
-  <HomeOffers :offers="offers ?? []" />
+  <HomeOffers :offers="home?.offers ?? []" />
 
-  <ProductShelf title="Featured" :products="featured?.results ?? []" />
+  <ProductShelf title="Featured" :products="home?.featured ?? []" />
 
-  <section v-if="plans?.length" aria-labelledby="memberships" class="py-12">
+  <section v-if="home?.membershipPlans.length" aria-labelledby="memberships" class="py-12">
     <UContainer>
       <h2 id="memberships" class="mb-8 text-3xl font-medium tracking-tight">Memberships</h2>
-      <MembershipPlans :options="plans" :sign-in-to="user ? undefined : '/login?redirect=/'" />
+      <MembershipPlans :options="home.membershipPlans" :sign-in-to="user ? undefined : '/login?redirect=/'" />
     </UContainer>
   </section>
 
@@ -80,23 +58,23 @@ const { data: categoryRows } = await useAsyncData(
     </UContainer>
   </section>
 
-  <ProductShelf title="Best sellers" :products="bestSellers?.results ?? []" />
-  <ProductShelf title="New arrivals" :products="newest?.results ?? []" />
+  <ProductShelf title="Best sellers" :products="home?.bestSellers ?? []" />
+  <ProductShelf title="New arrivals" :products="home?.newArrivals ?? []" />
 
   <ProductShelf
-    v-for="row in categoryRows ?? []"
+    v-for="row in home?.categories ?? []"
     :key="row.category.id"
     :title="row.category.name"
     :products="row.products"
     :more="`/categories/${row.category.slug}`"
   />
 
-  <section v-if="brands?.length" aria-labelledby="shop-by-brand" class="py-12">
+  <section v-if="home?.brands.length" aria-labelledby="shop-by-brand" class="py-12">
     <UContainer>
       <h2 id="shop-by-brand" class="mb-8 text-3xl font-medium tracking-tight">Shop by brand</h2>
       <ul class="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-        <li v-for="brand in brands" :key="brand.id">
-          <NuxtLink :to="`/brands/${brand.slug}`" class="flex aspect-3/2 items-center justify-center rounded-sm bg-elevated p-4 transition hover:bg-accented" :aria-label="brand.name">
+        <li v-for="brand in home.brands" :key="brand.id">
+          <NuxtLink :to="`/brands/${brand.slug}`" class="flex aspect-3/2 items-center justify-center rounded-sm bg-elevated p-4 transition hover:bg-accented active:scale-[0.98]" :aria-label="brand.name">
             <img v-if="brand.logo" :src="brand.logo" alt="" loading="lazy" class="max-h-full max-w-full object-contain">
             <span v-else class="text-center font-serif text-lg text-highlighted">{{ brand.name }}</span>
           </NuxtLink>

@@ -139,3 +139,21 @@ test('categories list by position, then name, and filter by featured', async () 
   expect(featured).toEqual(expect.arrayContaining([top.id, later.id]))
   expect(featured).not.toContain(first.id)
 })
+
+test('home shelves take products under a category, featured first, up to the limit', async () => {
+  const clothing = await categoryService.create({ name: unique('clothing'), slug: unique('clothing'), isFeatured: true })
+  const shirts = await createCategory('shirts', clothing.id)
+  const other = await categoryService.create({ name: unique('other'), slug: unique('other'), isFeatured: true })
+  const listed = async (name: string, categoryId: number, isFeatured = false) => {
+    const slug = unique(name)
+    return productService.create({ name: slug, slug, sku: slug, price: '10', categoryId, status: 'Published', isFeatured })
+  }
+  const plain = await listed('plain', shirts.id)
+  const featured = await listed('featured', shirts.id, true)
+  const elsewhere = await listed('elsewhere', other.id)
+
+  const shelves = await productService.productsForCategories([clothing.id, other.id], 1)
+  expect(shelves.get(clothing.id)?.map((product) => product.id)).toEqual([featured.id])
+  expect(shelves.get(other.id)?.map((product) => product.id)).toEqual([elsewhere.id])
+  expect(shelves.get(clothing.id)?.map((product) => product.id)).not.toContain(plain.id)
+})

@@ -28,6 +28,21 @@ type Verified = {
 const minorUnits = (currency: string) =>
   10 ** (new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits ?? 2)
 
+// What the checkout page says is being paid for: the items, with their
+// option values and quantities, cut short to fit Thuprai Pay's limit
+const MESSAGE_MAX = 100
+const lineLabel = (line: { productName: string; variantTitle: string | null; quantity: number }) => {
+  const name = line.variantTitle ? `${line.productName} (${line.variantTitle})` : line.productName
+  return line.quantity > 1 ? `${name} × ${line.quantity}` : name
+}
+const paymentMessage = (order: { lines: { productName: string; variantTitle: string | null; quantity: number }[] }) => {
+  const text = order.lines.map(lineLabel).join(', ')
+  if (text.length <= MESSAGE_MAX) return text
+  const cut = text.slice(0, MESSAGE_MAX - 1)
+  const at = cut.lastIndexOf(' ')
+  return `${(at > MESSAGE_MAX / 2 ? cut.slice(0, at) : cut).trimEnd()}…`
+}
+
 const api = async <T>(path: string, body?: unknown): Promise<T> => {
   const { apiBase, apiKey } = config()
   const base = (apiBase || 'https://pay.awecode.com').replace(/\/$/, '')
@@ -75,7 +90,7 @@ export default defineNitroPlugin(() => {
         orderId: String(order.id),
         // Unique per payment, so Pay now can start another for the same order
         reference: `${order.id}-${Date.now().toString(36)}`,
-        message: `Order ${order.id}`,
+        message: paymentMessage(order),
         data: { orderId: order.id },
         ...(guest?.email ? { customer: { name: guest.name, email: guest.email, phone: guest.phone } } : {}),
         successRedirectUrl: returnUrl,

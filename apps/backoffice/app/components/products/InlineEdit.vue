@@ -74,7 +74,7 @@ const commit = async () => {
     v-else
     type="button"
     :aria-label="label"
-    class="-mx-1.5 rounded px-1.5 py-0.5 tabular-nums hover:bg-elevated hover:ring hover:ring-default"
+    class="-mx-1.5 rounded px-1.5 py-0.5 tabular-nums hover:bg-elevated hover:ring hover:ring-default active:bg-accented"
     :class="{ 'text-dimmed': !display }"
     @click.stop="start"
   >

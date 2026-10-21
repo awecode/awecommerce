@@ -61,7 +61,14 @@ describe.skipIf(!url)('paying with Thuprai Pay', async () => {
 
     const { request: guest, order, payment } = await placeOrder()
     expect(order.payment.redirectUrl).toBe(`${thuprai.base}/checkout/${payment.id}`)
-    expect(payment).toMatchObject({ amount: 125050, currency: 'NPR', orderId: String(order.id), data: { orderId: order.id }, customer: { email: 'sita@example.com' } })
+    expect(payment).toMatchObject({
+      amount: 125050,
+      currency: 'NPR',
+      orderId: String(order.id),
+      message: order.lines[0].productName,
+      data: { orderId: order.id },
+      customer: { email: 'sita@example.com' },
+    })
     expect(payment.reference).toMatch(new RegExp(`^${order.id}-`))
 
     // Thuprai Pay adds ?orderId=&status= to the return link the plain way

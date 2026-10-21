@@ -119,18 +119,15 @@ const uploadPendingImages = async () => {
   const waiting = state.images.filter((image) => pendingImages.has(image))
   if (!waiting.length) return true
   const slug = state.slug.trim()
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+  if (!isStorageSlug(slug)) {
     form.value?.setErrors([{ name: 'slug', message: 'Images are stored under the slug: use lowercase letters, numbers and hyphens' }], 'slug')
     toast.add({ title: 'Check the highlighted fields', color: 'error', icon: 'i-lucide-circle-alert' })
     return false
   }
   for (const preview of waiting) {
     const file = pendingImages.get(preview)!
-    const body = new FormData()
-    body.append('slug', slug)
-    body.append('file', file)
     try {
-      const { url } = await api<{ url: string }>('/api/admin/product-images', { method: 'POST', body })
+      const { url } = await uploadAdminImage(file, { folder: 'products', slug })
       state.images = state.images.map((image) => (image === preview ? url : image))
       if (state.thumbnail === preview) state.thumbnail = url
       pendingImages.delete(preview)

@@ -197,4 +197,12 @@ test('member prices: the lowest over the plans, for offers one unit qualifies fo
   // For a member of Premium only
   expect((await offerService.memberPrices([variant], [premium.id])).get(variant.id)!.price).toBe('90')
   expect((await offerService.memberPrices([variant], [])).size).toBe(0)
+
+  // Both at once: the same as asking for each
+  for (const planIds of [[premium.id], [platinum.id], []]) {
+    expect(await offerService.memberPricesFor([variant, otherVariant], planIds)).toEqual({
+      yours: await offerService.memberPrices([variant, otherVariant], planIds),
+      lowest: prices,
+    })
+  }
 })

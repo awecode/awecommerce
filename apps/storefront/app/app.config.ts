@@ -7,7 +7,8 @@ export default defineAppConfig({
       neutral: 'stone',
     },
     button: {
-      slots: { base: 'rounded-full' },
+      // Shrinks a little while pressed, so a tap shows on touch screens too
+      slots: { base: 'rounded-full transition active:scale-[0.98]' },
     },
   },
   store: {

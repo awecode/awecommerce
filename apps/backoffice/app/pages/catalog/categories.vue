@@ -10,10 +10,6 @@ type Category = CatalogRow & {
   order: number | null
 }
 
-// In the script, not the template: a "//" in this slot's template trips up
-// vue-tsc's type checking of the rest of the slot
-const logoPlaceholder = 'https://example.com/logo.png'
-
 useSeoMeta({ title: 'Categories' })
 
 const columns: TableColumn<Category>[] = [
@@ -45,6 +41,32 @@ const parentOptions = (editing: Category | null) => {
     ...rows.filter((row) => !excluded.has(row.id)).map((row) => ({ label: row.name, value: row.id })),
   ]
 }
+
+const toast = useToast()
+const pendingLogo = ref<File | null>(null)
+
+const uploadLogoIfNeeded = async (state: Record<string, any>) => {
+  if (!pendingLogo.value) return true
+  const slug = String(state.slug || '').trim()
+  if (!isStorageSlug(slug)) {
+    toast.add({
+      title: 'Check the slug',
+      description: 'Logos are stored under the slug: use lowercase letters, numbers and hyphens',
+      color: 'error',
+      icon: 'i-lucide-circle-alert',
+    })
+    return false
+  }
+  try {
+    const { url } = await uploadAdminImage(pendingLogo.value, { folder: 'categories', slug })
+    state.logo = url
+    pendingLogo.value = null
+    return true
+  } catch (error) {
+    toast.add({ title: 'Could not upload logo', description: apiErrorMessage(error), color: 'error', icon: 'i-lucide-circle-alert' })
+    return false
+  }
+}
 </script>
 
 <template>
@@ -57,6 +79,9 @@ const parentOptions = (editing: Category | null) => {
     :defaults="{ parentId: null, order: 1, isFeatured: false, logo: '', description: '' }"
     :create-schema="createCategorySchema"
     :update-schema="updateCategorySchema"
+    :pending-changes="Boolean(pendingLogo)"
+    :before-save="uploadLogoIfNeeded"
+    :on-form-reset="() => { pendingLogo = null }"
   >
     <template #fields="form">
       <UFormField label="Parent" name="parentId">
@@ -72,10 +97,10 @@ const parentOptions = (editing: Category | null) => {
         <UInputNumber v-model="form.state.order" :min="0" class="w-32" />
       </UFormField>
       <UFormField name="isFeatured">
-        <USwitch v-model="form.state.isFeatured" label="Featured" description="Shows a row of its newest products on the home page" />
+        <USwitch v-model="form.state.isFeatured" label="Featured" description="Shows a row of its products on the home page, featured first, then newest" />
       </UFormField>
-      <UFormField label="Logo URL" name="logo">
-        <UInput v-model="form.state.logo" type="url" :placeholder="logoPlaceholder" class="w-full" />
+      <UFormField label="Logo" name="logo" help="Upload a file, or paste a public URL">
+        <CatalogLogoField v-model:logo="form.state.logo" v-model:pending="pendingLogo" />
       </UFormField>
       <UFormField label="Description" name="description">
         <UTextarea v-model="form.state.description" :rows="3" autoresize class="w-full" />

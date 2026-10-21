@@ -83,6 +83,7 @@ test('memberships of different programs run side by side', async () => {
   await service.grant({ userId, planId: movies.id, months: 1 })
 
   expect((await service.activeMemberships(userId)).map((m) => m.planId).sort()).toEqual([music.id, movies.id].sort())
+  expect((await service.activePlanIds(userId)).sort()).toEqual([music.id, movies.id].sort())
 })
 
 test('an ended or cancelled membership does not count', async () => {
@@ -285,6 +286,34 @@ test('plans to join: other programs, and higher tiers of the one held', async ()
   const forGuest = (await service.plansToJoin()).filter((o) => [music, films].includes(o.plan.program))
   expect(forGuest.map((o) => o.plan.id)).toEqual([cinema.id, gold.id, silver.id, bronze.id])
   expect(forGuest.every((o) => o.replaces === null)).toBe(true)
+})
+
+test('the memberships overview matches reading each part on its own', async () => {
+  const userId = unique('member')
+  const music = await plan(unique('music'), 1)
+  const gold = await plan(music.program, 2)
+  const films = await plan(unique('films'), 1)
+  for (const { id } of [music, gold, films]) {
+    const slug = unique('overview-product')
+    const product = await new ProductService(db).create({ name: slug, slug, sku: slug, price: '10', stockQuantity: 0, status: 'Published' })
+    await service.addTerm({ planId: id, variantId: product.variants[0].id, months: 12 })
+  }
+  await service.grant({ userId, planId: music.id, months: 1 })
+  const cancelled = await service.grant({ userId, planId: films.id, months: 1 })
+  await service.cancel(cancelled.id, 'Asked to leave')
+
+  const overview = await service.overview(userId)
+
+  const current = await service.currentPlans(userId)
+  const renewals = await service.termsOnSale(current.map((c) => c.plan.id))
+  expect(overview.current).toEqual(
+    current.map((entry) => ({ ...entry, terms: renewals.filter((term) => term.planId === entry.plan.id) })),
+  )
+  expect(overview.toJoin).toEqual(await service.plansToJoin(userId))
+  expect(overview.toJoin.map((o) => [o.plan.id, o.replaces?.id ?? null])).toContainEqual([gold.id, music.id])
+  const listed = await service.list({ userId })
+  expect(overview.history.map((m) => [m.id, m.state, m.plan.id])).toEqual(listed.map((m) => [m.id, m.state, m.plan.id]))
+  expect(overview.history.map((m) => m.state)).toEqual(['cancelled', 'active'])
 })
 
 test('a membership added to the cart replaces the ones of its program', async () => {

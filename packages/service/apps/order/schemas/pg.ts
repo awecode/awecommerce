@@ -1,6 +1,6 @@
 
 import {
-  boolean, integer, jsonb, numeric, pgTable,
+  boolean, index, integer, jsonb, numeric, pgTable,
   serial,
   text,
   timestamp
@@ -86,7 +86,7 @@ export const orders = pgTable('order', {
   cancellationRemarks: text(),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [index('order_userId_idx').on(t.userId)])
 
 export const orderStatusChanges = pgTable('order_status_change', {
   id: serial().primaryKey(),
@@ -146,7 +146,7 @@ export const orderLines = pgTable('order_line', {
   status: orderStatusEnum().notNull().default('Pending'),
   createdAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp({ mode: 'string', withTimezone: true }).notNull().defaultNow(),
-})
+}, (t) => [index('order_line_orderId_idx').on(t.orderId)])
 
 export const transactionStatusEnum = pgEnum('transaction_status', ['Requested', 'Success', 'Failed', 'Cancelled', 'Error', 'Disproved', 'Refunded'])
 
