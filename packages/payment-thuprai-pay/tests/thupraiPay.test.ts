@@ -3,7 +3,6 @@ import { eq } from 'drizzle-orm'
 import { afterAll, describe, expect, test } from 'vitest'
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { paymentEvents } from '@awecommerce/service/apps/order/schemas'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { buyer, createProduct, setupApi, url } from '../../api-store/tests/helpers'
 import { createUser } from '../../api-admin/tests/helpers'
 import { API_KEY, startFakeThupraiPay, WEBHOOK_SECRET } from './fake-thuprai-pay'
@@ -18,8 +17,10 @@ describe.skipIf(!url)('paying with Thuprai Pay', async () => {
   process.env.NUXT_THUPRAI_PAY_API_KEY = API_KEY
   process.env.NUXT_THUPRAI_PAY_WEBHOOK_SECRET = WEBHOOK_SECRET
   process.env.NUXT_THUPRAI_PAY_API_BASE = thuprai.base
+  // Thuprai Pay takes rupees
+  process.env.NUXT_PUBLIC_STORE_CURRENCY = 'NPR'
+  afterAll(() => delete process.env.NUXT_PUBLIC_STORE_CURRENCY)
   const db = await setupApi({ rootDir: '../../payment-thuprai-pay/tests/app' })
-  await new StoreSettingsService(db).updateSettings({ currency: 'NPR' })
   const orders = new OrderService(db)
 
   // A guest who checked out one item at Rs 1250.50 with Thuprai Pay

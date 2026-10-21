@@ -8,7 +8,7 @@ watch(() => props.images, () => (current.value = 0))
 <template>
   <div class="space-y-3">
     <div class="aspect-4/5 overflow-hidden rounded-sm bg-elevated">
-      <img v-if="images.length" :src="images[current]" :alt="alt" class="size-full object-cover">
+      <AppImage v-if="images.length" :src="images[current]!" :alt="alt" :width="1600" :height="2000" loading="eager" class="size-full object-cover" />
       <div v-else class="flex size-full items-center justify-center">
         <UIcon name="i-lucide-image" class="size-10 text-dimmed" />
       </div>
@@ -23,7 +23,7 @@ watch(() => props.images, () => (current.value = 0))
           :aria-current="index === current"
           @click="current = index"
         >
-          <img :src="image" alt="" class="size-full object-cover">
+          <AppImage :src="image" alt="" :width="192" :height="192" class="size-full object-cover" />
         </button>
       </li>
     </ul>

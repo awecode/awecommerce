@@ -238,7 +238,7 @@ const place = async () => {
         <ul class="divide-y divide-default">
           <li v-for="line in summary?.lines" :key="line.id" class="flex gap-3 py-3 text-sm">
             <div class="relative size-14 shrink-0 overflow-hidden rounded-sm bg-elevated">
-              <img v-if="line.variant.image?.imageUrl ?? line.variant.product.thumbnail" :src="(line.variant.image?.imageUrl ?? line.variant.product.thumbnail)!" alt="" class="size-full object-cover">
+              <AppImage v-if="line.variant.image?.imageUrl ?? line.variant.product.thumbnail" :src="(line.variant.image?.imageUrl ?? line.variant.product.thumbnail)!" alt="" :width="112" :height="112" class="size-full object-cover" />
             </div>
             <div class="min-w-0 flex-1">
               <p class="font-medium">{{ line.variant.product.name }}</p>

@@ -639,7 +639,8 @@ class OrderService {
   // gateway's payment id), so repeated webhooks and returns do nothing more.
   // The order is marked Paid only when it is unpaid, not cancelled, and the
   // amount is its total; otherwise the payment is kept and the order log says
-  // why, for staff to sort out. Returns 'paid', 'duplicate' or 'not-marked'.
+  // why, for staff to sort out. A Pending order with nothing to ship is
+  // confirmed once paid. Returns 'paid', 'duplicate' or 'not-marked'.
   async recordPayment(
     orderId: number,
     payment: { amount: string; reference: string; method: string; label?: string; metadata?: Record<string, unknown> },
@@ -680,6 +681,16 @@ class OrderService {
       }
       await tx.update(orders).set({ paymentStatus: 'Paid', updatedAt: new Date().toISOString() }).where(eq(orders.id, orderId))
       await orderService.createLog(orderId, `Paid ${received}`)
+      // Paying for an order with nothing to ship confirms it: there is
+      // nothing left for staff to check. A status staff already moved stays.
+      const [shipped] = await tx
+        .select({ id: orderLines.id })
+        .from(orderLines)
+        .where(and(eq(orderLines.orderId, orderId), eq(orderLines.requiresShipping, true)))
+        .limit(1)
+      if (order.status === 'Pending' && !shipped) {
+        await orderService.recordStatusChange(orderId, 'Pending', 'Confirmed')
+      }
       return 'paid' as const
     })
   }

@@ -42,7 +42,7 @@ const { data, isLoading } = useQuery({
           :class="{ 'bg-elevated': product.id === currentId }"
           :aria-current="product.id === currentId ? 'page' : undefined"
         >
-          <UAvatar :src="product.thumbnail ?? undefined" icon="i-lucide-image" size="xs" class="rounded" />
+          <UAvatar :src="resizedImage(product.thumbnail, 96)" icon="i-lucide-image" size="xs" class="rounded" />
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium text-highlighted">{{ product.name }}</p>
             <p class="truncate text-xs text-muted">

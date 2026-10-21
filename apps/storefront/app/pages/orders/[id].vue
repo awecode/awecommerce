@@ -15,7 +15,7 @@ definePageMeta({
 const route = useRoute()
 const money = useMoney()
 const { user } = useAuth()
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 
 const hash = route.query.hash as string | undefined
 const { data: order, error, refresh } = await useFetch(() => `/api/store/orders/${route.params.id}`, { query: { hash } })
@@ -82,7 +82,7 @@ const placedOn = computed(() =>
       <ul class="divide-y divide-default border-y border-default">
         <li v-for="line in lines" :key="line.id" class="flex gap-4 py-5">
           <div class="size-20 shrink-0 overflow-hidden rounded-sm bg-elevated">
-            <img v-if="line.imageUrl" :src="line.imageUrl" :alt="line.productName" class="size-full object-cover">
+            <AppImage v-if="line.imageUrl" :src="line.imageUrl" :alt="line.productName" :width="160" :height="160" class="size-full object-cover" />
           </div>
           <div class="min-w-0 flex-1">
             <p class="font-medium">{{ line.productName }}</p>

@@ -14,7 +14,7 @@ type Offer = {
 defineProps<{ offers: Offer[] }>()
 const money = useMoney()
 const toast = useToast()
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 const day = (value: string) => new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'medium' }).format(new Date(value))
 
 // "20% off", "$5.00 off each", "Now $10.00", "Free shipping"
@@ -38,7 +38,7 @@ const id = useId()
       <h2 :id="id" class="mb-8 text-3xl font-medium tracking-tight">Offers</h2>
       <ul class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <li v-for="offer in offers" :key="offer.id" class="overflow-hidden rounded-sm bg-muted" role="group" :aria-label="offer.name">
-          <img v-if="offer.image" :src="offer.image" alt="" loading="lazy" class="aspect-video w-full object-cover">
+          <AppImage v-if="offer.image" :src="offer.image" alt="" :width="960" :height="540" class="aspect-video w-full object-cover" />
           <div class="space-y-3 p-6">
             <p class="font-sans text-xs font-medium tracking-wider text-muted uppercase">{{ benefit(offer.benefit) }}</p>
             <div>

@@ -7,7 +7,6 @@ import * as orderSchemas from './order/schemas'
 import * as productSchemas from './product/schemas'
 import * as loyaltySchemas from './loyalty/schemas'
 import * as taxSchemas from './tax/schemas'
-import * as storeSchemas from './store/schemas'
 import * as membershipSchemas from './membership/schemas'
 
 const tables = {
@@ -17,7 +16,6 @@ const tables = {
   ...productSchemas,
   ...loyaltySchemas,
   ...taxSchemas,
-  ...storeSchemas,
   ...membershipSchemas,
 }
 

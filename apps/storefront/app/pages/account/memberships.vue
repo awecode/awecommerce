@@ -6,7 +6,7 @@ definePageMeta({ auth: true })
 useSeoMeta({ title: 'Your memberships', robots: 'noindex' })
 
 const { data } = await useFetch('/api/store/memberships', { key: 'memberships' })
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 const day = (value: string) => new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'medium' }).format(new Date(value))
 const stateLabels = { active: 'Active', upcoming: 'Upcoming', ended: 'Ended', cancelled: 'Cancelled' } as const
 const months = (n: number) => `${n} month${n === 1 ? '' : 's'}`

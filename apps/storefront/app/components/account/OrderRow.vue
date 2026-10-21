@@ -9,7 +9,7 @@ type Order = {
 }
 const props = defineProps<{ order: Order }>()
 const money = useMoney()
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 const date = computed(() => new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'medium' }).format(new Date(props.order.createdAt)))
 const items = computed(() => props.order.lines.reduce((total, line) => total + line.quantity, 0))
 </script>
@@ -18,7 +18,7 @@ const items = computed(() => props.order.lines.reduce((total, line) => total + l
   <NuxtLink :to="`/orders/${order.id}`" class="flex items-center gap-4 py-5 transition-colors hover:bg-muted/60 active:bg-muted sm:px-3" :aria-label="`Order ${order.id}`">
     <div class="flex -space-x-3">
       <div v-for="line in order.lines.slice(0, 3)" :key="line.id" class="size-12 overflow-hidden rounded-sm bg-elevated ring-2 ring-(--ui-bg)">
-        <img v-if="line.imageUrl" :src="line.imageUrl" alt="" class="size-full object-cover">
+        <AppImage v-if="line.imageUrl" :src="line.imageUrl" alt="" :width="96" :height="96" class="size-full object-cover" />
       </div>
     </div>
     <div class="min-w-0 flex-1">

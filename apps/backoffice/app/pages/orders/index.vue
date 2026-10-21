@@ -9,7 +9,7 @@ useSeoMeta({ title: 'Orders' })
 const route = useRoute()
 const router = useRouter()
 const money = useMoney()
-const { data: store } = useStoreSettings()
+const store = useStoreSettings()
 
 const param = (name: string) => (route.query[name] as string | undefined) || undefined
 const setQuery = (changes: Record<string, string | undefined>) =>

@@ -6,14 +6,12 @@ import { offerBenefits, offerConditions, offerRangeIncludedProducts, offerRanges
 import { memberships as membershipRows } from '@awecommerce/service/apps/membership/schemas'
 import { productClasses } from '@awecommerce/service/apps/product/schemas'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { setupStorefront, signedInPage, url } from './helpers'
 
 type Page = Awaited<ReturnType<typeof createPage>>
 
 describe.skipIf(!url)('memberships', async () => {
   const db = await setupStorefront()
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD', locale: 'en-US' })
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
   const memberships = new MembershipService(db)
 

@@ -1,5 +1,4 @@
 import { MembershipService } from '@awecommerce/service/apps/membership/services/membership'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 
 // Memberships sold as products: a line whose variant is a membership term
 // grants the plan when the order is paid (its months times the quantity, to
@@ -51,7 +50,7 @@ export default defineNitroPlugin(() => {
       if (membership.status === 'cancelled') {
         return { title: `${found.plan.name} membership`, text: 'This membership was cancelled.' }
       }
-      const { locale } = await new StoreSettingsService(useDb()).getSettings()
+      const { locale } = useRuntimeConfig().public.store
       const date = (value: string) => new Intl.DateTimeFormat(locale || 'en-US', { dateStyle: 'long' }).format(new Date(value))
       const started = new Date(membership.startsAt) <= new Date()
       return {

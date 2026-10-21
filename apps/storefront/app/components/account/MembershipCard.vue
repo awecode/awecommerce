@@ -12,7 +12,7 @@ const props = defineProps<{ membership: Current }>()
 const money = useMoney()
 const toast = useToast()
 const { add, drawerOpen } = useCart()
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 const day = (value: string) => new Intl.DateTimeFormat(settings.value?.locale ?? 'en-US', { dateStyle: 'long' }).format(new Date(value))
 
 const status = computed(() => {

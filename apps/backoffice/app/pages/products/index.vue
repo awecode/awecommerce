@@ -12,7 +12,7 @@ const toast = useToast()
 const confirm = useConfirm()
 const queryCache = useQueryCache()
 const money = useMoney()
-const { data: store } = useStoreSettings()
+const store = useStoreSettings()
 
 // ---- view, filters, sort and page, all in the URL
 const setQuery = (changes: Record<string, string | undefined>) =>
@@ -319,7 +319,7 @@ const tableMeta = { class: { tr: (row: { index: number }) => (row.index === high
         </template>
         <template #name-cell="{ row }">
           <div class="flex min-w-0 items-center gap-2.5">
-            <UAvatar :src="row.original.thumbnail ?? undefined" icon="i-lucide-image" size="xs" class="rounded" :alt="row.original.name" />
+            <UAvatar :src="resizedImage(row.original.thumbnail, 96)" icon="i-lucide-image" size="xs" class="rounded" :alt="row.original.name" />
             <span data-product-name class="truncate font-medium text-highlighted">{{ row.original.name }}</span>
             <UIcon v-if="row.original.isFeatured" name="i-lucide-star" class="size-3.5 shrink-0 text-warning" />
           </div>

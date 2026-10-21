@@ -1,10 +1,14 @@
 import { createPage } from '@nuxt/test-utils/e2e'
-import { describe, expect, test } from 'vitest'
+import { afterAll, describe, expect, test } from 'vitest'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { STAFF_EMAIL, setupBackoffice, signedInPage, url } from './helpers'
 
 describe.skipIf(!url)('backoffice shell and sign-in', async () => {
+  // The store's name, currency and locale, which the server reads at start
+  Object.assign(process.env, { NUXT_PUBLIC_STORE_NAME: 'Northwind', NUXT_PUBLIC_STORE_CURRENCY: 'EUR', NUXT_PUBLIC_STORE_LOCALE: 'de-DE' })
+  afterAll(() => {
+    for (const key of ['NUXT_PUBLIC_STORE_NAME', 'NUXT_PUBLIC_STORE_CURRENCY', 'NUXT_PUBLIC_STORE_LOCALE']) delete process.env[key]
+  })
   const db = await setupBackoffice()
 
   test('a guest is sent to the sign-in page', async () => {
@@ -15,18 +19,16 @@ describe.skipIf(!url)('backoffice shell and sign-in', async () => {
   })
 
   test('staff sign in and land on Products, in the store currency', async () => {
-    await new StoreSettingsService(db).updateSettings({ name: 'Northwind', currency: 'EUR', locale: 'de-DE' })
     const slug = `shell-product-${Date.now()}`
-    await new ProductService(db).create({ name: 'Shell Test Mug', slug, sku: slug, price: '12.5' })
+    await new ProductService(db).create({ name: `Shell Test Mug ${slug}`, slug, sku: slug, price: '12.5' })
 
     const page = await signedInPage(db, STAFF_EMAIL)
 
     await page.waitForURL('**/products')
-    await page.getByText('Shell Test Mug').waitFor()
+    await page.getByText(`Shell Test Mug ${slug}`).waitFor()
     // de-DE writes euros as 12,50 €
     expect(await page.getByText('12,50 €').first().isVisible()).toBe(true)
     expect(await page.getByText('Northwind').first().isVisible()).toBe(true)
-    await new StoreSettingsService(db).updateSettings({ name: '', currency: 'USD', locale: 'en-US' })
   })
 
   test('a customer who signs in gets the no-access page', async () => {

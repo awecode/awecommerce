@@ -344,10 +344,6 @@ Categories form a tree through `parentId`. `CategoryService.update` refuses (wit
 - `CategoryService.list({ excludeInactiveBranches: true })` leaves out categories under an inactive category; `isActive` only checks each category's own flag.
 - `CategoryService.list({ hasListedProducts: true })` keeps categories that hold a listed product (see Product variants), in them or in a category below them. `BrandService.list({ hasListedProducts: true })` keeps brands with a listed product. Use them for store menus, so no entry leads to an empty page.
 
-### Store settings
-
-`StoreSettingsService` keeps the store's `name`, `currency` (ISO 4217, default `USD`) and `locale` (BCP 47, default `en-US`), used to show prices. `getSettings()` returns them; `updateSettings(changes)` changes the given ones, stores the currency in capitals and the locale in its standard form (`en-us` becomes `en-US`), and returns all of them. It throws `Unknown currency: <code>` or `Unknown locale: <tag>` for values `Intl` does not know.
-
 ### Product admin helpers
 
 - `ProductService.list()` rows include `maxPrice` (with `minPrice`, over active variants), `variantCount` (all variants), `totalStock` (active variants) and `singleVariant`: for a product with exactly one variant, its `id`, `sku`, `price`, `discountedPrice`, `stockQuantity` and `isActive`, otherwise `null`. `sortBy` also takes `nameAsc`, `nameDesc`, `newest` (the default), `oldest` and `featuredNewest` (featured products first, then newest). `limit` without `pagination` returns that many rows and skips the count. `getListedBySlug(slug)` loads a listed product with its variants, options, images and related products in one query, and `productsForCategories(categoryIds, limit)` returns up to `limit` listed products for each category (its subcategories' too, featured first, then newest), by category id.
@@ -366,8 +362,7 @@ Categories form a tree through `parentId`. `CategoryService.update` refuses (wit
 | `@awecommerce/service/apps/order/services/shipping-method` | `ShippingMethodService` |
 | `@awecommerce/service/apps/loyalty/services/loyalty` | `LoyaltyService` |
 | `@awecommerce/service/apps/tax/services/tax` | `TaxService`, `calculateTax` |
-| `@awecommerce/service/apps/store/services/store` | `StoreSettingsService` |
-| `@awecommerce/service/apps/<module>/schemas` | That module's tables and types, for `product`, `cart`, `offer`, `order`, `loyalty`, `tax` and `store` |
+| `@awecommerce/service/apps/<module>/schemas` | That module's tables and types, for `product`, `cart`, `offer`, `order`, `loyalty` and `tax` |
 | `@awecommerce/service/core/db/pg/schema` | All tables, for your Drizzle instance and `drizzle-kit` |
 | `@awecommerce/service/core/db` | `db`, the package's database instance |
 | `@awecommerce/service/core/db/pg/db` | `closeDb`, `initializeDb`, `getClient` |

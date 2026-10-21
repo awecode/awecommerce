@@ -1,7 +1,6 @@
 import type { H3Event } from 'h3'
 import { eq } from 'drizzle-orm'
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { users } from '../../../auth/server/db/schema'
 import { type OrderEmailKind, type OrderEmailOrder, orderEmailContent } from '../order-emails'
 
@@ -38,7 +37,7 @@ export const sendOrderEmail = async (
     const db = useDb()
     const hash = new OrderService(db).generateHash(String(order.id))
     const link = `${origin}/orders/${order.id}?hash=${encodeURIComponent(hash)}`
-    const store = await new StoreSettingsService(db).getSettings()
+    const { store } = useRuntimeConfig().public
     const notes = kind === 'placed' || kind === 'confirmed' ? await fulfillmentNotes(order.id) : new Map<number, FulfillmentNote>()
     const lines = order.lines.map((line) => ({ ...line, note: notes.get(line.id) }))
     const { subject, html, text } = orderEmailContent(kind, { ...order, lines }, store, link)

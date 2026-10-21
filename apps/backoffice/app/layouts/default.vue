@@ -2,7 +2,7 @@
 import type { NavigationMenuItem } from '@nuxt/ui'
 
 const open = ref(false)
-const { data: store } = useStoreSettings()
+const store = useStoreSettings()
 
 const close = () => (open.value = false)
 const links: NavigationMenuItem[][] = [
@@ -25,7 +25,6 @@ const links: NavigationMenuItem[][] = [
   ],
   [
     { label: 'Settings', type: 'label' },
-    { label: 'Store', icon: 'i-lucide-store', to: '/settings/store', onSelect: close },
     { label: 'Tax', icon: 'i-lucide-percent', to: '/settings/tax', onSelect: close },
     { label: 'Shipping', icon: 'i-lucide-truck', to: '/settings/shipping', onSelect: close },
     { label: 'Loyalty', icon: 'i-lucide-gift', to: '/settings/loyalty', onSelect: close },

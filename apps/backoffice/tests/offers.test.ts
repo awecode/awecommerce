@@ -1,12 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { OfferService } from '@awecommerce/service/apps/offer/services/offer'
 import { CategoryService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { STAFF_EMAIL, setupBackoffice, signedInPage, url } from './helpers'
 
 describe.skipIf(!url)('offers', async () => {
   const db = await setupBackoffice()
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD', locale: 'en-US' })
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
   const offers = new OfferService(db)
 

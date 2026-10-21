@@ -44,13 +44,14 @@ const categoryImages = computed(() => menu.value.some((category) => category.log
             class="group relative flex items-end overflow-hidden rounded-sm bg-elevated p-5"
             :class="categoryImages ? 'aspect-square' : 'min-h-24 transition hover:bg-accented'"
           >
-            <img
+            <AppImage
               v-if="categoryImages"
               :src="category.logo || '/images/category.svg'"
               alt=""
-              loading="lazy"
+              :width="600"
+              :height="600"
               class="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]"
-            >
+            />
             <span class="relative font-serif text-xl text-highlighted" :class="{ 'rounded-sm bg-default/90 px-3 py-1': categoryImages }">{{ category.name }}</span>
           </NuxtLink>
         </li>
@@ -75,7 +76,7 @@ const categoryImages = computed(() => menu.value.some((category) => category.log
       <ul class="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
         <li v-for="brand in home.brands" :key="brand.id">
           <NuxtLink :to="`/brands/${brand.slug}`" class="flex aspect-3/2 items-center justify-center rounded-sm bg-elevated p-4 transition hover:bg-accented active:scale-[0.98]" :aria-label="brand.name">
-            <img v-if="brand.logo" :src="brand.logo" alt="" loading="lazy" class="max-h-full max-w-full object-contain">
+            <AppImage v-if="brand.logo" :src="brand.logo" alt="" :width="240" fit="contain" format="" class="max-h-full max-w-full object-contain" />
             <span v-else class="text-center font-serif text-lg text-highlighted">{{ brand.name }}</span>
           </NuxtLink>
         </li>

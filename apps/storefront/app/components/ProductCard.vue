@@ -18,13 +18,14 @@ const range = computed(() => props.product.minPrice !== props.product.maxPrice)
 <template>
   <NuxtLink :to="`/products/${product.slug}`" class="group block transition-opacity active:opacity-75" data-product-card>
     <div class="relative aspect-4/5 overflow-hidden rounded-sm bg-elevated">
-      <img
+      <AppImage
         v-if="product.thumbnail"
         :src="product.thumbnail"
         :alt="product.name"
-        loading="lazy"
+        :width="800"
+        :height="1000"
         class="size-full object-cover transition duration-500 group-hover:scale-[1.03]"
-      >
+      />
       <UIcon v-else name="i-lucide-image" class="absolute inset-0 m-auto size-8 text-dimmed" />
       <UBadge v-if="!product.inStock" label="Sold out" color="neutral" variant="solid" class="absolute top-3 left-3" />
     </div>

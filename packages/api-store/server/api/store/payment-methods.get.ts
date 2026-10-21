@@ -7,5 +7,5 @@ import { CartService } from '@awecommerce/service/apps/cart/services/cart'
 export default defineServiceHandler(async (event) => {
   const cart = await findCart(event)
   const requiresShipping = cart ? await new CartService(useDb()).requiresShipping(cart.id) : true
-  return paymentMethodsFor({ requiresShipping, currency: await storeCurrency() })
+  return paymentMethodsFor({ requiresShipping, currency: storeCurrency() })
 })

@@ -39,15 +39,6 @@ describe.skipIf(!url)('admin settings and shipping API', async () => {
     expect(Number(cleared.body.redeemRate)).toBe(0.5)
   })
 
-  test('reads and changes the store settings', async () => {
-    expect((await admin('/api/admin/settings/store')).body).toMatchObject({ currency: 'USD', locale: 'en-US' })
-
-    const changed = await admin('/api/admin/settings/store', { method: 'PATCH', body: { name: 'Awe', currency: 'eur', locale: 'de-de' } })
-    expect(changed.body).toEqual({ name: 'Awe', currency: 'EUR', locale: 'de-DE' })
-    expect((await admin('/api/admin/settings/store', { method: 'PATCH', body: { currency: 'ZZZ' } })).status).toBe(422)
-    await admin('/api/admin/settings/store', { method: 'PATCH', body: { name: '', currency: 'USD', locale: 'en-US' } })
-  })
-
   test('manages shipping methods', async () => {
     const name = unique('Courier')
     const created = await admin('/api/admin/shipping-methods', { method: 'POST', body: { name, price: '15' } })

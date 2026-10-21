@@ -1,5 +1,5 @@
 // The storefront's look and the content that has no admin screen yet. The
-// store's name, currency and locale come from the store settings (backoffice).
+// store's name, currency and locale are in runtime config (NUXT_PUBLIC_STORE_*).
 export default defineAppConfig({
   ui: {
     colors: {

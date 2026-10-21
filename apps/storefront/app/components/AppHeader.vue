@@ -4,7 +4,7 @@ import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
 // The shop's header: name or logo, the category menu (in a drawer on small
 // screens), search, the account menu and the cart button (opens the drawer)
 const { store } = useAppConfig()
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 const menu = useCategoryMenu()
 const { count, drawerOpen } = useCart()
 const { user, signOut } = useAuth()

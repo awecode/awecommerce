@@ -8,13 +8,11 @@ import {
   RelatedProductService,
 } from '@awecommerce/service/apps/product/services/product'
 import { OfferService } from '@awecommerce/service/apps/offer/services/offer'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { setupStorefront, url } from './helpers'
 
 describe.skipIf(!url)('browsing', async () => {
   const db = await setupStorefront()
   // Prices below are checked as US dollars
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD', locale: 'en-US' })
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
   const products = new ProductService(db)
 

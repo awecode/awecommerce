@@ -12,7 +12,7 @@ const confirm = useConfirm()
 const prompt = usePrompt()
 const money = useMoney()
 const queryCache = useQueryCache()
-const { data: store } = useStoreSettings()
+const store = useStoreSettings()
 
 const id = computed(() => String(route.params.id))
 const { data: person, error } = useQuery({

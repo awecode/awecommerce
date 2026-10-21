@@ -2,8 +2,12 @@
 // later caller waits for the request in flight (`defer`) instead of
 // cancelling it and fetching again.
 
-// The store's name, currency and locale
-export const useStoreSettings = () => useFetch('/api/store/settings', { key: 'store-settings', dedupe: 'defer' })
+// The store's name, currency and locale, from the app's config
+// (NUXT_PUBLIC_STORE_NAME, NUXT_PUBLIC_STORE_CURRENCY, NUXT_PUBLIC_STORE_LOCALE)
+export const useStoreSettings = () => {
+  const { store } = useRuntimeConfig().public
+  return computed(() => store)
+}
 
 // Categories and brands with products the store shows
 export const useCategories = () => useFetch('/api/store/categories', { key: 'categories', dedupe: 'defer' })
@@ -12,9 +16,9 @@ export const useBrands = () => useFetch('/api/store/brands', { key: 'brands', de
 // Formats a price (a decimal string, as the API sends it) in the store's
 // currency and locale. Empty for no price.
 export const useMoney = () => {
-  const { data } = useStoreSettings()
+  const settings = useStoreSettings()
   const format = computed(() =>
-    new Intl.NumberFormat(data.value?.locale ?? 'en-US', { style: 'currency', currency: data.value?.currency ?? 'USD' }),
+    new Intl.NumberFormat(settings.value.locale || 'en-US', { style: 'currency', currency: settings.value.currency || 'USD' }),
   )
   return (value: string | number | null | undefined) =>
     value === null || value === undefined || value === '' ? '' : format.value.format(Number(value))

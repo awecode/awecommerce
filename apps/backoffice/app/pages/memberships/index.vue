@@ -11,7 +11,7 @@ const router = useRouter()
 const toast = useToast()
 const prompt = usePrompt()
 const queryCache = useQueryCache()
-const { data: store } = useStoreSettings()
+const store = useStoreSettings()
 // Paths with an id are only known at run time
 const api = $fetch as <T = unknown>(url: string, options?: Record<string, unknown>) => Promise<T>
 

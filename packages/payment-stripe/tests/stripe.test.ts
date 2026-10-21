@@ -5,7 +5,6 @@ import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { paymentEvents } from '@awecommerce/service/apps/order/schemas'
 import { productClasses } from '@awecommerce/service/apps/product/schemas'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { buyer, createProduct, mailsTo, setupApi, unique, url } from '../../api-store/tests/helpers'
 import { createUser } from '../../api-admin/tests/helpers'
 import { startFakeStripe, WEBHOOK_SECRET } from './fake-stripe'
@@ -22,7 +21,6 @@ describe.skipIf(!url)('paying with Stripe', async () => {
   // Where order emails link to
   process.env.NUXT_PUBLIC_SITE_URL = 'http://storefront.test'
   const db = await setupApi({ rootDir: '../../payment-stripe/tests/app' })
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD' })
   const orders = new OrderService(db)
 
   // A guest who checked out one item at 25 with Stripe, with an email of

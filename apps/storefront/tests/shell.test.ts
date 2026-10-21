@@ -1,10 +1,15 @@
 import { createPage } from '@nuxt/test-utils/e2e'
-import { describe, expect, test } from 'vitest'
+import { afterAll, describe, expect, test } from 'vitest'
 import { CategoryService, ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { setupStorefront, signedInPage, url } from './helpers'
 
 describe.skipIf(!url)('storefront shell', async () => {
+  // The store's name and locale, which the server reads at start
+  Object.assign(process.env, { NUXT_PUBLIC_STORE_NAME: 'Linen & Oak', NUXT_PUBLIC_STORE_LOCALE: 'en-GB' })
+  afterAll(() => {
+    delete process.env.NUXT_PUBLIC_STORE_NAME
+    delete process.env.NUXT_PUBLIC_STORE_LOCALE
+  })
   const db = await setupStorefront()
   const base = () => process.env.BETTER_AUTH_URL!
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
@@ -15,7 +20,6 @@ describe.skipIf(!url)('storefront shell', async () => {
   }
 
   test('shows the store name, the hero and the SEO defaults', async () => {
-    await new StoreSettingsService(db).updateSettings({ name: 'Linen & Oak', locale: 'en-GB' })
     const page = await createPage('/')
 
     await page.getByRole('banner').getByText('Linen & Oak').waitFor()

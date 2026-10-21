@@ -1,6 +1,5 @@
 import type { H3Event } from 'h3'
 import { OrderService, type PaymentTry } from '@awecommerce/service/apps/order/services/order'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 
 // Payment providers: the ways a buyer can pay. Offline ones (cash on
 // delivery, pay later) only name the method, and staff mark the order paid.
@@ -133,11 +132,11 @@ export const paymentMethodsFor = (context: PaymentContext): PaymentMethod[] =>
     .filter((provider) => !provider.available || provider.available(context))
     .map(view)
 
-export const storeCurrency = async (): Promise<string> => (await new StoreSettingsService(useDb()).getSettings()).currency
+export const storeCurrency = (): string => useRuntimeConfig().public.store.currency
 
-const orderContext = async (order: Order): Promise<PaymentContext> => ({
+const orderContext = (order: Order): PaymentContext => ({
   requiresShipping: order.lines.some((line) => line.requiresShipping),
-  currency: await storeCurrency(),
+  currency: storeCurrency(),
 })
 
 // For the order pages: the method, and whether the buyer can pay now (an
@@ -151,7 +150,7 @@ export const orderPayment = async (order: Order) => {
     canPay,
     // Open: we are waiting to hear from the gateway. Failed: with its message.
     latestTry: canPay && paymentTry ? { status: paymentTry.status, message: paymentTry.message ?? null } : null,
-    methods: canPay ? paymentMethodsFor(await orderContext(order)) : [],
+    methods: canPay ? paymentMethodsFor(orderContext(order)) : [],
   }
 }
 
@@ -177,7 +176,7 @@ export const startPayment = async (event: H3Event, order: Order, provider: Payme
     event,
     order,
     amount: order.total,
-    currency: await storeCurrency(),
+    currency: storeCurrency(),
     returnUrl: back,
     cancelUrl: `${back}&cancelled=1`,
   })

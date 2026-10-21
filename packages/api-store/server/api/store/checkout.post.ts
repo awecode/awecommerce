@@ -25,7 +25,7 @@ export default defineServiceHandler(async (event) => {
   if (ships && body.shippingAddress === undefined && shippingAddressId === undefined) {
     throw new ValidationError('Pass shippingAddress or shippingAddressId: the cart has something to ship')
   }
-  const methods = paymentMethodsFor({ requiresShipping: ships, currency: await storeCurrency() })
+  const methods = paymentMethodsFor({ requiresShipping: ships, currency: storeCurrency() })
   if (!methods.length) {
     throw new ValidationError('Payments are not set up yet')
   }

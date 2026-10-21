@@ -428,7 +428,7 @@ onUnmounted(() => window.removeEventListener('beforeunload', beforeUnload))
               <h2 id="showcase" class="text-xs font-medium text-muted">Showcase</h2>
               <USwitch v-model="state.isFeatured" label="Featured" description="For a storefront offers block, when there is one" />
               <div class="space-y-2">
-                <img v-if="state.image" :src="state.image" alt="" class="aspect-video w-full rounded-md border border-default object-cover">
+                <AppImage v-if="state.image" :src="state.image" alt="" :width="960" :height="540" class="aspect-video w-full rounded-md border border-default object-cover" />
                 <div class="flex gap-2">
                   <UButton :label="state.image ? 'Replace image' : 'Add image'" icon="i-lucide-image-plus" color="neutral" variant="outline" size="sm" @click="imageInput?.click()" />
                   <UButton v-if="state.image" label="Remove" color="neutral" variant="ghost" size="sm" @click="removeImage" />

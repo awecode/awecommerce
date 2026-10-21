@@ -34,7 +34,7 @@ const run = async (action: () => Promise<unknown>) => {
 <template>
   <li class="flex gap-4 py-5" :class="{ 'opacity-60': busy }">
     <NuxtLink :to="`/products/${product.slug}`" class="shrink-0 overflow-hidden rounded-sm bg-elevated transition-opacity hover:opacity-90 active:opacity-75" :class="compact ? 'size-20' : 'size-24 sm:size-28'">
-      <img v-if="image" :src="image" :alt="product.name" class="size-full object-cover">
+      <AppImage v-if="image" :src="image" :alt="product.name" :width="compact ? 160 : 256" :height="compact ? 160 : 256" class="size-full object-cover" />
     </NuxtLink>
     <div class="flex min-w-0 flex-1 flex-col gap-2">
       <div class="flex justify-between gap-4">

@@ -6,7 +6,6 @@ import { orders } from '@awecommerce/service/apps/order/schemas'
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { ShippingMethodService } from '@awecommerce/service/apps/order/services/shipping-method'
 import { ProductClassService, ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import * as authSchema from '../../../packages/auth/server/db/schema'
 import { STAFF_EMAIL, setupBackoffice, signedInPage, url } from './helpers'
 
@@ -14,7 +13,6 @@ describe.skipIf(!url)('orders', async () => {
   // Orders placed below get a link hash, as at checkout
   process.env.ORDER_HASH_SECRET = 'test-secret'
   const db = await setupBackoffice()
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD', locale: 'en-US' })
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
   const courier = await new ShippingMethodService(db).create({ name: unique('Courier'), price: '5' })
 

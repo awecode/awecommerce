@@ -3,14 +3,12 @@ import { eq } from 'drizzle-orm'
 import { describe, expect, test } from 'vitest'
 import { productVariants, products } from '@awecommerce/service/apps/product/schemas'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { createVoucher } from '../../../packages/api-store/tests/helpers'
 import { setupStorefront, url } from './helpers'
 
 describe.skipIf(!url)('cart', async () => {
   const db = await setupStorefront()
   // Totals below are checked as US dollars
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD', locale: 'en-US' })
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
 
   const product = async (price = '20', stockQuantity = 10) => {

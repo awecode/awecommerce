@@ -2,7 +2,7 @@
 // The shop's footer: name and tagline, the top-level categories, and the
 // links set in app.config.ts
 const { store } = useAppConfig()
-const { data: settings } = useStoreSettings()
+const settings = useStoreSettings()
 const menu = useCategoryMenu()
 const year = new Date().getFullYear()
 </script>

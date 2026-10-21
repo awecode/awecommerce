@@ -2,7 +2,6 @@ import { createPage } from '@nuxt/test-utils/e2e'
 import { afterAll, describe, expect, test } from 'vitest'
 import { OrderService } from '@awecommerce/service/apps/order/services/order'
 import { ProductService } from '@awecommerce/service/apps/product/services/product'
-import { StoreSettingsService } from '@awecommerce/service/apps/store/services/store'
 import { startFakeStripe, WEBHOOK_SECRET } from '../../../packages/payment-stripe/tests/fake-stripe'
 import { setupStorefront, url } from './helpers'
 
@@ -16,7 +15,6 @@ describe.skipIf(!url)('paying online', async () => {
   process.env.NUXT_STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET
   process.env.NUXT_STRIPE_API_BASE = stripe.base
   const db = await setupStorefront()
-  await new StoreSettingsService(db).updateSettings({ currency: 'USD', locale: 'en-US' })
   const unique = (prefix: string) => `${prefix}-${Date.now()}${Math.floor(Math.random() * 1000)}`
 
   // A guest's checkout of one item at 30, paying by card: on Stripe's page

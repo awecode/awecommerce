@@ -11,7 +11,7 @@ const toast = useToast()
 const confirm = useConfirm()
 const money = useMoney()
 const queryCache = useQueryCache()
-const { data: store } = useStoreSettings()
+const store = useStoreSettings()
 const cancelModal = useOverlay().create(CancelOrderModal)
 
 const id = computed(() => Number(route.params.id))
@@ -146,7 +146,7 @@ const phone = computed(() => (order.value?.guestUser as { phone?: string } | nul
                     <tr v-for="line in order.lines" :key="line.id" class="align-top [&>td]:px-3 [&>td]:py-2">
                       <td>
                         <div class="flex gap-3">
-                          <UAvatar :src="line.imageUrl ?? undefined" icon="i-lucide-image" size="md" class="rounded" />
+                          <UAvatar :src="resizedImage(line.imageUrl, 128)" icon="i-lucide-image" size="md" class="rounded" />
                           <div class="min-w-0">
                             <NuxtLink :to="`/products/${line.productId}`" class="font-medium text-highlighted hover:underline">{{ line.productName }}</NuxtLink>
                             <p v-for="o in line.options" :key="o.name" class="text-xs text-muted">{{ o.name }}: {{ o.value }}</p>
