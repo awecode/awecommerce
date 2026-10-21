@@ -68,9 +68,9 @@ const groups = computed(() => [
       <template #header="{ collapsed }">
         <div class="flex items-center gap-2 px-1 min-w-0">
           <div class="size-6 shrink-0 rounded-md bg-primary text-inverted grid place-items-center text-xs font-semibold">
-            {{ (store?.name || 'Store').slice(0, 1).toUpperCase() }}
+            {{ store.name.slice(0, 1).toUpperCase() }}
           </div>
-          <span v-if="!collapsed" class="truncate text-sm font-semibold">{{ store?.name || 'Store' }}</span>
+          <span v-if="!collapsed" class="truncate text-sm font-semibold">{{ store.name }}</span>
         </div>
       </template>
 

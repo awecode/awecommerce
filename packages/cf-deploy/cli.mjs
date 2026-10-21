@@ -55,7 +55,7 @@ Asked once and saved: both site URLs, the store's name, currency and locale,
 payment methods, ORDER_HASH_SECRET, the R2 bucket and its public URL, SES and
 payment provider keys, Google Analytics and image resizing.
 Custom domains go in wrangler.jsonc when a URL is not *.workers.dev.
-Preview URLs stay off. R2 CORS allows both site origins.
+Preview URLs stay off. R2 CORS lets both sites read the bucket (GET and HEAD).
 `)
 }
 
@@ -424,12 +424,14 @@ const varsForApp = (appKey, state) => {
     NUXT_PUBLIC_STORE_CURRENCY: state.store.currency,
     NUXT_PUBLIC_STORE_LOCALE: state.store.locale,
     NUXT_S3_PUBLIC_URL: state.r2PublicUrl,
+    // Staff get the admin role when their account is created, which happens
+    // in whichever app they sign in to first, so both apps need the list
+    NUXT_AUTH_ADMIN_EMAILS: state.adminEmails,
   }
   if (appKey === 'backoffice') {
     // Auth URL = this Worker; SITE_URL = the storefront (order email links).
     vars.BETTER_AUTH_URL = backoffice
     vars.NUXT_PUBLIC_SITE_URL = storefront
-    if (state.adminEmails) vars.NUXT_AUTH_ADMIN_EMAILS = state.adminEmails
   } else {
     // One public URL. Sign-in falls back to NUXT_PUBLIC_SITE_URL here.
     vars.NUXT_PUBLIC_SITE_URL = storefront
@@ -1285,7 +1287,7 @@ const managedR2DevUrl = async (bucketName) => {
 
 // One R2 bucket for both Workers (binding R2): backoffice uploads and storefront
 // profile photos. Its public URL is NUXT_S3_PUBLIC_URL (a custom domain or r2.dev).
-// CORS allows both site origins.
+// CORS lets both sites read the bucket (GET and HEAD); nothing is uploaded from the browser.
 const ensureR2 = async (state) => {
   console.log('\n== R2 (object storage) ==')
   if (state.r2BucketName && state.r2PublicUrl) {
@@ -1398,8 +1400,9 @@ const ensureR2 = async (state) => {
   if (origins.length) {
     const rules = [
       {
-        allowed: { origins, methods: ['GET', 'HEAD', 'PUT', 'POST'], headers: ['*'] },
-        exposeHeaders: ['ETag'],
+        // Read only: uploads go through the apps, which write with the R2
+        // binding or the S3 keys, never from the browser
+        allowed: { origins, methods: ['GET', 'HEAD'] },
         maxAgeSeconds: 86400,
       },
     ]

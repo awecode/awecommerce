@@ -65,12 +65,12 @@ export default defineNuxtConfig({
       // (NUXT_PUBLIC_SITE_URL). Order emails link to the order there, also
       // when the backoffice sends them.
       siteUrl: '',
-      // The store's name (NUXT_PUBLIC_STORE_NAME), its currency, an ISO 4217
+      // The store's name (NUXT_PUBLIC_STORE_NAME, Awecommerce Store when unset), its currency, an ISO 4217
       // code such as USD that prices are in (NUXT_PUBLIC_STORE_CURRENCY), and
       // its locale, a BCP 47 tag such as en-US for how prices, numbers and
       // dates are written (NUXT_PUBLIC_STORE_LOCALE)
       store: {
-        name: '',
+        name: 'Awecommerce Store',
         currency: 'USD',
         locale: 'en-US',
       },

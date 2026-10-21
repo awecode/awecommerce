@@ -9,7 +9,7 @@ const menu = useCategoryMenu()
 const { count, drawerOpen } = useCart()
 const { user, signOut } = useAuth()
 
-const storeName = computed(() => settings.value?.name || 'Store')
+const storeName = computed(() => settings.value.name)
 // Back to the same page after signing in. Its path and query only: the hash
 // is never sent to the server (and on the sign-in link's page it holds the
 // token), and the sign-in pages themselves have nothing to come back to.

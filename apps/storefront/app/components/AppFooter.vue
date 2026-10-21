@@ -11,7 +11,7 @@ const year = new Date().getFullYear()
   <footer class="mt-24 border-t border-default bg-muted">
     <UContainer class="grid gap-10 py-14 sm:grid-cols-3">
       <div class="space-y-2">
-        <p class="font-serif text-xl font-semibold">{{ settings?.name || 'Store' }}</p>
+        <p class="font-serif text-xl font-semibold">{{ settings.name }}</p>
         <p class="max-w-xs text-sm text-muted">{{ store.tagline }}</p>
       </div>
       <nav v-if="menu.length" aria-label="Shop">
@@ -32,7 +32,7 @@ const year = new Date().getFullYear()
       </nav>
     </UContainer>
     <UContainer>
-      <p class="border-t border-default py-6 text-xs text-muted">© {{ year }} {{ settings?.name || 'Store' }}</p>
+      <p class="border-t border-default py-6 text-xs text-muted">© {{ year }} {{ settings.name }}</p>
     </UContainer>
   </footer>
 </template>

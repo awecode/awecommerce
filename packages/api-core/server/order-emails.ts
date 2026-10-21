@@ -56,7 +56,7 @@ export const orderEmailContent = (
   store: OrderEmailStore,
   link: string,
 ): { subject: string; html: string; text: string } => {
-  const storeName = store.name || 'our store'
+  const storeName = store.name
   const money = (value: number | string) =>
     new Intl.NumberFormat(store.locale || 'en-US', { style: 'currency', currency: store.currency || 'USD' }).format(Number(value))
   const number = `#${order.id}`

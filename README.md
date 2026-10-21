@@ -16,7 +16,7 @@ Each app extends one API layer, so it serves only that API and `useFetch` knows 
 
 ## Run the apps
 
-Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`; the storefront uses `NUXT_PUBLIC_SITE_URL` when it is unset) and `BETTER_AUTH_SECRET`. The storefront also needs `NUXT_PAYMENT_METHODS` (such as `cash_on_delivery,pay_later`): no payment method is on by default, and without one no order can be placed (see Payments). Set the store's name, currency and locale with `NUXT_PUBLIC_STORE_NAME`, `NUXT_PUBLIC_STORE_CURRENCY` (ISO 4217, `USD` when unset) and `NUXT_PUBLIC_STORE_LOCALE` (BCP 47, `en-US` when unset), the same in both apps; changing them needs a redeploy. Migrate the database first, for the library's tables and the auth tables:
+Each app reads its settings from the environment (see the app's `.env.example`): the database (`NUXT_POSTGRES_URL`), its public URL (`BETTER_AUTH_URL`; the storefront uses `NUXT_PUBLIC_SITE_URL` when it is unset) and `BETTER_AUTH_SECRET`. The storefront also needs `NUXT_PAYMENT_METHODS` (such as `cash_on_delivery,pay_later`): no payment method is on by default, and without one no order can be placed (see Payments). Set the store's name, currency and locale with `NUXT_PUBLIC_STORE_NAME` (`Awecommerce Store` when unset), `NUXT_PUBLIC_STORE_CURRENCY` (ISO 4217, `USD` when unset) and `NUXT_PUBLIC_STORE_LOCALE` (BCP 47, `en-US` when unset), the same in both apps; changing them needs a redeploy. Migrate the database first, for the library's tables and the auth tables:
 
 ```sh
 pnpm migrate        # library tables (see packages/service/README.md)
@@ -68,7 +68,7 @@ The store API tests check the Workers path on Node: every request is made to loo
 
 1. A Worker: you pick the name (such as `awecommerce-backoffice`), it is written to the app's `wrangler.jsonc`, and a placeholder Worker is created so Workers Builds has something to attach to. Preview URLs are turned off.
 2. The GitHub connection (once) and a production build trigger on the default branch. Build: `pnpm install --frozen-lockfile && pnpm --filter <app> run build:cf`. Deploy: `pnpm --filter <app> exec wrangler deploy --config .output/server/wrangler.json`, the config Nitro writes on Workers Builds (the app's `wrangler.jsonc` plus the built Worker and its assets).
-3. Settings shared by both apps, asked on the backoffice's turn and saved: both public URLs, the staff admin emails, the payment methods, `ORDER_HASH_SECRET` (random unless you give one), the store's name, currency and locale, the storefront's Google Analytics id and home page row size, whether to resize images, the R2 bucket (picked or created) with its public address (a custom domain or r2.dev) and CORS for both sites, then the SES keys and the keys of each payment method turned on.
+3. Settings shared by both apps, asked on the backoffice's turn and saved: both public URLs, the staff admin emails, the payment methods, `ORDER_HASH_SECRET` (random unless you give one), the store's name, currency and locale, the storefront's Google Analytics id and home page row size, whether to resize images, the R2 bucket (picked or created) with its public address (a custom domain or r2.dev) and CORS letting both sites read it (GET and HEAD only; uploads go through the apps), then the SES keys and the keys of each payment method turned on.
 4. Vars written into the app's `wrangler.jsonc`, with the R2 binding `R2` and, when the URL is not on `workers.dev`, the URL's host as the Worker's custom domain. Secrets are set on the Worker right away.
 5. The build variable `IMAGE_PROVIDER=cloudflare` on the trigger when image resizing is on (removed when off). It is read when the app is built, so it is not a Worker var. Turn on image transformations for the sites' zone and allow the R2 public host as a source.
 6. A first build, if you confirm.
@@ -77,8 +77,8 @@ What each Worker gets:
 
 | | Backoffice | Storefront |
 |---|---|---|
-| Vars | `BETTER_AUTH_URL` (its own URL), `NUXT_PUBLIC_SITE_URL` (the storefront's URL), `NUXT_AUTH_ADMIN_EMAILS` | `NUXT_PUBLIC_SITE_URL` (its own URL; sign-in uses it, as `BETTER_AUTH_URL` is not set), `NUXT_PAYMENT_METHODS`, `NUXT_HOME_CATEGORY_ROW_SIZE`, `NUXT_PUBLIC_GOOGLE_ANALYTICS_ID` when given |
-| Vars, both | `NUXT_PUBLIC_STORE_NAME`, `NUXT_PUBLIC_STORE_CURRENCY`, `NUXT_PUBLIC_STORE_LOCALE`, `NUXT_S3_PUBLIC_URL`, `NUXT_SES_REGION`, `NUXT_SES_FROM_EMAIL`, `NUXT_SES_ACCESS_KEY_ID` | the same |
+| Vars | `BETTER_AUTH_URL` (its own URL), `NUXT_PUBLIC_SITE_URL` (the storefront's URL) | `NUXT_PUBLIC_SITE_URL` (its own URL; sign-in uses it, as `BETTER_AUTH_URL` is not set), `NUXT_PAYMENT_METHODS`, `NUXT_HOME_CATEGORY_ROW_SIZE`, `NUXT_PUBLIC_GOOGLE_ANALYTICS_ID` when given |
+| Vars, both | `NUXT_AUTH_ADMIN_EMAILS`, `NUXT_PUBLIC_STORE_NAME`, `NUXT_PUBLIC_STORE_CURRENCY`, `NUXT_PUBLIC_STORE_LOCALE`, `NUXT_S3_PUBLIC_URL`, `NUXT_SES_REGION`, `NUXT_SES_FROM_EMAIL`, `NUXT_SES_ACCESS_KEY_ID` | the same |
 | Secrets | `BETTER_AUTH_SECRET` (its own), `ORDER_HASH_SECRET`, `NUXT_SES_SECRET_KEY`, `NUXT_STRIPE_SECRET_KEY` with Stripe | `BETTER_AUTH_SECRET` (its own), `ORDER_HASH_SECRET`, `NUXT_SES_SECRET_KEY`; with Stripe `NUXT_STRIPE_SECRET_KEY` and `NUXT_STRIPE_WEBHOOK_SECRET`; with Thuprai Pay `NUXT_THUPRAI_PAY_API_KEY` and `NUXT_THUPRAI_PAY_WEBHOOK_SECRET` |
 
 Optional payment vars (`NUXT_STRIPE_LABEL`, `NUXT_THUPRAI_PAY_API_BASE`, `NUXT_THUPRAI_PAY_LABEL`, `NUXT_THUPRAI_PAY_DESCRIPTION`) are written when given. Which settings each payment method needs, and in which app, is one list, `PAYMENT_PROVIDERS` in `packages/cf-deploy/cli.mjs`: add your provider's id and settings there. An id that is not in the list is still put in `NUXT_PAYMENT_METHODS`, with a warning, and its keys are yours to set. The Stripe and Thuprai Pay webhooks still have to be set up at the gateways (see Payments).
@@ -144,7 +144,7 @@ IMAGE_PROVIDER=cloudflare pnpm --filter @awecommerce/storefront cf:deploy   # wi
 
 ## Sign-in
 
-Customers and staff sign in the same way, with a magic link, and share one `users` table. Staff are users with `role: 'admin'`; emails listed in `NUXT_AUTH_ADMIN_EMAILS` get it when they first sign in. Without SES settings, development prints the sign-in email to the console.
+Customers and staff sign in the same way, with a magic link, and share one `users` table. Staff are users with `role: 'admin'`; emails listed in `NUXT_AUTH_ADMIN_EMAILS` get it when their account is created, in whichever app they sign in to first, so set the same list in both apps. Without SES settings, development prints the sign-in email to the console.
 
 - Every `/api/admin` route needs an admin (401 signed out, 403 for customers), set in `packages/api-admin/server/middleware/admin.ts` rather than through an environment variable.
 - The storefront's pages are public (`authRequiredByDefault: false`); a page that needs a customer sets `definePageMeta({ auth: true })`. The backoffice's pages need sign-in by default and send guests to `/login`.

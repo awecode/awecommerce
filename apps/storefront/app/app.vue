@@ -5,7 +5,7 @@ const settings = useStoreSettings()
 const route = useRoute()
 const { siteUrl: configuredSiteUrl, googleAnalyticsId } = useRuntimeConfig().public
 const siteUrl = (configuredSiteUrl || useRequestURL().origin).replace(/\/$/, '')
-const storeName = computed(() => settings.value?.name || 'Store')
+const storeName = computed(() => settings.value.name)
 
 useHead({
   htmlAttrs: { lang: () => settings.value?.locale ?? 'en-US' },
