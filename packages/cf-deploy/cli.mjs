@@ -988,9 +988,9 @@ const listTriggers = async (tag) => {
 const appBuildCommand = (worker) =>
   `pnpm install --frozen-lockfile && pnpm --filter ${worker.filter} run build:cf`
 
-// On Workers Builds (WORKERS_CI is set), Nitro writes .output/server/wrangler.json:
-// the app's wrangler.jsonc plus the built entry and assets. Deploy that, from the
-// app's directory. Nitro's output is already bundled for Workers.
+// build:cf writes .output/server/wrangler.json: the app's wrangler.jsonc plus
+// the built entry and assets. Deploy that, from the app's directory. Nitro's
+// output is already bundled for Workers.
 const appDeployCommand = (worker) =>
   `pnpm --filter ${worker.filter} exec wrangler deploy --config .output/server/wrangler.json`
 
